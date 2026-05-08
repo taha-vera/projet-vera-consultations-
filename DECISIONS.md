@@ -146,3 +146,29 @@ pas au token déclaré — investigation requise", pas "coalition prouvée".
 - P16: reveal() cost_override fixe=0.2 → backoff progressif (anti-scraping lecture)
 - P17: session_hash rotation sur ingest() si batch_count > seuil — anti-tracking sans reveal()
 - P18: _noisy_epsilon fingerprint par paliers — ajouter variance pour casser correlation temporelle buckets 0.1
+
+---
+
+## VERA NAV — Statut Mai 2026
+
+VERA NAV (Network Anonymization Vector) a été retiré du repo public le 8 mai 2026 suite à un audit critique mené par 8 IA indépendantes (ChatGPT, Mistral, DeepSeek, Meta, Gemini, Perplexity, Mythos, Copilot).
+
+### Failles critiques identifiées (convergences multi-IA)
+
+1. Coalition detection statistiquement faible — corrélation Pearson seuil 0.5, faux positifs/négatifs probables (6/8 IA)
+2. Race conditions — dicts partagés sans verrou complet sur _purge_sessions, _budgets, _last_activity (5/8 IA)
+3. DoS mémoire — pas de cap sur _sessions, _session_meta, _budgets (5/8 IA)
+4. Permissions clé non bloquantes — warnings.warn seulement, pas exit en production (4/8 IA)
+5. Process/reveal incohérents — cost_override permet contournement partiel du rate-limiting (4/8 IA)
+
+### Décision
+
+VERA NAV reste un prototype interne. La production utilisera :
+- VERA Core v2.7.6 comme moteur DP
+- Infrastructure de rate-limiting et anti-coalition fournie par le client
+- Réécriture NAV v2 prévue après le premier pilote réel
+
+### Honnêteté
+
+Le NAV original avait 13/13 tests fonctionnels — mais ces tests ne couvraient pas les failles structurelles identifiées par l'audit critique. La présence de tests verts ne suffit pas à valider la sécurité d'un système de production.
+
