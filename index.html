@@ -1,4 +1,17 @@
-<!DOCTYPE html>
+cd ~/vera-landing
+
+sed -i 's/Votre revenu\./Votre vie privée\./g' index.html
+
+sed -i 's/Vous êtes rémunéré pour votre contribution\./VERA permet de contribuer à l\x27analyse audio sans exposer vos données personnelles\./g' index.html
+
+git add index.html
+git commit -m "Fix VERA messaging"
+git push
+
+
+
+
+D!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
