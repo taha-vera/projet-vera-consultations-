@@ -1,263 +1,71 @@
-cd ~/vera-landing
-
-sed -i 's/Votre revenu\./Votre vie privée\./g' index.html
-
-sed -i 's/Vous êtes rémunéré pour votre contribution\./VERA permet de contribuer à l\x27analyse audio sans exposer vos données personnelles\./g' index.html
-
-git add index.html
-git commit -m "Fix VERA messaging"
-git push
-
-
-
-
 <!DOCTYPE html>
-<html lang="fr">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VERA — Écoutez. Protégez. Gagnez.</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#050505; color:#fff; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
-    nav { padding:1.5rem 2rem; display:flex; justify-content:space-between; align-items:center; }
-    .logo { color:#00ff88; font-weight:700; font-size:1.3rem; letter-spacing:2px; }
-    .nav-links a { color:#888; text-decoration:none; margin-left:2rem; font-size:0.9rem; }
-    .nav-links a:hover { color:#fff; }
-
-    .hero { text-align:center; padding:6rem 2rem 4rem; }
-    .hero-tag { color:#00ff88; font-size:0.85rem; letter-spacing:3px; text-transform:uppercase; margin-bottom:1.5rem; }
-    .hero h1 { font-size:3rem; font-weight:700; line-height:1.2; margin-bottom:1.5rem; }
-    .hero h1 span { color:#00ff88; }
-    .hero-sub { color:#888; font-size:1.1rem; max-width:500px; margin:0 auto 2.5rem; line-height:1.7; }
-    .btn-primary { background:#00ff88; color:#000; padding:0.9rem 2rem; border-radius:8px; text-decoration:none; font-weight:700; font-size:1rem; }
-    .btn-secondary { color:#888; padding:0.9rem 2rem; text-decoration:none; font-size:1rem; margin-left:1rem; }
-    .btn-secondary:hover { color:#fff; }
-
-    .how { padding:4rem 2rem; text-align:center; }
-    .how h2 { font-size:2rem; margin-bottom:3rem; }
-    .steps { display:flex; justify-content:center; gap:2rem; flex-wrap:wrap; }
-    .step { background:#111; border:1px solid #222; border-radius:12px; padding:2rem; max-width:220px; }
-    .step-icon { font-size:2.5rem; margin-bottom:1rem; }
-    .step h3 { color:#fff; margin-bottom:0.5rem; }
-    .step p { color:#666; font-size:0.9rem; line-height:1.6; }
-
-    .promise { padding:4rem 2rem; text-align:center; background:#0a0a0a; }
-    .promise h2 { font-size:2rem; margin-bottom:2rem; }
-    .promise-list { max-width:500px; margin:0 auto; text-align:left; }
-    .promise-list div { padding:0.75rem 0; border-bottom:1px solid #1a1a1a; color:#ccc; font-size:0.95rem; }
-    .promise-link { color:#555; font-size:0.8rem; margin-top:1.5rem; display:block; text-align:center; }
-    .promise-link a { color:#00ff88; text-decoration:none; }
-
-    .join { padding:4rem 2rem; text-align:center; }
-    .join h2 { font-size:2rem; margin-bottom:0.5rem; }
-    .join-sub { color:#666; margin-bottom:2rem; }
-    .form { max-width:440px; margin:0 auto; background:#111; border:1px solid #222; border-radius:12px; padding:2rem; text-align:left; }
-    .form label { color:#888; font-size:0.85rem; display:block; margin-bottom:0.4rem; }
-    .form input, .form select { width:100%; padding:0.75rem; background:#0a0a0a; border:1px solid #333; border-radius:6px; color:#fff; font-size:0.95rem; margin-bottom:1.2rem; }
-    .consent-box { background:#0a0a0a; border-radius:6px; padding:1rem; margin-bottom:1.2rem; }
-    .consent-box label { color:#666; font-size:0.82rem; line-height:1.6; cursor:pointer; }
-    .consent-box input { width:auto; margin-right:0.5rem; margin-bottom:0; }
-    .btn-join { width:100%; padding:1rem; background:#00ff88; color:#000; border:none; border-radius:8px; font-size:1rem; font-weight:700; cursor:pointer; }
-    .btn-join:hover { background:#00dd77; }
-    .result { margin-top:1rem; padding:1rem; background:#0a0a0a; border-radius:6px; color:#00ff88; text-align:center; display:none; font-size:0.9rem; line-height:1.6; }
-
-    footer { padding:2rem; text-align:center; color:#333; font-size:0.8rem; border-top:1px solid #111; }
-    footer a { color:#555; text-decoration:none; margin:0 0.5rem; }
-    footer a:hover { color:#888; }
-  </style>
+  <title>VERA</title>
 </head>
-<body>
+<body style="font-family:Arial;text-align:center;padding:40px">
 
-<nav>
-  <div class="logo">VERA</div>
-  <div class="nav-links">
-    <a href="#how">Comment</a>
-    <a href="#join">Rejoindre</a>
-    <a href="technical.html">Technique</a>
-    <a href="https://github.com/taha-vera/ancre-v08" target="_blank">GitHub</a>
-  </div>
-</nav>
+<h1>VERA</h1>
 
-<section class="hero">
-  <div class="hero-tag">Privacy · Audio · Rémunération</div>
-  <h1>Votre écoute.
-Votre contrôle.
-Votre vie privée.</h1>
-  <p class="hero-sub">
-    VERA vous permet de contribuer à l'analyse audio de façon totalement anonyme.
-    Vos données restent sur votre appareil. VERA permet de contribuer à l'analyse audio
-sans exposer vos données personnelles.
-  </p>
-  <a href="#join" class="btn-primary">Rejoindre gratuitement</a>
-  <a href="#how" class="btn-secondary">En savoir plus</a>
-</section>
+<p>Analyse audio locale (TEST SIMPLE)</p>
 
-<section class="how" id="how">
-  <h2>Comment ça marche</h2>
-  <div class="steps">
-    <div class="step">
-      <div class="step-icon">🎵</div>
-      <h3>Vous écoutez</h3>
-      <p>Radio, podcast, streaming — vous indiquez ce que vous écoutez.</p>
-    </div>
-    <div class="step">
-      <div class="step-icon">🔒</div>
-      <h3>VERA protège</h3>
-      <p>Vos données sont anonymisées sur votre appareil. Rien d'individuel ne part vers nos serveurs.</p>
-    </div>
-    <div class="step">
-      <div class="step-icon">💶</div>
-      <h3>Vous gagnez</h3>
-      <p>VERA revend les statistiques anonymes aux opérateurs IA. Vous recevez votre part.</p>
-    </div>
-  </div>
-</section>
+<input type="file" id="audioFile">
+<br><br>
 
-<section class="promise" id="promise">
-  <h2>Nos engagements</h2>
-  <div class="promise-list">
-    <div>✅ Vos données audio restent sur votre appareil</div>
-    <div>✅ Nous ne vendons jamais vos données individuelles</div>
-    <div>✅ Vous pouvez arrêter et tout effacer à tout moment</div>
-    <div>✅ Conforme RGPD — droit à l'effacement garanti</div>
-    <div>✅ Code source ouvert et auditable</div>
-  </div>
-  <span class="promise-link">
-    Détails techniques et scientifiques :
-    <a href="https://github.com/taha-vera/ancre-v08">protocole ANCRE →</a>
-  </span>
-</section>
+<audio id="audio" controls></audio>
 
-<section class="join" id="join">
-  <h2>Rejoindre VERA</h2>
-  <p class="join-sub">Gratuit. Anonyme. Vous pouvez arrêter à tout moment.</p>
-  <div class="form">
-    <label>Email (optionnel)</label>
-    <input type="email" id="vera-email" placeholder="votre@email.com">
-    <label>Ce que vous écoutez</label>
-    <select id="vera-media">
-      <option value="">-- Choisir --</option>
-      <option value="radio_france">Radio France (FIP, France Inter...)</option>
-      <option value="spotify">Spotify</option>
-      <option value="deezer">Deezer</option>
-      <option value="podcast">Podcasts</option>
-      <option value="other">Autre</option>
-    </select>
-    <div class="consent-box">
-      <label>
-        <input type="checkbox" id="vera-consent">
-        Je consens à partager mon signal d'écoute anonymisé avec VERA.
-        Je comprends que mes données individuelles ne quittent jamais mon appareil
-        et sont effacées après traitement. Conforme RGPD Art.25.
-      </label>
-    </div>
-    <button class="btn-join" onclick="veraJoin()">Rejoindre VERA</button>
-    <div class="result" id="vera-result"></div>
-  </div>
-</section>
-
-
-
-<style>
-.sb { background:#0a0a0a; border:1px solid #333; color:#aaa; padding:0.5rem 1rem; border-radius:6px; cursor:pointer; }
-.sb:hover,.sb.active { background:#00ff88; color:#000; border-color:#00ff88; font-weight:700; }
-</style>
-<script>
-var S={fip:"https://icecast.radiofrance.fr/fip-midfi.mp3",franceinter:"https://icecast.radiofrance.fr/franceinter-midfi.mp3",franceculture:"https://icecast.radiofrance.fr/franceculture-midfi.mp3",francemusique:"https://icecast.radiofrance.fr/francemusique-midfi.mp3",mouv:"https://icecast.radiofrance.fr/mouv-midfi.mp3",franceinfo:"https://icecast.radiofrance.fr/franceinfo-midfi.mp3"};
-function play(id){
-  document.querySelectorAll('.sb').forEach(function(b){b.classList.remove('active')});
-  document.getElementById('b-'+id).classList.add('active');
-  window.open(S[id],'_blank');
-  document.getElementById('sig').style.display='block';
-  document.getElementById('sv').textContent=(0.55+Math.random()*0.15).toFixed(4);
-}
-</script>
-<footer>
-  <div>
-    <a href="technical.html">Documentation technique</a>
-    <a href="https://github.com/taha-vera/ancre-v08" target="_blank">GitHub ANCRE</a>
-    <a href="mailto:tahahouari@hotmail.fr">Contact</a>
-  </div>
-  <div style="margin-top:0.5rem;">© 2026 VERA Protocol — tahahouari@hotmail.fr</div>
-</footer>
-
-<script>
-function veraJoin() {
-  const consent = document.getElementById("vera-consent").checked;
-  const media = document.getElementById("vera-media").value;
-  if (!consent) { alert("Veuillez cocher la case de consentement."); return; }
-  if (!media) { alert("Veuillez indiquer ce que vous écoutez."); return; }
-  const result = document.getElementById("vera-result");
-  result.style.display = "block";
-  result.innerHTML = "✅ Bienvenue dans VERA.<br>Votre signal est protégé.<br>Nous vous contacterons dès le lancement.";
-}
-</script>
-
-
-<div style="margin-top:30px;text-align:center">
-<button onclick="openRadio()" style="
-padding:14px 22px;
-border:none;
-border-radius:12px;
-font-size:16px;
-cursor:pointer;
-background:#111;
-color:white;
-">
-🎵 Écouter Radio France
-</button>
-</div>
-
-
-<div style="margin:40px auto;text-align:center">
-
-<h3>🎵 Analyse audio locale</h3>
-
-<input
-  type="file"
-  id="audioFile"
-  accept="audio/*"
-  style="margin:20px"
-/>
-
-<br>
-
-<audio
-  id="audio"
-  controls
-  style="width:90%;max-width:520px"
-></audio>
-
-<p id="status">WAITING AUDIO</p>
-
+<p id="status">WAITING</p>
 <h2 id="signal">0.000</h2>
 
-<p style="opacity:.7">
-Analyse locale via WebAudio API.<br>
-Aucune donnée audio ne quitte votre appareil.
-</p>
-
-</div>
-
-
-<button id="startBtn" style="padding:10px 20px;font-size:16px">
-START VERA
-</button>
-
 <script>
-document.getElementById('startBtn').onclick = async () => {
-  const fileInput = document.getElementById('audioFile');
-  fileInput.click();
-};
-</script>
+console.log("VERA JS LOADED");
 
+const fileInput = document.getElementById('audioFile');
+const audio = document.getElementById('audio');
+const signal = document.getElementById('signal');
+const status = document.getElementById('status');
 
-<script>
-alert("VERA JS OK");
-console.log("VERA JS OK");
+let ctx, analyser;
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  audio.src = URL.createObjectURL(file);
+
+  ctx = ctx || new AudioContext();
+  const src = ctx.createMediaElementSource(audio);
+
+  analyser = analyser || ctx.createAnalyser();
+  analyser.fftSize = 256;
+
+  src.connect(analyser);
+  analyser.connect(ctx.destination);
+
+  await audio.play();
+
+  status.textContent = "LIVE";
+
+  const data = new Uint8Array(analyser.frequencyBinCount);
+
+  function tick() {
+    if (audio.paused) return;
+
+    analyser.getByteFrequencyData(data);
+
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i];
+
+    signal.textContent =
+      ((sum / data.length) / 255).toFixed(3);
+
+    requestAnimationFrame(tick);
+  }
+
+  tick();
+});
 </script>
 
 </body>
-
 </html>
