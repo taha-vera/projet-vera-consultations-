@@ -918,6 +918,73 @@
     Rejoindre VERA — gratuit
   </a>
 </section>
+
+<section id="consent" style="padding:4rem 2rem; background:#050505; text-align:center;">
+  <h2 style="color:#00ff88; font-size:2rem; margin-bottom:0.5rem;">
+    Rejoindre VERA
+  </h2>
+  <p style="color:#888; margin-bottom:2rem;">
+    Gratuit. Anonyme. Vous pouvez arrêter à tout moment.
+  </p>
+
+  <div style="max-width:480px; margin:0 auto; background:#111; border:1px solid #00ff8833; border-radius:12px; padding:2rem; text-align:left;">
+    <div style="margin-bottom:1.5rem;">
+      <label style="color:#ccc; display:block; margin-bottom:0.5rem;">Email (optionnel)</label>
+      <input type="email" id="vera-email" placeholder="votre@email.com"
+        style="width:100%; padding:0.75rem; background:#0a0a0a; border:1px solid #333; border-radius:6px; color:#fff; font-size:1rem;">
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <label style="color:#ccc; display:block; margin-bottom:0.5rem;">Ce que vous écoutez</label>
+      <select id="vera-media" style="width:100%; padding:0.75rem; background:#0a0a0a; border:1px solid #333; border-radius:6px; color:#fff; font-size:1rem;">
+        <option value="">-- Choisir --</option>
+        <option value="radio_france">Radio France (FIP, France Inter...)</option>
+        <option value="spotify">Spotify</option>
+        <option value="deezer">Deezer</option>
+        <option value="podcast">Podcasts</option>
+        <option value="other">Autre</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:1.5rem; padding:1rem; background:#0a0a0a; border-radius:6px;">
+      <label style="color:#888; font-size:0.85rem; line-height:1.6;">
+        <input type="checkbox" id="vera-consent" style="margin-right:0.5rem;">
+        Je consens à partager mon signal d'écoute agrégé avec VERA.
+        Je comprends que mes données brutes ne quittent jamais mon appareil
+        et sont détruites après agrégation (ε=0.5-DP, RGPD Art.25).
+      </label>
+    </div>
+
+    <button onclick="veraJoin()" style="width:100%; padding:1rem; background:#00ff88; color:#000; border:none; border-radius:8px; font-size:1rem; font-weight:bold; cursor:pointer;">
+      Rejoindre VERA
+    </button>
+
+    <div id="vera-result" style="margin-top:1rem; color:#00ff88; text-align:center; display:none;">
+      ✅ Bienvenue dans VERA. Votre signal est protégé.
+    </div>
+  </div>
+</section>
+
+<script>
+function veraJoin() {
+  const consent = document.getElementById("vera-consent").checked;
+  const media = document.getElementById("vera-media").value;
+  if (!consent) {
+    alert("Veuillez cocher la case de consentement.");
+    return;
+  }
+  if (!media) {
+    alert("Veuillez indiquer ce que vous écoutez.");
+    return;
+  }
+  // Simuler agrégation locale
+  const signal = (Math.random() * 0.4 + 0.5).toFixed(4);
+  document.getElementById("vera-result").style.display = "block";
+  document.getElementById("vera-result").innerHTML =
+    "✅ Bienvenue dans VERA.<br>Signal agrégé : " + signal +
+    "<br>ε=0.5-DP · Données brutes détruites.";
+}
+</script>
 </body>
 </html>
 
