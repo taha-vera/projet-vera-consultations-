@@ -170,7 +170,7 @@ function play(id){
   document.querySelectorAll('.sb').forEach(function(b){b.classList.remove('active')});
   document.getElementById('b-'+id).classList.add('active');
   var p=document.getElementById('player');
-  p.src=S[id]; p.play();
+  p.src=S[id]; p.play().catch(function(){window.open(S[id],'_blank');});
   document.getElementById('sig').style.display='block';
   document.getElementById('sv').textContent=(0.55+Math.random()*0.15).toFixed(4);
 }
