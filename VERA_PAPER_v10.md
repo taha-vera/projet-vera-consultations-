@@ -573,7 +573,7 @@ as a hard invariant. QED.
 
 ---
 
-## 4.1 Overview
+## 5.1 Overview
 
 This section formally specifies the security properties VERA provides, the operational assumptions under which those properties hold, and the attack classes that are explicitly outside the protocol's scope.
 
@@ -585,9 +585,9 @@ This distinction is not a limitation of design — it is a deliberate architectu
 
 ---
 
-## 4.2 Threat Model
+## 5.2 Threat Model
 
-### 4.2.1 Attacker Classes
+### 5.2.1 Attacker Classes
 
 VERA considers four attacker classes with increasing privilege:
 
@@ -598,7 +598,7 @@ VERA considers four attacker classes with increasing privilege:
 | **A2 — Malicious Platform Operator** | A licensed VERA operator deliberately attempting to bypass privacy guarantees | Partially defended: contractual and audit mechanisms; see §4.5 |
 | **A3 — Compromised Client Binary** | An attacker with full control over the client device or application binary before noise injection | Out of scope: see §4.4 |
 
-### 4.2.2 Primary Attack Surfaces
+### 5.2.2 Primary Attack Surfaces
 
 **Averaging attacks (TEST1A class).** TEST1A probes the confidentiality of the global aggregate mean under repeated LDP queries — a property that is mathematically unachievable for any Local Differential Privacy mechanism by the post-processing impossibility theorem: N independent noisy observations of the same true mean converge to that mean at rate O(1/√N), regardless of ε. This is not a VERA-specific limitation; it is a fundamental consequence of the LDP model. VERA therefore makes no claim of global-aggregate confidentiality. The guaranteed property — tested and confirmed in TEST1B — is individual-level protection: no single user's contribution is recoverable from any exported aggregate. The server-side invariants (K ≥ 100, TMoM, wK = 0.3, ε_total ≤ 1.5) enforce this separation. Selling the aggregate to AI operators is the intended use case; protecting who contributed what is the privacy guarantee.
 
@@ -610,7 +610,7 @@ VERA considers four attacker classes with increasing privilege:
 
 ---
 
-## 4.3 Security Assumptions
+## 5.3 Security Assumptions
 
 VERA's guarantees are conditioned on the following assumptions. These are not aspirational — they are explicit preconditions. If any assumption is violated, the corresponding guarantee degrades as described.
 
@@ -626,7 +626,7 @@ VERA's guarantees are conditioned on the following assumptions. These are not as
 
 ---
 
-## 4.4 Compromised Client: Scope Boundary
+## 5.4 Compromised Client: Scope Boundary
 
 An attacker with full control of the client binary prior to noise injection — including root access, supply-chain compromise, hypervisor attacks, or physical access — can in principle extract raw data before VERA processes it. This is not a vulnerability in VERA's design; it is a property of all software-layer privacy systems.
 
@@ -640,7 +640,7 @@ This is a weaker property than hardware attestation. It is also deployable on an
 
 ---
 
-## 4.5 Malicious Platform Operator
+## 5.5 Malicious Platform Operator
 
 VERA is a B2B protocol. The entities that deploy and operate VERA — radio platforms, streaming services, AI operators — are the primary trust anchors in the system, not the end users. A platform operator that deliberately bypasses noise injection, retains raw data in violation of the SLA, or exports sub-K aggregates is the highest-privilege attacker class (A2).
 
@@ -656,7 +656,7 @@ This is the correct scope boundary. Claiming cryptographic enforcement against a
 
 ---
 
-## 4.6 Rationale: VERA Does Not Require TEEs
+## 5.6 Rationale: VERA Does Not Require TEEs
 
 A natural question for reviewers: why does VERA not mandate Trusted Execution Environments (SGX enclaves, TrustZone secure worlds, or equivalent) for client-side noise injection?
 
@@ -677,7 +677,7 @@ The system remains coherent and its guarantees remain valid in an environment wh
 
 ---
 
-## 4.7 Deployment Trade-offs
+## 5.7 Deployment Trade-offs
 
 | Property | TEE-Mandatory Design | VERA Design |
 |---|---|---|
@@ -693,7 +693,7 @@ VERA optimizes for universal deployability and open auditability over maximal cl
 
 ---
 
-## 4.8 Non-Goals
+## 5.8 Non-Goals
 
 The following are explicitly outside VERA's security scope:
 
@@ -709,7 +709,7 @@ The following are explicitly outside VERA's security scope:
 
 ---
 
-## 4.9 Summary: Security Boundary
+## 5.9 Summary: Security Boundary
 
 | Threat | VERA Coverage |
 |---|---|
