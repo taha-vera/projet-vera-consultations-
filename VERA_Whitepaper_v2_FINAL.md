@@ -105,3 +105,8 @@ Not random. Laplace noise should be symmetric.
 **Root Cause Analysis**:
 - Primary: Clipping/trimming interaction wi
 
+
+## 6. Engineering Tradeoffs: What We Sacrificed for Production
+
+(section complète avec 3 couches biais, K réglementaire, TEE crypto-only)
+
