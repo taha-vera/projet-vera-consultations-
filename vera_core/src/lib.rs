@@ -1,7 +1,5 @@
-pub mod attestation;
-pub mod hpke;
-pub mod replay;
-pub mod session;
-pub mod transport;
-pub mod ffi;
-pub mod vera_client;
+pub mod vera_sevsnssp;
+pub mod vera_hpke;
+pub mod vera_core;
+pub mod vera_android;
+pub mod vera_http_client;
