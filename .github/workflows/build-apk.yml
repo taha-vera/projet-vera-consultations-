@@ -13,15 +13,13 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: aarch64-linux-android
     - name: Build APK
       run: |
         cd VERA-Pulse
         chmod +x gradlew
-        ./gradlew assembleRelease
+        ./gradlew assembleDebug
     - uses: actions/upload-artifact@v4
+      if: success()
       with:
         name: vera-pulse-apk
-        path: VERA-Pulse/app/build/outputs/apk/release/
+        path: VERA-Pulse/app/build/outputs/apk/debug/
