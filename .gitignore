@@ -4,3 +4,4 @@ __pycache__/
 *.png
 Cargo.lock
 target/
+__pycache__/
