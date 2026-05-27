@@ -1,3 +1,4 @@
-#!/bin/bash
-cd "$(dirname "$0")"
+#!/bin/sh
+APP_NAME="Gradle"
+APP_HOME=$(cd "$(dirname "$0")" && pwd)
 exec gradle "$@"
