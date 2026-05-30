@@ -1,6 +1,5 @@
 [workspace]
 resolver = "2"
-
 members = [
-    "vera_core"
+    "vera-radio",
 ]
