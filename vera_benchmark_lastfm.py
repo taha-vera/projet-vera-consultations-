@@ -86,7 +86,7 @@ print("\n" + "="*60)
 print("VERA BENCHMARK — Last.fm hetrec2011 (données réelles)")
 print("="*60)
 
-path = os.path.expanduser("~/Vera-protocole-clean/lastfm_data/user_artists.dat")
+path = os.path.expanduser("~/Vera-protocole/user_artists.dat")
 print("Chargement des données...")
 t0 = time.time()
 data = load_lastfm(path)
