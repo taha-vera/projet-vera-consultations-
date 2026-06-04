@@ -125,7 +125,7 @@ Total: 34 tests, 0 failed.
 
 ## Keywords
 
-`VERA` `Differential Privacy` `GDPR Art.17` `Audio Aggregation` `B2B` `SACEM` `Privacy-Utility Frontier` `k-anonymity` `Discrete Laplace` `AI Training Data` `Open Protocol` `Cultural Data` `Redistribution` `Rust`
+`VERA` `Differential Privacy` `GDPR Art.17` `Audio Aggregation` `B2B` `SACEM` `Privacy-Utility Frontier` `k-anonymity` `Discrete Laplace` `AI Training Data` `Open Protocol` `Cultural Data` `Redistribution` `Rust` `AI Act` `Radio France` `weak signals` `privacy-preserving` `open-source infrastructure` `artist compensation` `FFT` `vera-spine` `PETS 2027`
 
 ## Badges
 
