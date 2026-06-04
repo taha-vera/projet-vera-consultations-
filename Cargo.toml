@@ -5,4 +5,5 @@ members = [
     "vera-sib/spine",
     "vera-cli",
     "vera-sdk/radio",
+    "vera-sdk/client",
 ]
