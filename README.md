@@ -108,3 +108,17 @@ Repository: github.com/taha-vera/Protocole-Vera
 Email: tahahouari@hotmail.fr
 
 VERA Protocol — privacy-preserving, model-agnostic, open-source.
+
+## Test Coverage
+
+| Category | Tests |
+|----------|-------|
+| Security | reject_nan_in_ingest, reject_nan_in_revenue, reject_inf_in_ingest, reject_mixed_nan_values |
+| Differential Privacy | test_budget_exhausted, test_budget_remaining, test_budget_consume_ok, test_dlap_output_bounded, test_dlap_no_float_holes |
+| VERA Invariants | prop_decay_monotone, prop_decay_in_unit_interval, prop_redistribution_sum_exact |
+| Stress | stress_1k_cohorts_100k_graphlets, stress_redistribution_500_cohorts, stress_purge_1000_graphlets, stress_float_accumulation |
+| Serialization | serial_golden_snapshot, serial_graphlet_no_raw_value, serial_graphlet_mean_preserved |
+| SDK Radio | test_three_lines_integration, test_no_export_below_k100, test_budget_decreases |
+| SDK Client | test_purchase_ok, test_budget_exceeded, test_redistribution_model |
+
+Total: 34 tests, 0 failed.
