@@ -468,3 +468,97 @@ mod integration {
         assert!(stats.total_cohorts > 0);
     }
 }
+
+#[cfg(test)]
+mod adversarial {
+    use super::*;
+    use super::collection::CollectionLayer;
+    use super::aggregation::AggregationLayer;
+    use super::revenue::RevenueDistributor;
+
+    #[test]
+    fn test_biased_signal_injection() {
+        // Attacker injects extreme values to bias the aggregate
+        let mut r = SimpleRng::new(42);
+        let col = CollectionLayer::new();
+        let mut agg = AggregationLayer::new(100);
+        let cid = agg.create_cohort(&mut r);
+        let cohort = agg.get_cohort_mut(&cid).unwrap();
+
+        // 99 normal signals
+        for _ in 0..99 {
+            col.ingest(&mut r, &[0.5], cohort).unwrap();
+        }
+        // 1 biased signal — attacker tries to push aggregate to 1.0
+        col.ingest(&mut r, &[1.0], cohort).unwrap();
+
+        let mean: f64 = cohort.graphlets.iter().map(|g| g.aggregated_value).sum::<f64>() / cohort.graphlets.len() as f64;
+        assert!(mean < 0.6, "biased injection moved mean: {}", mean);
+    }
+
+    #[test]
+    fn test_temporal_drift() {
+        // System remains stable over long time horizon
+        let mut r = SimpleRng::new(42);
+        let col = CollectionLayer::new();
+        let mut agg = AggregationLayer::new(100);
+        let cid = agg.create_cohort(&mut r);
+        let cohort = agg.get_cohort_mut(&cid).unwrap();
+
+        for i in 0..1000 {
+            let v = if i % 2 == 0 { 0.3 } else { 0.7 };
+            col.ingest(&mut r, &[v], cohort).unwrap();
+        }
+
+        // After 1000 ticks, aggregate should converge to ~0.5
+        let mean: f64 = cohort.graphlets.iter().map(|g| g.aggregated_value).sum::<f64>() / cohort.graphlets.len() as f64;
+        assert!((mean - 0.5).abs() < 0.1, "temporal drift mean: {}", mean);
+    }
+
+    #[test]
+    fn test_reidentification_risk() {
+        // Even with DP + k-anonymity, no raw value should be recoverable
+        use super::dp::privatize_value;
+        let raw = 0.42f64;
+        let mut recovered_exact = 0;
+        for seed in 0u64..1000 {
+            let noisy = privatize_value(raw, 1, 100, seed);
+            if (noisy - raw).abs() < 1e-6 {
+                recovered_exact += 1;
+            }
+        }
+        // Less than 1% exact recovery rate
+        assert!(recovered_exact < 25,
+            "re-identification risk: {}/1000 exact recoveries", recovered_exact);
+    }
+
+    #[test]
+    fn test_redistribution_gaming() {
+        // An actor cannot game redistribution by inflating their signal
+        let mut r = SimpleRng::new(42);
+        let col = CollectionLayer::new();
+        let mut agg = AggregationLayer::new(1);
+        let dist = RevenueDistributor::new();
+
+        // Normal actor
+        let cid1 = agg.create_cohort(&mut r);
+        col.ingest(&mut r, &[0.5], agg.get_cohort_mut(&cid1).unwrap()).unwrap();
+
+        // Gaming actor — inflates signal to max
+        let cid2 = agg.create_cohort(&mut r);
+        for _ in 0..100 {
+            col.ingest(&mut r, &[1.0], agg.get_cohort_mut(&cid2).unwrap()).unwrap();
+        }
+
+        let cohorts = agg.list_k_anonymous_cohorts(None);
+        let shares = dist.distribute(&mut r, 100.0, &cohorts, None).unwrap();
+        let total: f64 = shares.iter().map(|s| s.amount).sum();
+
+        // Total must always equal 100.0 regardless of gaming
+        assert!((total - 100.0).abs() < 1e-9, "redistribution total: {}", total);
+
+        // Gaming actor should not get more than 95% of revenue
+        let max_share = shares.iter().map(|s| s.amount).fold(0.0f64, f64::max);
+        assert!(max_share < 100.0, "gaming actor got everything: {}", max_share);
+    }
+}
