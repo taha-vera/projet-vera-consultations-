@@ -66,15 +66,15 @@ impl VeraClientSDK {
         // 60% to contributors (radios + artists via SACEM)
         // 25% to rights holders
         // 15% VERA commission
-        let redistribution = total_price * 0.60;
-        let rights = total_price * 0.25;
-        let commission = total_price * 0.15;
+        let redistribution = total_price * 0.70;
+        // SACEM decides internal split
+        let commission = total_price * 0.30;
 
         let receipt = PurchaseReceipt {
             operator_id: self.operator_id.clone(),
             total_patterns: patterns.len(),
             total_price,
-            redistribution_amount: redistribution + rights,
+            redistribution_amount: redistribution,
             vera_commission: commission,
         };
 
@@ -115,8 +115,8 @@ mod tests {
         let receipt = client.purchase(patterns).unwrap();
         assert_eq!(receipt.total_patterns, 10);
         assert!((receipt.total_price - 100.0).abs() < 1e-9);
-        assert!((receipt.vera_commission - 15.0).abs() < 1e-9);
-        assert!((receipt.redistribution_amount - 85.0).abs() < 1e-9);
+        assert!((receipt.vera_commission - 30.0).abs() < 1e-9);
+        assert!((receipt.redistribution_amount - 70.0).abs() < 1e-9);
     }
 
     #[test]
@@ -132,8 +132,8 @@ mod tests {
         let patterns = mock_patterns(1, 100.0);
         let receipt = client.purchase(patterns).unwrap();
         // 60% contributors + 25% rights = 85% redistributed
-        assert!((receipt.redistribution_amount - 85.0).abs() < 1e-9);
+        assert!((receipt.redistribution_amount - 70.0).abs() < 1e-9);
         // 15% VERA commission
-        assert!((receipt.vera_commission - 15.0).abs() < 1e-9);
+        assert!((receipt.vera_commission - 30.0).abs() < 1e-9);
     }
 }
