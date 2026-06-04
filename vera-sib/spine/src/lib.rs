@@ -424,3 +424,4 @@ mod pre_lock {
         assert!(col.ingest(&mut r,&[0.5,f64::NAN,0.3],c).is_err());
     }
 }
+pub mod dp;
