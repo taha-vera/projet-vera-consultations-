@@ -136,3 +136,56 @@ Le déploiement en production nécessite un partenariat IoT SAFE avec un MVNO ou
 *SAS VERA — Paris, France*  
 *Contact : tahahouari@hotmail.fr*  
 *Dépôt VERA : github.com/taha-vera/Vera-protocole-*
+## Modules
+
+| Module | Description | Status |
+|--------|-------------|--------|
+| vera-spine | Core protocol — 5 formal invariants + DP | ✅ v3.1.1 |
+| vera-radio | FFT audio capture + privacy export | ✅ v0.2 |
+| vera-sib | Empirical validation RSR/CSC/SUR/PHL | ✅ 9/9 |
+| vera-cli | Automation — setup/test/deploy/audit/import | ✅ v0.1 |
+| vera-benchmark | Economic proof — Last.fm real data | ✅ ρ=1.0 |
+| vera-pulse | Opt-in contributors + redistribution | 🔄 Planned |
+
+---
+
+## Results
+
+| Metric | Value | Meaning |
+|--------|-------|---------|
+| Spearman ρ | 1.0000 | Signal utility perfectly preserved |
+| K effective | 119 users | K-anonymity respected |
+| Latency | 0.134ms/artist | Production ready |
+| RSR | ≤ 0.53 | Reconstruction impossible |
+| CSC | ≤ 1e-6 | No cross-session correlation |
+| SUR | > 0.97 | 97% signal utility retained |
+| PHL | ≤ 1h | Temporal decay validated |
+| Tests | 31 passed | 0 failed |
+
+---
+
+## Quick Start
+
+Clone the repo, build and test with Cargo or VERA CLI.
+
+    cargo build --workspace
+    cargo test --workspace --lib
+    ./target/debug/vera test
+
+## Security
+
+- Discrete Laplace — resistant to Mironov 2012 float attack
+- Formal DP BudgetTracker — composition enforced
+- Zeroize — raw values erased from RAM after aggregation
+- See VERA_THREAT_MODEL_COMPLETE.md
+
+## License
+
+Open-source — see LICENSE
+
+## Contact
+
+Repository: github.com/taha-vera/Protocole-Vera
+Email: tahahouari@hotmail.fr
+
+VERA Protocol — privacy-preserving, model-agnostic, open-source.
