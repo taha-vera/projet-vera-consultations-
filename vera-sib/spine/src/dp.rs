@@ -1,5 +1,7 @@
-//! Discrete Laplace mechanism — résistant à l'attaque Mironov (2012)
-//! Remplace l'inversion CDF sur f64 par un échantillonnage sur entiers.
+use getrandom;
+
+// Discrete Laplace mechanism — résistant à l'attaque Mironov (2012)
+// Remplace l'inversion CDF sur f64 par un échantillonnage sur entiers.
 
 /// Discret Laplace : échantillonne Z ~ DLap(sensitivity/epsilon)
 /// Algorithme : Ghosh, Roughgarden, Sundarajan (2012)
@@ -31,9 +33,14 @@ pub fn discrete_laplace(sensitivity: u64, epsilon_num: u64, epsilon_den: u64, rn
 /// Applique DLap sur une valeur agrégée normalisée [0,1]
 /// Quantifie sur 1_000_000 pour éviter les f64
 pub fn privatize_value(value: f64, epsilon_num: u64, epsilon_den: u64, rng_state: u64) -> f64 {
+    // Cryptographic entropy from OS
+    let mut buf = [0u8; 8];
+    getrandom::getrandom(&mut buf).unwrap_or(());
+    let entropy = u64::from_le_bytes(buf);
+    let mixed_seed = rng_state.wrapping_mul(6364136223846793005).wrapping_add(entropy);
     let scale = 1_000_000u64;
     let quantized = (value * scale as f64).round() as i64;
-    let noise = discrete_laplace(1, epsilon_num, epsilon_den, rng_state);
+    let noise = discrete_laplace(1, epsilon_num, epsilon_den, mixed_seed);
     let noisy = (quantized + noise).clamp(0, scale as i64);
     noisy as f64 / scale as f64
 }
