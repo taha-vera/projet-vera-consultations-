@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://taha-vera.github.io/Protocole-Vera/sitemap.xml
