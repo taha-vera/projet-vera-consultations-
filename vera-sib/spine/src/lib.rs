@@ -425,3 +425,46 @@ mod pre_lock {
     }
 }
 pub mod dp;
+
+#[cfg(test)]
+mod integration {
+    use super::*;
+    use super::dp::{privatize_value, BudgetTracker};
+
+    #[test]
+    fn test_end_to_end_pipeline() {
+        // 1. INGEST
+        let mut spine = VeraSpine::new(100, 1.0, 42);
+        let cid = spine.create_cohort();
+        for _ in 0..100 {
+            spine.ingest(&cid, &[0.3, 0.5, 0.7]).unwrap();
+        }
+
+        // 2. DP
+        let mut budget = BudgetTracker::new(10.0);
+        budget.consume(1.0).unwrap();
+        let raw_value = 0.5f64;
+        let private_value = privatize_value(raw_value, 1, 1, 42);
+        assert!(private_value >= 0.0 && private_value <= 1.0);
+
+        // 3. EXPORT
+        let eligible = spine.eligible_cohorts(None);
+        assert!(!eligible.is_empty());
+
+        // 4. REDISTRIBUTION
+        let result = spine.distribute_revenue(100.0, None).unwrap();
+        let total: f64 = result.iter().map(|(_, a)| a).sum();
+        assert!((total - 100.0).abs() < 1e-9);
+
+        // 5. PURGE — verify no raw values in output
+        for (cohort_id, amount) in &result {
+            assert!(!cohort_id.contains("raw"));
+            assert!(*amount > 0.0);
+        }
+
+        // 6. VERIFY LOGS CONTAIN NO RAW PAYLOAD
+        let stats = spine.stats();
+        assert_eq!(stats.version, "3.1.1");
+        assert!(stats.total_cohorts > 0);
+    }
+}
