@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const VERA_VERSION: &str = "3.1.1";
@@ -84,6 +83,7 @@ impl RevenueShare {
 }
 
 pub mod collection {
+    use zeroize::Zeroize;
     use super::{Graphlet,Cohort,Layer,SimpleRng};
     pub struct CollectionLayer { pub layer:Layer }
     impl CollectionLayer {
@@ -92,6 +92,8 @@ pub mod collection {
             if values.is_empty(){return Err("empty".into());}
             if values.iter().any(|v|!v.is_finite()){return Err("non-finite value".into());}
             let agg=values.iter().sum::<f64>()/values.len() as f64;
+            let mut raw = values.to_vec();
+            raw.zeroize();
             let g=Graphlet::new(rng,agg,values.len());
             let id=g.graphlet_id.clone();
             cohort.add_graphlet(g); Ok(id)
