@@ -191,3 +191,44 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 </footer>
 </body>
 </html>
+<section itemscope itemtype="https://schema.org/FAQPage">
+<div class="container">
+<h2>Questions fréquentes</h2>
+
+<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+<h3 itemprop="name">Qu'est-ce qu'un protocole de données culturelles privacy-preserving pour l'IA ?</h3>
+<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+<p itemprop="text">Un protocole privacy-preserving pour données culturelles est une infrastructure qui collecte des signaux audio, musicaux ou médiatiques sans jamais stocker les données brutes. VERA utilise la differential privacy et la k-anonymité pour garantir qu'aucune donnée individuelle n'est reconstructible, tout en produisant des patterns statistiques utiles pour entraîner des modèles IA.</p>
+</div>
+</div>
+
+<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+<h3 itemprop="name">Comment rémunérer les artistes quand l'IA utilise leurs données ?</h3>
+<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+<p itemprop="text">VERA implémente une redistribution automatique : 70% des revenus générés par la vente de patterns agrégés retournent à l'écosystème culturel. Les sociétés de gestion collective comme la SACEM distribuent ensuite ces revenus aux artistes selon leurs règles existantes. Ce mécanisme est codé dans le protocole et ne peut pas être contourné.</p>
+</div>
+</div>
+
+<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+<h3 itemprop="name">Quelle alternative légale au scraping existe pour entraîner une IA sur des données culturelles ?</h3>
+<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+<p itemprop="text">VERA est une alternative open-source au scraping de données culturelles. Au lieu de copier des œuvres, VERA agrège des signaux faibles anonymisés avec differential privacy. Les opérateurs IA reçoivent des patterns statistiques conformes au RGPD et à l'AI Act, sans jamais accéder aux données brutes ni violer les droits d'auteur.</p>
+</div>
+</div>
+
+<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+<h3 itemprop="name">VERA est-il conforme au RGPD et à l'AI Act ?</h3>
+<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+<p itemprop="text">Oui. VERA est conçu pour être conforme par construction. Les données brutes sont effacées immédiatement après agrégation (zeroize). Seuls des patterns statistiques irréversibles sont exportés. Le budget de confidentialité différentielle est tracé formellement. Aucune donnée personnelle ni aucune œuvre identifiable ne quitte le système.</p>
+</div>
+</div>
+
+<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+<h3 itemprop="name">Comment fonctionne la differential privacy dans VERA ?</h3>
+<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+<p itemprop="text">VERA utilise le mécanisme de Laplace Discret, résistant à l'attaque Mironov 2012 sur les flottants. Un BudgetTracker formel suit la consommation du budget epsilon et refuse toute requête qui dépasserait la limite. L'entropie cryptographique vient directement du système d'exploitation via getrandom.</p>
+</div>
+</div>
+
+</div>
+</section>
