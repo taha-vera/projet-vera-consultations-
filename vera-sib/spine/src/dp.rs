@@ -75,3 +75,76 @@ mod tests {
         assert!(unique.len() > 1, "distribution trop concentrée");
     }
 }
+
+/// Budget tracker — composition séquentielle
+/// Refuse toute requête qui dépasserait epsilon_max
+pub struct BudgetTracker {
+    pub epsilon_max: f64,
+    pub epsilon_used: f64,
+    pub query_count: u64,
+}
+
+impl BudgetTracker {
+    pub fn new(epsilon_max: f64) -> Self {
+        assert!(epsilon_max > 0.0, "epsilon_max doit être > 0");
+        Self { epsilon_max, epsilon_used: 0.0, query_count: 0 }
+    }
+
+    /// Tente de consommer epsilon_cost — retourne Err si budget épuisé
+    pub fn consume(&mut self, epsilon_cost: f64) -> Result<(), String> {
+        if self.epsilon_used + epsilon_cost > self.epsilon_max {
+            return Err(format!(
+                "Budget DP épuisé: utilisé={:.4} + coût={:.4} > max={:.4}",
+                self.epsilon_used, epsilon_cost, self.epsilon_max
+            ));
+        }
+        self.epsilon_used += epsilon_cost;
+        self.query_count += 1;
+        Ok(())
+    }
+
+    pub fn remaining(&self) -> f64 {
+        self.epsilon_max - self.epsilon_used
+    }
+
+    pub fn is_exhausted(&self) -> bool {
+        self.remaining() <= 0.0
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+
+    #[test]
+    fn test_budget_consume_ok() {
+        let mut t = BudgetTracker::new(1.0);
+        assert!(t.consume(0.3).is_ok());
+        assert!(t.consume(0.3).is_ok());
+        assert!(t.consume(0.3).is_ok());
+        assert!((t.epsilon_used - 0.9).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_budget_exhausted() {
+        let mut t = BudgetTracker::new(1.0);
+        t.consume(0.9).unwrap();
+        assert!(t.consume(0.2).is_err());
+    }
+
+    #[test]
+    fn test_budget_remaining() {
+        let mut t = BudgetTracker::new(2.0);
+        t.consume(0.5).unwrap();
+        assert!((t.remaining() - 1.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_budget_query_count() {
+        let mut t = BudgetTracker::new(10.0);
+        t.consume(1.0).unwrap();
+        t.consume(1.0).unwrap();
+        t.consume(1.0).unwrap();
+        assert_eq!(t.query_count, 3);
+    }
+}
