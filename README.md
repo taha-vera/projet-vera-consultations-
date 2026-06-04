@@ -122,3 +122,30 @@ VERA Protocol — privacy-preserving, model-agnostic, open-source.
 | SDK Client | test_purchase_ok, test_budget_exceeded, test_redistribution_model |
 
 Total: 34 tests, 0 failed.
+
+## Keywords
+
+`VERA` `Differential Privacy` `GDPR Art.17` `Audio Aggregation` `B2B` `SACEM` `Privacy-Utility Frontier` `k-anonymity` `Discrete Laplace` `AI Training Data` `Open Protocol` `Cultural Data` `Redistribution` `Rust`
+
+## Badges
+
+
+
+![Tests](https://img.shields.io/badge/tests-37%20passed-green)
+
+
+
+
+![Spearman](https://img.shields.io/badge/Spearman-1.0000-blue)
+
+
+
+
+![License](https://img.shields.io/badge/license-open--source-orange)
+
+
+
+
+![Version](https://img.shields.io/badge/SPINE-v3.1.1-purple)
+
+
