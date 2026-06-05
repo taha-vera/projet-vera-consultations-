@@ -1,0 +1,728 @@
+{
+  "capture_date": "2026-06-05",
+  "protocol": "VERA v3.1.1",
+  "stations": {
+    "fip": {
+      "mean": {
+        "bass": 0.8366,
+        "mid": 0.1428,
+        "treble": 0.0207
+      },
+      "variance": {
+        "bass": 0.001526,
+        "mid": 0.001402,
+        "treble": 3.4e-05
+      },
+      "spectral_entropy_mean": 13.7935,
+      "zcr_mean": 0.0529,
+      "speech_music_ratio": 0.1707,
+      "transitions_count": 5,
+      "spectral_fingerprint_32d": [
+        0.326589,
+        0.137007,
+        0.079235,
+        0.055209,
+        0.042944,
+        0.036545,
+        0.030465,
+        0.027174,
+        0.027471,
+        0.026036,
+        0.022417,
+        0.021947,
+        0.01813,
+        0.017209,
+        0.01656,
+        0.016396,
+        0.014757,
+        0.01368,
+        0.0128,
+        0.010592,
+        0.009426,
+        0.008126,
+        0.008075,
+        0.00639,
+        0.005573,
+        0.004669,
+        0.003794,
+        0.000726,
+        4.2e-05,
+        8e-06,
+        5e-06,
+        4e-06
+      ],
+      "hourly_evolution": {
+        "hour_1": {
+          "bass": 0.8366,
+          "mid": 0.1428,
+          "treble": 0.0207
+        }
+      },
+      "temporal_evolution": [
+        {
+          "bass": 0.8434,
+          "mid": 0.1383,
+          "treble": 0.0183
+        },
+        {
+          "bass": 0.6576,
+          "mid": 0.3189,
+          "treble": 0.0236
+        },
+        {
+          "bass": 0.8208,
+          "mid": 0.1627,
+          "treble": 0.0166
+        },
+        {
+          "bass": 0.8296,
+          "mid": 0.1535,
+          "treble": 0.0168
+        },
+        {
+          "bass": 0.8036,
+          "mid": 0.1796,
+          "treble": 0.0168
+        },
+        {
+          "bass": 0.8389,
+          "mid": 0.1329,
+          "treble": 0.0282
+        },
+        {
+          "bass": 0.8572,
+          "mid": 0.1142,
+          "treble": 0.0287
+        },
+        {
+          "bass": 0.8621,
+          "mid": 0.1071,
+          "treble": 0.0308
+        },
+        {
+          "bass": 0.8311,
+          "mid": 0.134,
+          "treble": 0.0348
+        },
+        {
+          "bass": 0.872,
+          "mid": 0.106,
+          "treble": 0.0221
+        }
+      ],
+      "chunks_analyzed": 49,
+      "duration_minutes": 49,
+      "stability_score": 0.9013
+    },
+    "france-culture": {
+      "mean": {
+        "bass": 0.6878,
+        "mid": 0.2742,
+        "treble": 0.0379
+      },
+      "variance": {
+        "bass": 0.001944,
+        "mid": 0.001585,
+        "treble": 5.7e-05
+      },
+      "spectral_entropy_mean": 15.3236,
+      "zcr_mean": 0.0898,
+      "speech_music_ratio": 0.3987,
+      "transitions_count": 9,
+      "spectral_fingerprint_32d": [
+        0.28954,
+        0.140888,
+        0.078513,
+        0.056888,
+        0.050835,
+        0.032988,
+        0.034436,
+        0.026809,
+        0.02958,
+        0.028412,
+        0.023596,
+        0.023837,
+        0.024542,
+        0.023323,
+        0.0204,
+        0.018235,
+        0.014131,
+        0.013232,
+        0.013158,
+        0.010985,
+        0.009379,
+        0.008708,
+        0.007309,
+        0.006339,
+        0.005286,
+        0.004427,
+        0.003541,
+        0.000658,
+        1.5e-05,
+        4e-06,
+        3e-06,
+        2e-06
+      ],
+      "hourly_evolution": {
+        "hour_1": {
+          "bass": 0.6878,
+          "mid": 0.2742,
+          "treble": 0.0379
+        }
+      },
+      "temporal_evolution": [
+        {
+          "bass": 0.6664,
+          "mid": 0.3004,
+          "treble": 0.0332
+        },
+        {
+          "bass": 0.6744,
+          "mid": 0.2829,
+          "treble": 0.0427
+        },
+        {
+          "bass": 0.6485,
+          "mid": 0.3118,
+          "treble": 0.0397
+        },
+        {
+          "bass": 0.5813,
+          "mid": 0.3689,
+          "treble": 0.0498
+        },
+        {
+          "bass": 0.6393,
+          "mid": 0.3187,
+          "treble": 0.042
+        },
+        {
+          "bass": 0.6199,
+          "mid": 0.337,
+          "treble": 0.0431
+        },
+        {
+          "bass": 0.6448,
+          "mid": 0.3158,
+          "treble": 0.0394
+        },
+        {
+          "bass": 0.6188,
+          "mid": 0.3393,
+          "treble": 0.0419
+        },
+        {
+          "bass": 0.6316,
+          "mid": 0.3248,
+          "treble": 0.0437
+        },
+        {
+          "bass": 0.6498,
+          "mid": 0.3089,
+          "treble": 0.0413
+        }
+      ],
+      "chunks_analyzed": 49,
+      "duration_minutes": 49,
+      "stability_score": 0.8804
+    },
+    "france-info": {
+      "mean": {
+        "bass": 0.7353,
+        "mid": 0.2455,
+        "treble": 0.0192
+      },
+      "variance": {
+        "bass": 0.010481,
+        "mid": 0.010192,
+        "treble": 1.7e-05
+      },
+      "spectral_entropy_mean": 15.2059,
+      "zcr_mean": 0.067,
+      "speech_music_ratio": 0.3339,
+      "transitions_count": 12,
+      "spectral_fingerprint_32d": [
+        0.385161,
+        0.136731,
+        0.078527,
+        0.056698,
+        0.052151,
+        0.047511,
+        0.034934,
+        0.026921,
+        0.032643,
+        0.02816,
+        0.021068,
+        0.017804,
+        0.015999,
+        0.013086,
+        0.010752,
+        0.009014,
+        0.006972,
+        0.00553,
+        0.00429,
+        0.003562,
+        0.002981,
+        0.002618,
+        0.002032,
+        0.00157,
+        0.001126,
+        0.00102,
+        0.000948,
+        0.000181,
+        5e-06,
+        2e-06,
+        2e-06,
+        1e-06
+      ],
+      "hourly_evolution": {
+        "hour_1": {
+          "bass": 0.7353,
+          "mid": 0.2455,
+          "treble": 0.0192
+        }
+      },
+      "temporal_evolution": [
+        {
+          "bass": 0.7822,
+          "mid": 0.1959,
+          "treble": 0.0218
+        },
+        {
+          "bass": 0.7992,
+          "mid": 0.1842,
+          "treble": 0.0166
+        },
+        {
+          "bass": 0.8285,
+          "mid": 0.1592,
+          "treble": 0.0122
+        },
+        {
+          "bass": 0.787,
+          "mid": 0.1951,
+          "treble": 0.0179
+        },
+        {
+          "bass": 0.7722,
+          "mid": 0.2044,
+          "treble": 0.0234
+        },
+        {
+          "bass": 0.7834,
+          "mid": 0.1988,
+          "treble": 0.0178
+        },
+        {
+          "bass": 0.791,
+          "mid": 0.1867,
+          "treble": 0.0223
+        },
+        {
+          "bass": 0.7704,
+          "mid": 0.207,
+          "treble": 0.0226
+        },
+        {
+          "bass": 0.8281,
+          "mid": 0.1495,
+          "treble": 0.0224
+        },
+        {
+          "bass": 0.8007,
+          "mid": 0.1815,
+          "treble": 0.0178
+        }
+      ],
+      "chunks_analyzed": 49,
+      "duration_minutes": 49,
+      "stability_score": 0.3104
+    },
+    "france-inter": {
+      "mean": {
+        "bass": 0.802,
+        "mid": 0.1737,
+        "treble": 0.0243
+      },
+      "variance": {
+        "bass": 0.002998,
+        "mid": 0.003172,
+        "treble": 1.5e-05
+      },
+      "spectral_entropy_mean": 13.9757,
+      "zcr_mean": 0.0685,
+      "speech_music_ratio": 0.2166,
+      "transitions_count": 10,
+      "spectral_fingerprint_32d": [
+        0.357278,
+        0.105375,
+        0.075358,
+        0.042458,
+        0.044249,
+        0.039694,
+        0.021733,
+        0.020681,
+        0.020897,
+        0.02156,
+        0.023008,
+        0.021796,
+        0.022054,
+        0.022342,
+        0.019583,
+        0.017261,
+        0.01573,
+        0.015914,
+        0.014763,
+        0.013664,
+        0.013051,
+        0.011967,
+        0.010499,
+        0.009103,
+        0.008221,
+        0.005847,
+        0.004903,
+        0.000955,
+        3.6e-05,
+        9e-06,
+        6e-06,
+        5e-06
+      ],
+      "hourly_evolution": {
+        "hour_1": {
+          "bass": 0.802,
+          "mid": 0.1737,
+          "treble": 0.0243
+        }
+      },
+      "temporal_evolution": [
+        {
+          "bass": 0.8159,
+          "mid": 0.1633,
+          "treble": 0.0208
+        },
+        {
+          "bass": 0.8136,
+          "mid": 0.166,
+          "treble": 0.0204
+        },
+        {
+          "bass": 0.7556,
+          "mid": 0.221,
+          "treble": 0.0234
+        },
+        {
+          "bass": 0.7274,
+          "mid": 0.2491,
+          "treble": 0.0234
+        },
+        {
+          "bass": 0.7224,
+          "mid": 0.2557,
+          "treble": 0.022
+        },
+        {
+          "bass": 0.7288,
+          "mid": 0.2465,
+          "treble": 0.0247
+        },
+        {
+          "bass": 0.756,
+          "mid": 0.2239,
+          "treble": 0.0201
+        },
+        {
+          "bass": 0.708,
+          "mid": 0.2664,
+          "treble": 0.0256
+        },
+        {
+          "bass": 0.7128,
+          "mid": 0.2636,
+          "treble": 0.0236
+        },
+        {
+          "bass": 0.7677,
+          "mid": 0.2109,
+          "treble": 0.0214
+        }
+      ],
+      "chunks_analyzed": 49,
+      "duration_minutes": 49,
+      "stability_score": 0.7938
+    },
+    "france-musique": {
+      "mean": {
+        "bass": 0.7831,
+        "mid": 0.1984,
+        "treble": 0.0185
+      },
+      "variance": {
+        "bass": 0.008902,
+        "mid": 0.009107,
+        "treble": 5.1e-05
+      },
+      "spectral_entropy_mean": 14.5078,
+      "zcr_mean": 0.0584,
+      "speech_music_ratio": 0.2533,
+      "transitions_count": 16,
+      "spectral_fingerprint_32d": [
+        0.376336,
+        0.133856,
+        0.079537,
+        0.055185,
+        0.050094,
+        0.040538,
+        0.032469,
+        0.026362,
+        0.023927,
+        0.020372,
+        0.018179,
+        0.016378,
+        0.015964,
+        0.016448,
+        0.014909,
+        0.013553,
+        0.012433,
+        0.010147,
+        0.008239,
+        0.007083,
+        0.006068,
+        0.005046,
+        0.004267,
+        0.00362,
+        0.003177,
+        0.002875,
+        0.00243,
+        0.000478,
+        2e-05,
+        4e-06,
+        3e-06,
+        2e-06
+      ],
+      "hourly_evolution": {
+        "hour_1": {
+          "bass": 0.7831,
+          "mid": 0.1984,
+          "treble": 0.0185
+        }
+      },
+      "temporal_evolution": [
+        {
+          "bass": 0.8731,
+          "mid": 0.1188,
+          "treble": 0.0082
+        },
+        {
+          "bass": 0.8299,
+          "mid": 0.1488,
+          "treble": 0.0213
+        },
+        {
+          "bass": 0.8666,
+          "mid": 0.1173,
+          "treble": 0.0161
+        },
+        {
+          "bass": 0.7757,
+          "mid": 0.1996,
+          "treble": 0.0246
+        },
+        {
+          "bass": 0.8236,
+          "mid": 0.1563,
+          "treble": 0.0201
+        },
+        {
+          "bass": 0.8317,
+          "mid": 0.1563,
+          "treble": 0.012
+        },
+        {
+          "bass": 0.8098,
+          "mid": 0.1682,
+          "treble": 0.0219
+        },
+        {
+          "bass": 0.804,
+          "mid": 0.1757,
+          "treble": 0.0203
+        },
+        {
+          "bass": 0.8262,
+          "mid": 0.1556,
+          "treble": 0.0183
+        },
+        {
+          "bass": 0.8334,
+          "mid": 0.1443,
+          "treble": 0.0222
+        }
+      ],
+      "chunks_analyzed": 49,
+      "duration_minutes": 49,
+      "stability_score": 0.398
+    },
+    "mouv": {
+      "mean": {
+        "bass": 0.8165,
+        "mid": 0.1489,
+        "treble": 0.0346
+      },
+      "variance": {
+        "bass": 0.000527,
+        "mid": 0.000386,
+        "treble": 3e-05
+      },
+      "spectral_entropy_mean": 13.4777,
+      "zcr_mean": 0.0776,
+      "speech_music_ratio": 0.1824,
+      "transitions_count": 4,
+      "spectral_fingerprint_32d": [
+        0.244573,
+        0.09069,
+        0.070573,
+        0.059606,
+        0.049134,
+        0.04649,
+        0.040351,
+        0.037482,
+        0.032744,
+        0.032365,
+        0.031726,
+        0.029558,
+        0.027436,
+        0.026027,
+        0.024614,
+        0.023306,
+        0.020657,
+        0.018658,
+        0.017144,
+        0.014944,
+        0.012694,
+        0.011302,
+        0.00997,
+        0.008492,
+        0.007233,
+        0.005999,
+        0.005131,
+        0.001007,
+        7.5e-05,
+        9e-06,
+        6e-06,
+        4e-06
+      ],
+      "hourly_evolution": {
+        "hour_1": {
+          "bass": 0.8165,
+          "mid": 0.1489,
+          "treble": 0.0346
+        }
+      },
+      "temporal_evolution": [
+        {
+          "bass": 0.8332,
+          "mid": 0.1257,
+          "treble": 0.0411
+        },
+        {
+          "bass": 0.8471,
+          "mid": 0.1163,
+          "treble": 0.0366
+        },
+        {
+          "bass": 0.8233,
+          "mid": 0.1408,
+          "treble": 0.0359
+        },
+        {
+          "bass": 0.831,
+          "mid": 0.1376,
+          "treble": 0.0314
+        },
+        {
+          "bass": 0.8165,
+          "mid": 0.1477,
+          "treble": 0.0358
+        },
+        {
+          "bass": 0.8476,
+          "mid": 0.1267,
+          "treble": 0.0257
+        },
+        {
+          "bass": 0.8168,
+          "mid": 0.1512,
+          "treble": 0.0321
+        },
+        {
+          "bass": 0.8239,
+          "mid": 0.1454,
+          "treble": 0.0307
+        },
+        {
+          "bass": 0.8563,
+          "mid": 0.113,
+          "treble": 0.0306
+        },
+        {
+          "bass": 0.8556,
+          "mid": 0.1139,
+          "treble": 0.0305
+        }
+      ],
+      "chunks_analyzed": 49,
+      "duration_minutes": 49,
+      "stability_score": 0.9685
+    }
+  },
+  "distance_matrix": {
+    "fipvsfrance-culture": 0.1993,
+    "fipvsfrance-info": 0.1443,
+    "fipvsfrance-inter": 0.0465,
+    "fipvsfrance-musique": 0.0772,
+    "fipvsmouv": 0.0252,
+    "france-culturevsfrance-info": 0.0586,
+    "france-culturevsfrance-inter": 0.1527,
+    "france-culturevsfrance-musique": 0.1233,
+    "france-culturevsmouv": 0.1797,
+    "france-infovsfrance-inter": 0.0981,
+    "france-infovsfrance-musique": 0.0671,
+    "france-infovsmouv": 0.1271,
+    "france-intervsfrance-musique": 0.0316,
+    "france-intervsmouv": 0.0305,
+    "france-musiquevsmouv": 0.0618
+  },
+  "dp_signatures": {
+    "fip": {
+      "bass": 0.8077,
+      "mid": 0.3745,
+      "treble": 0.0831
+    },
+    "france-culture": {
+      "bass": 0.6589,
+      "mid": 0.5059,
+      "treble": 0.1003
+    },
+    "france-info": {
+      "bass": 0.7064,
+      "mid": 0.4772,
+      "treble": 0.0816
+    },
+    "france-inter": {
+      "bass": 0.7731,
+      "mid": 0.4054,
+      "treble": 0.0867
+    },
+    "france-musique": {
+      "bass": 0.7542,
+      "mid": 0.4301,
+      "treble": 0.0809
+    },
+    "mouv": {
+      "bass": 0.7876,
+      "mid": 0.3806,
+      "treble": 0.097
+    }
+  },
+  "reidentification_score": 0.7333
+}
