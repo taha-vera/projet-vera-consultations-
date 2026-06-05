@@ -1,216 +1,299 @@
-# VERA Protocol — Whitepaper v1.0
+# VERA Protocol — Whitepaper v2.0
 
-**Version:** 1.0  
-**Date:** 2026-06-04  
-**Repository:** github.com/taha-vera/Protocole-Vera  
-**Branch:** phase-1/w1-guardian-sophistication  
+**Version:** 2.0
+**Date:** 2026-06-05
+**Repository:** github.com/taha-vera/Protocole-Vera
+**Status:** Living document — aligned with proof protocol vision
 
 ---
 
 ## Abstract
 
-VERA (Verifiable Extraction and Redistribution Architecture) is an open-source 
-privacy-preserving protocol designed to aggregate weak recurring signals from 
-cultural data sources (radio, music, creative works) and make them available 
-to AI operators as high-quality, legally compliant training data.
+VERA (Verifiable Extraction and Redistribution Architecture) is an
+open-source proof protocol for cultural data processing.
 
-VERA acts as a neutral trusted intermediary between three actors:
-- **Cultural sources** (radio stations, media) providing signals
-- **Rights holders** (collective management organizations) representing artists
-- **AI operators** purchasing aggregated patterns for model training
+VERA is not a company. Not a financial intermediary. Not a platform.
 
-The protocol guarantees five formal invariants enforced by code, not policy:
-non-persistence, irreversible aggregation, temporal decay, mandatory 
-redistribution, and separation of powers.
+VERA enforces a set of immutable technical invariants and produces
+verifiable cryptographic evidence about the processing of cultural signals.
 
-VERA does not replace existing collective management organizations. 
-It acts as a measurement, aggregation, auditability, and redistribution 
-layer compatible with existing legal frameworks (GDPR, AI Act).
+When data transits through VERA, raw signals are destroyed.
+What remains are orphaned statistics — aggregated, irreversible,
+untraceable to any individual source or work.
 
----
-## Section 1 — Protocol Architecture
+This certified destruction is the core value of VERA.
 
-### 1.1 Problem Statement
+For AI operators, it provides technical documentation for regulatory compliance.
 
-AI models require high-quality cultural data for training. Current data 
-acquisition practices face three critical challenges:
+For collective management organizations such as SACEM, it provides
+verifiable proof that cultural signals were processed — enabling
+them to exercise redistribution rights according to their own rules.
 
-1. **Legal risk** — scraping cultural content without consent violates 
-   copyright and GDPR
-2. **No compensation** — artists and cultural producers receive nothing 
-   when their work trains AI models
-3. **No auditability** — AI operators cannot prove their training data 
-   is legally compliant
-
-VERA solves all three simultaneously.
-
-### 1.2 The Five Formal Invariants
-
-VERA SPINE v3.1.1 enforces five invariants by construction:
-
-| Invariant | Description | Enforcement |
-|-----------|-------------|-------------|
-| I. Non-persistence | Raw signals are never stored | `zeroize` after aggregation |
-| II. Irreversible aggregation | Only statistical patterns exported | k-anonymity ≥ 100 |
-| III. Temporal decay | Older data loses weight over time | exponential decay, half-life 24h |
-| IV. Mandatory redistribution | Revenue automatically distributed | formal proof in tests |
-| V. Separation of powers | Layers cannot access each other | module isolation |
-
-### 1.3 Differential Privacy Layer
-
-VERA implements three DP mechanisms:
-
-- **Discrete Laplace** — resistant to Mironov (2012) floating-point attack
-- **Gaussian** — for (ε,δ)-DP guarantees
-- **Randomized Response** — for local DP at collection layer
-
-A formal `BudgetTracker` enforces composition: every query consumes 
-budget ε, and requests are refused when the global budget is exhausted.
-
-### 1.4 Validation
-
-22 tests validated across three platforms (ARM64, x86_64, Ubuntu):
-- 15 invariant tests (vera-spine)
-- 4 pipeline tests (vera-radio)  
-- 3 DP mechanism tests
-- 4 budget composition tests
-- 9 empirical SIB tests (RSR, CSC, SUR, PHL)
-
----
-## Section 2 — Stakeholder Alignment
-
-### 2.1 Three-Actor Ecosystem
-
-VERA connects three actors through a neutral trusted infrastructure:
-
-Radio stations provide cultural signals. Collective management
-organizations (SACEM, SCPP, ADAMI) represent artists and rights holders.
-AI operators purchase aggregated patterns for model training.
-VERA sits at the center as the trusted measurement, audit,
-and redistribution layer.
-
-### 2.2 Value Proposition per Actor
-
-| Actor | Contribution | Gain |
-|-------|-------------|------|
-| Radio | Cultural signal | Additional revenue stream |
-| SACEM | Artist representation | New AI-era compensation |
-| AI Operator | Funding | Legal auditable training data |
-| VERA | Infrastructure | Service commission |
-
-### 2.3 Aligned Interests
-
-The key question any investor or institution asks is:
-why would each actor agree to participate?
-
-Radio has signal but no AI monetization path. VERA provides it.
-SACEM has artists but no technical proof of AI usage. VERA provides it.
-AI Operators have money but no legal data source. VERA provides it.
-
-Each actor has a direct economic interest in VERA existence.
-
-### 2.4 Institutional Compatibility
-
-VERA does not replace collective management organizations.
-The protocol acts as a measurement, aggregation, auditability,
-and redistribution layer compatible with GDPR, AI Act Article 10,
-and French intellectual property law.
-
-SACEM and equivalent organizations remain the legal representatives
-of artists. VERA provides the technical proof and redistribution
-mechanism — they handle the relationship with their members.
-
----
-## Section 3 — Empirical Validation (SIB)
-
-### 3.1 VERA SIB — Surviving Information Budget
-
-VERA SIB validates four privacy metrics on real aggregated data:
-
-| Metric | Threshold | Status |
-|--------|-----------|--------|
-| RSR — Reconstruction Success Rate | <= 0.53 | PASS |
-| CSC — Cross-Session Correlation | <= 1e-6 | PASS |
-| SUR — Signal Utility Retention | > 0.97 | PASS |
-| PHL — Persistence Half-Life | <= 1h | PASS |
-
-### 3.2 What These Metrics Prove
-
-RSR below 0.53 means an attacker cannot reconstruct who contributed
-a signal better than random chance. This directly validates
-Invariant I (non-persistence) and Invariant II (irreversible aggregation).
-
-CSC below 1e-6 means sessions cannot be linked across time.
-This validates Invariant V (separation of powers).
-
-SUR above 0.97 means 97% of signal utility is preserved despite
-DP noise. This is the economic proof: the data is useful.
-
-PHL below 1h means data loses half its weight within one hour.
-This validates Invariant III (temporal decay).
-
-### 3.3 Test Infrastructure
-
-All tests validated on three platforms:
-- Termux ARM64 (Android)
-- Google Cloud Shell Ubuntu x86_64
-- Claude sandbox x86_64
-
-22 Rust tests + 9 Python SIB tests = 31 total validated tests.
-
----
-## Section 4 — VERA as Proof Protocol
-
-### 4.1 What VERA Is
-
-VERA is a proof protocol. Not a company. Not a financial intermediary.
-Not a rights management organization.
-
-VERA enforces five formal invariants by code, not policy.
-These invariants are immutable. No one can override them.
-
-### 4.2 What VERA Certifies
-
-When data transits through VERA, the protocol produces
-verifiable evidence that:
-
-- Raw signals were destroyed after aggregation
-- Aggregation is mathematically irreversible
-- Privacy constraints were enforced
-- The signal transited through a compliant VERA implementation
-
-These orphaned statistics cannot be traced back to any source.
-
-### 4.3 For Artists and Rights Holders
-
-VERA certifies that cultural signals transited through the protocol.
-Collective management organizations such as SACEM can use this
-certification to exercise redistribution rights according to
-their own rules. VERA does not collect money. VERA does not pay.
+VERA does not collect money.
+VERA does not redistribute revenue.
 VERA certifies.
 
-### 4.4 VERA-Pulse
+---
 
-VERA-Pulse is the opt-in module for individual contributors.
-Users explicitly consent to share aggregated signals.
-No raw audio is ever transmitted — only local FFT aggregates.
-No personal data is retained.
+## Section 1 — The Problem
+
+### 1.1 AI Training Data is Legally Contested
+
+AI models require vast amounts of cultural data for training.
+Current data acquisition practices face three critical challenges:
+
+- Legal risk: scraping cultural content without consent violates copyright and GDPR
+- No proof: AI operators cannot demonstrate that training data was processed lawfully
+- No traceability: artists and rights holders have no evidence that their works contributed to AI training
+
+### 1.2 Nobody Wants to Solve This
+
+The problem persists because it is currently in the interest
+of major AI actors to ignore it.
+
+Scraping is cheap. Legal risk is deferred.
+Artists are not organized enough to enforce their rights at scale.
+Regulators are catching up slowly.
+
+VERA is built for the moment this changes — which is now,
+with the AI Act entering into force in 2026.
 
 ---
 
-## Section 5 — Roadmap
+## Section 2 — What VERA Is
+
+### 2.1 A Proof Protocol
+
+VERA is a proof protocol.
+
+Its purpose is to process cultural signals through a set of
+immutable technical invariants and produce verifiable evidence
+that the processing occurred correctly.
+
+The output of VERA is not data. It is proof.
+
+Proof that raw signals were destroyed.
+Proof that aggregation was irreversible.
+Proof that privacy constraints were enforced.
+Proof that the signal transited through a compliant implementation.
+
+### 2.2 What VERA Is Not
+
+VERA is not a platform.
+VERA is not a marketplace.
+VERA is not a financial intermediary.
+VERA is not a collective management organization.
+VERA does not collect money.
+VERA does not redistribute revenue.
+VERA does not manage copyrights or neighboring rights.
+
+These functions belong to the organizations that choose
+to deploy or use VERA.
+
+### 2.3 The Analogy
+
+VERA is to cultural data what a notary is to a contract.
+
+The notary does not own the contract.
+The notary does not enforce the contract.
+The notary certifies that the contract was signed correctly.
+
+VERA certifies that cultural data was processed correctly.
+What happens next is not VERA's concern.
+
+---
+
+## Section 3 — The Five Invariants
+
+VERA enforces five invariants by code, not policy.
+These invariants are immutable.
+An implementation that violates them is not VERA.
+
+### Invariant I — Non-Persistence
+
+Raw signals are never stored.
+They are destroyed immediately after aggregation.
+No raw audio, no raw cultural data, no individual signal
+ever leaves the collection layer.
+
+### Invariant II — Irreversible Aggregation
+
+Only statistical aggregates are produced.
+k-anonymity threshold >= 100 is enforced.
+No individual contribution can be reconstructed
+from the aggregate output.
+
+### Invariant III — Temporal Decay
+
+Aggregated data loses weight over time.
+Half-life: 24 hours. Maximum validity: 30 days.
+This ensures that the protocol does not accumulate
+long-term profiles of any kind.
+
+### Invariant IV — Certified Destruction
+
+VERA produces cryptographic evidence that raw data was destroyed.
+This certification is the technical proof that collective
+management organizations need to exercise their rights.
+
+VERA does not redistribute. VERA certifies.
+The redistribution — if any — is decided and executed
+by the organizations that use VERA's certification.
+
+### Invariant V — Separation of Powers
+
+Collection, aggregation, and export layers are strictly separated.
+No layer can access the data of another.
+This architectural separation is enforced by code.
+
+---
+
+## Section 4 — The Three Actors
+
+VERA operates at the intersection of three actors.
+VERA serves all three. VERA is controlled by none.
+
+### 4.1 Radio Stations and Media
+
+Radio stations and media organizations provide cultural signals.
+What they gain: verifiable proof that their content was processed
+lawfully, enabling them to claim compensation through collective
+management organizations.
+
+### 4.2 Collective Management Organizations
+
+Organizations such as SACEM, SCPP, ADAMI represent artists
+and rights holders.
+
+What they gain: VERA's certification provides the technical
+evidence they need to prove that cultural works contributed
+to AI training — without identifying which specific work,
+without storing any raw signal.
+
+VERA does not replace these organizations.
+VERA provides the proof they need to do their job.
+
+### 4.3 AI Operators
+
+AI operators need high-quality cultural training data that is
+legally defensible under the AI Act and GDPR.
+
+What they gain: VERA provides the technical documentation
+required by AI Act Article 53 — automatically, auditably,
+at zero cost.
+
+VERA does not sell data to AI operators.
+VERA certifies that data was processed correctly.
+AI operators use this certification as legal documentation.
+
+---
+
+## Section 5 — Technical Validation
+
+### 5.1 Implementation
+
+VERA SPINE v3.1.1 is implemented in Rust.
+The five invariants are enforced by 39 automated tests
+across four platforms.
+
+### 5.2 Differential Privacy
+
+VERA implements Discrete Laplace mechanism —
+resistant to the Mironov 2012 floating-point attack.
+A formal BudgetTracker enforces DP composition.
+Cryptographic entropy via getrandom (OS-level).
+
+### 5.3 Empirical Validation — Radio France
+
+Six Radio France stations were captured and processed
+through the VERA analysis pipeline for 3 hours.
+
+Results:
+- Six stations produced statistically distinct signatures
+- Signatures remain stable over time
+- Raw audio was destroyed — only orphaned statistics remain
+- Separability score at epsilon=1.0: 0.20
+  (decreasing monotonically with epsilon, as expected)
+
+Note: this analysis used a Python reference implementation.
+Full Rust pipeline integration via vera-radio is in progress.
+
+### 5.4 Test Coverage
+
+| Category | Tests | Status |
+|----------|-------|--------|
+| Security | 4 | PASS |
+| Differential Privacy | 5 | PASS |
+| VERA Invariants | 3 | PASS |
+| Stress | 4 | PASS |
+| Serialization | 3 | PASS |
+| Adversarial | 4 | PASS |
+| Integration | 1 | PASS |
+| SDK | 6 | PASS |
+| SIB empirical | 9 | PASS |
+
+Total: 39 tests, 0 failed.
+
+---
+
+## Section 6 — Legal Value
+
+### 6.1 The Regulatory Context
+
+The AI Act enters into force in 2026.
+Article 53 requires AI operators to document their
+training data sources and processing methods.
+
+GDPR Article 17 requires that personal data be erasable.
+VERA's non-persistence invariant satisfies this by design —
+there is nothing to erase because nothing was stored.
+
+### 6.2 What VERA's Proof Means Legally
+
+VERA's cryptographic certification that raw data was destroyed
+constitutes technical documentation that:
+
+- No personal data was retained
+- Processing occurred according to documented invariants
+- The resulting statistics are mathematically orphaned
+
+This documentation can contribute to an AI operator's
+compliance posture under the AI Act and GDPR.
+
+Note: VERA's legal value should be confirmed by formal
+legal analysis in each jurisdiction. VERA provides the
+technical foundation — legal interpretation requires
+qualified legal counsel.
+
+### 6.3 For Artists
+
+VERA certifies that cultural signals transited through the protocol.
+This certification enables collective management organizations to:
+
+- Prove that cultural works contributed to AI training
+- Exercise their redistribution rights under existing law
+- Negotiate compensation with AI operators
+
+VERA does not determine compensation.
+VERA does not enforce payment.
+VERA certifies the fact of processing.
+What follows is decided by humans and institutions.
+
+---
+
+## Section 7 — Roadmap
 
 | Phase | Milestone | Status |
 |-------|-----------|--------|
-| 1 | VERA SPINE v3.1.1 — 5 invariants locked | DONE |
-| 1 | Differential Privacy layer — Discrete Laplace | DONE |
-| 1 | vera-radio — FFT capture + DP export | DONE |
-| 1 | vera-sib — 31 tests validated | DONE |
-| 1 | vera-cli — automation layer | DONE |
-| 2 | vera-benchmark — economic proof | IN PROGRESS |
-| 2 | vera-pulse — opt-in contributors | PLANNED |
+| 1 | VERA SPINE v3.1.1 — 5 invariants | DONE |
+| 1 | Differential Privacy — Discrete Laplace | DONE |
+| 1 | vera-radio — FFT capture | DONE |
+| 1 | vera-sib — empirical validation | DONE |
+| 1 | vera-cli — automation | DONE |
+| 1 | Radio France — real data validation | DONE |
+| 2 | vera-radio Rust pipeline — real stream | IN PROGRESS |
+| 2 | Zenodo DOI — citable reference | PLANNED |
 | 3 | SACEM partnership outreach | PLANNED |
-| 3 | First AI operator pilot | PLANNED |
 | 3 | CNIL filing | PLANNED |
 | 4 | PETS 2027 academic submission | PLANNED |
 
@@ -218,89 +301,26 @@ No personal data is retained.
 
 ## Conclusion
 
-VERA fills a gap nobody wants to solve because it is currently
-in their interest to ignore it. AI models need high-quality
-cultural data. Cultural producers need compensation. Regulators
-need auditability.
+VERA fills a gap that nobody wants to fill because it is
+currently in the interest of major AI actors to ignore it.
 
-VERA provides all three simultaneously, as open-source infrastructure,
-upstream of all AI models, controlled by no single actor.
+The gap is this: there is no open, neutral, auditable way
+to process cultural data for AI training while certifying
+that the raw material was destroyed.
+
+VERA is that protocol.
+
+Not a platform. Not a business. Not a financial actor.
+
+A protocol. With invariants. Open-source. For everyone.
 
 The code runs. The tests pass. The invariants hold.
+The proof is generated automatically.
+
+What the actors do with that proof is their responsibility.
 
 ---
 
-*VERA Protocol — open-source, privacy-preserving, model-agnostic.*
+*VERA Protocol v2.0*
 *github.com/taha-vera/Protocole-Vera*
-
-## Section 6 — VERA as a Proof Protocol
-
-VERA is a proof protocol.
-
-It is not a financial intermediary.
-It is not a revenue redistribution system.
-It is not a rights management organization.
-
-Its purpose is to enforce a set of immutable technical
-invariants and to generate verifiable evidence about
-the processing of cultural data.
-
-### What VERA Proves
-
-When data transits through VERA, the protocol produces
-cryptographic evidence that:
-
-- Raw signals were destroyed after aggregation
-- Aggregation was performed according to protocol rules
-- The resulting statistics are mathematically irreversible
-- The required privacy constraints were enforced
-- The signal transited through a compliant VERA implementation
-
-### What VERA Does Not Do
-
-VERA does not collect money.
-VERA does not redistribute revenue.
-VERA does not pay artists.
-VERA does not manage copyrights or neighboring rights.
-VERA does not act as a collecting society.
-
-These responsibilities remain with the organizations
-that choose to deploy or use VERA.
-
-### Legal Value
-
-VERA is designed to generate auditable technical evidence
-regarding the provenance and processing of training data.
-
-For AI operators, this evidence can contribute to the
-technical documentation required by applicable regulatory
-frameworks, including obligations related to transparency,
-traceability, and lawful data use.
-
-For rights holders and cultural organizations, VERA provides
-verifiable proof that cultural signals were processed through
-the protocol without retaining the original raw material.
-
-### Commercial Proposition
-
-For AI operators, VERA's value proposition is simple:
-
-"VERA automatically generates auditable technical evidence
-about how training data was processed.
-Open-source, transparent, and verifiable."
-
-The protocol's objective is to reduce compliance friction
-while increasing trust between AI developers, cultural
-stakeholders, and regulators.
-
-### The Invariants Are the Protocol
-
-VERA's invariants are not constraints on the protocol.
-They ARE the protocol.
-
-Anyone can implement VERA.
-Anyone can fork VERA.
-But an implementation that violates the invariants
-is not VERA.
-
-The invariants are the identity of the protocol.
+*taha-vera.github.io/Protocole-Vera*
