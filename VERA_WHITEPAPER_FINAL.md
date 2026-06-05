@@ -159,37 +159,42 @@ All tests validated on three platforms:
 22 Rust tests + 9 Python SIB tests = 31 total validated tests.
 
 ---
-## Section 4 — Economic Model
+## Section 4 — VERA as Proof Protocol
 
-### 4.1 VERA as Trusted Infrastructure
+### 4.1 What VERA Is
 
-VERA operates as a neutral protocol — analogous to TCP/IP for
-the internet or VISA for payments. VERA does not sell data.
-VERA certifies transactions between data contributors and AI operators.
+VERA is a proof protocol. Not a company. Not a financial intermediary.
+Not a rights management organization.
 
-### 4.2 Revenue Model
+VERA enforces five formal invariants by code, not policy.
+These invariants are immutable. No one can override them.
 
-VERA generates revenue through three mechanisms:
+### 4.2 What VERA Certifies
 
-1. Commission — percentage on each data transaction
-2. Audit — verification that buyers respect DP guarantees
-3. Licensing — usage rights agreements between contributors and operators
+When data transits through VERA, the protocol produces
+verifiable evidence that:
 
-### 4.3 Contributor Compensation
+- Raw signals were destroyed after aggregation
+- Aggregation is mathematically irreversible
+- Privacy constraints were enforced
+- The signal transited through a compliant VERA implementation
 
-Contributors (radio stations, artists via SACEM) receive automatic
-redistribution proportional to their signal weight in the aggregate.
-This is enforced by Invariant IV and verified by 4 dedicated tests.
+These orphaned statistics cannot be traced back to any source.
 
-AI operators create their own token or payment mechanisms.
-VERA provides only the measurement and proof — not the financial layer.
+### 4.3 For Artists and Rights Holders
+
+VERA certifies that cultural signals transited through the protocol.
+Collective management organizations such as SACEM can use this
+certification to exercise redistribution rights according to
+their own rules. VERA does not collect money. VERA does not pay.
+VERA certifies.
 
 ### 4.4 VERA-Pulse
 
-VERA-Pulse is the opt-in mobile module for individual contributors.
+VERA-Pulse is the opt-in module for individual contributors.
 Users explicitly consent to share aggregated signals.
-They receive credits redeemable with partner AI operators.
 No raw audio is ever transmitted — only local FFT aggregates.
+No personal data is retained.
 
 ---
 
