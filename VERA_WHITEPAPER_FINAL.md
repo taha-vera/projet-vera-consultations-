@@ -245,8 +245,8 @@ Article 53 requires AI operators to document their
 training data sources and processing methods.
 
 GDPR Article 17 requires that personal data be erasable.
-VERA's non-persistence invariant satisfies this by design —
-there is nothing to erase because nothing was stored.
+VERA is designed to minimize the need for erasure by avoiding
+persistence of raw data by design.
 
 ### 6.2 What VERA's Proof Means Legally
 
