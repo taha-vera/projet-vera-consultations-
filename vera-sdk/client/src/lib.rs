@@ -62,20 +62,19 @@ impl VeraClientSDK {
             ));
         }
 
-        // VERA redistribution model:
-        // 60% to contributors (radios + artists via SACEM)
-        // 25% to rights holders
-        // 15% VERA commission
-        let redistribution = total_price * 0.70;
+        // VERA is a proof protocol.
+        // It does not redistribute revenue.
+        // Redistribution is handled by collective management organizations.
+        let redistribution = 0.0; // VERA does not redistribute
         // SACEM decides internal split
-        let commission = total_price * 0.30;
+        
 
         let receipt = PurchaseReceipt {
             operator_id: self.operator_id.clone(),
             total_patterns: patterns.len(),
             total_price,
             redistribution_amount: redistribution,
-            vera_commission: commission,
+            vera_commission: 0.0, // VERA does not take commission
         };
 
         self.spent += total_price;
@@ -115,8 +114,8 @@ mod tests {
         let receipt = client.purchase(patterns).unwrap();
         assert_eq!(receipt.total_patterns, 10);
         assert!((receipt.total_price - 100.0).abs() < 1e-9);
-        assert!((receipt.vera_commission - 30.0).abs() < 1e-9);
-        assert!((receipt.redistribution_amount - 70.0).abs() < 1e-9);
+        assert_eq!(receipt.vera_commission, 0.0);
+        assert_eq!(receipt.redistribution_amount, 0.0);
     }
 
     #[test]
@@ -132,8 +131,8 @@ mod tests {
         let patterns = mock_patterns(1, 100.0);
         let receipt = client.purchase(patterns).unwrap();
         // 60% contributors + 25% rights = 85% redistributed
-        assert!((receipt.redistribution_amount - 70.0).abs() < 1e-9);
+        assert_eq!(receipt.redistribution_amount, 0.0);
         // 15% VERA commission
-        assert!((receipt.vera_commission - 30.0).abs() < 1e-9);
+        assert_eq!(receipt.vera_commission, 0.0);
     }
 }
