@@ -227,3 +227,75 @@ The code runs. The tests pass. The invariants hold.
 
 *VERA Protocol — open-source, privacy-preserving, model-agnostic.*
 *github.com/taha-vera/Protocole-Vera*
+
+## Section 6 — VERA as a Proof Protocol
+
+VERA is a proof protocol.
+
+It is not a financial intermediary.
+It is not a revenue redistribution system.
+It is not a rights management organization.
+
+Its purpose is to enforce a set of immutable technical
+invariants and to generate verifiable evidence about
+the processing of cultural data.
+
+### What VERA Proves
+
+When data transits through VERA, the protocol produces
+cryptographic evidence that:
+
+- Raw signals were destroyed after aggregation
+- Aggregation was performed according to protocol rules
+- The resulting statistics are mathematically irreversible
+- The required privacy constraints were enforced
+- The signal transited through a compliant VERA implementation
+
+### What VERA Does Not Do
+
+VERA does not collect money.
+VERA does not redistribute revenue.
+VERA does not pay artists.
+VERA does not manage copyrights or neighboring rights.
+VERA does not act as a collecting society.
+
+These responsibilities remain with the organizations
+that choose to deploy or use VERA.
+
+### Legal Value
+
+VERA is designed to generate auditable technical evidence
+regarding the provenance and processing of training data.
+
+For AI operators, this evidence can contribute to the
+technical documentation required by applicable regulatory
+frameworks, including obligations related to transparency,
+traceability, and lawful data use.
+
+For rights holders and cultural organizations, VERA provides
+verifiable proof that cultural signals were processed through
+the protocol without retaining the original raw material.
+
+### Commercial Proposition
+
+For AI operators, VERA's value proposition is simple:
+
+"VERA automatically generates auditable technical evidence
+about how training data was processed.
+Open-source, transparent, and verifiable."
+
+The protocol's objective is to reduce compliance friction
+while increasing trust between AI developers, cultural
+stakeholders, and regulators.
+
+### The Invariants Are the Protocol
+
+VERA's invariants are not constraints on the protocol.
+They ARE the protocol.
+
+Anyone can implement VERA.
+Anyone can fork VERA.
+But an implementation that violates the invariants
+is not VERA.
+
+The invariants are the identity of the protocol.
