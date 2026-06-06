@@ -3,7 +3,7 @@ pub mod tempo;
 pub mod language;
 use crate::graphlet_builder::AudioFeatures;
 
-pub fn extract_features(signal: &str) -> Result<AudioFeatures, String> {
+pub fn extract_features(signal: &[u8]) -> Result<AudioFeatures, String> {
     let g = genre::detect_genre(signal);
     let t = tempo::detect_tempo(signal);
     let l = language::detect_language(signal);
