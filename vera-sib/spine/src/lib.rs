@@ -365,7 +365,7 @@ mod robustness {
         let result=spine.distribute_revenue(100.0,None).unwrap();
         let revenue:f64=result.iter().map(|(_,a)|a).sum();
         let snap=format!(r#"{{"version":"{}","revenue":{:.6}}}"#,VERA_VERSION,revenue);
-        assert!(snap.contains("3.1.1"));
+        assert!(snap.contains("3.1.2"));
         assert!((revenue-100.0).abs()<1e-9);
         assert!(!snap.contains("raw_value"));
         println!("\n  Golden : {snap}");
@@ -465,7 +465,7 @@ mod integration {
 
         // 6. VERIFY LOGS CONTAIN NO RAW PAYLOAD
         let stats = spine.stats();
-        assert_eq!(stats.version, "3.1.1");
+        assert_eq!(stats.version, "3.1.2");
         assert!(stats.total_cohorts > 0);
     }
 }
