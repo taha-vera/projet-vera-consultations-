@@ -5,3 +5,5 @@ __pycache__/
 Cargo.lock
 target/
 __pycache__/
+target/
+archive/
