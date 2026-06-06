@@ -1,4 +1,4 @@
-pub fn detect_genre(signal: &[u8]) -> f64 {
+pub fn detect_energy(signal: &[u8]) -> f64 {
     if signal.is_empty() { return 0.3; }
     let samples: Vec<f32> = signal.chunks(4)
         .filter_map(|c| if c.len() == 4 {

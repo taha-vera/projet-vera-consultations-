@@ -1,4 +1,4 @@
-pub fn detect_language(signal: &[u8]) -> f64 {
+pub fn detect_mean(signal: &[u8]) -> f64 {
     if signal.is_empty() { return 0.3; }
     let samples: Vec<f32> = signal.chunks(4)
         .filter_map(|c| if c.len() == 4 {

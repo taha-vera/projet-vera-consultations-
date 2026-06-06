@@ -1,8 +1,8 @@
 #[derive(Debug, Clone)]
 pub struct AudioFeatures {
-    pub genre:    f64,
-    pub tempo:    f64,
-    pub language: f64,
+    pub energy:    f64,
+    pub variance:    f64,
+    pub mean: f64,
 }
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ pub struct RadioGraphlet {
 
 impl RadioGraphlet {
     pub fn from_features(f: AudioFeatures) -> Result<Self, String> {
-        let values = [f.genre, f.tempo, f.language];
+        let values = [f.energy, f.variance, f.mean];
         for v in values {
             if !v.is_finite() {
                 return Err(format!("non-finite feature: {v}"));
