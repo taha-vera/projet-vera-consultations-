@@ -28,3 +28,10 @@ VERA provides the proof they need to do their job.
 39 tests, 0 failed, 4 platforms.
 
 github.com/taha-vera/Protocole-Vera
+
+
+## Architecture Note
+
+The active pipeline is implemented in Rust (vera-sib, vera-radio, vera-sdk, vera-cli).
+Python scripts in archive/ are analysis utilities used during development.
+All protocol invariants are enforced by Rust code only.
