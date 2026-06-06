@@ -48,7 +48,7 @@ impl VeraRadioClient {
         let cohort = self.aggregation
             .get_cohort_mut(&self.cohort_id)
             .ok_or("cohort not found")?;
-        self.collection.ingest(&mut self.rng, signal, cohort)?;
+        self.collection.ingest(&mut self.rng, signal.to_vec(), cohort)?;
         Ok(())
     }
 

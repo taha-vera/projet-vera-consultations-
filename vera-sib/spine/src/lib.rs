@@ -88,13 +88,14 @@ pub mod collection {
     pub struct CollectionLayer { pub layer:Layer }
     impl CollectionLayer {
         pub fn new()->Self{Self{layer:Layer::Collection}}
-        pub fn ingest(&self,rng:&mut SimpleRng,values:&[f64],cohort:&mut Cohort)->Result<String,String>{
+        pub fn ingest(&self,rng:&mut SimpleRng,mut values:Vec<f64>,cohort:&mut Cohort)->Result<String,String>{
             if values.is_empty(){return Err("empty".into());}
             if values.iter().any(|v|!v.is_finite()){return Err("non-finite value".into());}
-            let agg=values.iter().sum::<f64>()/values.len() as f64;
-            let mut raw = values.to_vec();
-            raw.zeroize();
-            let g=Graphlet::new(rng,agg,values.len());
+            let count=values.len();
+            let agg=values.iter().sum::<f64>()/count as f64;
+            values.zeroize();
+            drop(values);
+            let g=Graphlet::new(rng,agg,count);
             let id=g.graphlet_id.clone();
             cohort.add_graphlet(g); Ok(id)
         }
@@ -174,7 +175,7 @@ impl VeraSpine {
              redistribution:revenue::RevenueDistributor::new()}
     }
     pub fn create_cohort(&mut self)->String{self.aggregation.create_cohort(&mut self.rng)}
-    pub fn ingest(&mut self,cid:&str,values:&[f64])->Result<String,String>{
+    pub fn ingest(&mut self,cid:&str,values:Vec<f64>)->Result<String,String>{
         let c=self.aggregation.get_cohort_mut(cid).ok_or_else(||format!("unknown:{}",cid))?;
         self.collection.ingest(&mut self.rng,values,c)
     }
@@ -230,7 +231,7 @@ mod robustness {
             for _ in 0..n {
                 let cid=agg.create_cohort(&mut r);
                 let c=agg.get_cohort_mut(&cid).unwrap();
-                col.ingest(&mut r,&[0.5],c).unwrap();
+                col.ingest(&mut r, vec![0.5],c).unwrap();
                 cohorts.push(c.clone());
             }
             let shares=dist.distribute(&mut r,total,&cohorts,None).unwrap();
@@ -260,7 +261,7 @@ mod robustness {
         for _ in 0..1_000 {
             let cid=agg.create_cohort(&mut r);
             let c=agg.get_cohort_mut(&cid).unwrap();
-            for _ in 0..100 { col.ingest(&mut r,&[0.5],c).unwrap(); }
+            for _ in 0..100 { col.ingest(&mut r, vec![0.5],c).unwrap(); }
         }
         assert_eq!(agg.cohort_count(),1_000);
         assert_eq!(agg.list_k_anonymous_cohorts(None).len(),1_000);
@@ -275,7 +276,7 @@ mod robustness {
         let dist=RevenueDistributor::new();
         for _ in 0..500 {
             let cid=agg.create_cohort(&mut r);
-            col.ingest(&mut r,&[0.5],agg.get_cohort_mut(&cid).unwrap()).unwrap();
+            col.ingest(&mut r, vec![0.5],agg.get_cohort_mut(&cid).unwrap()).unwrap();
         }
         let cohorts=agg.list_k_anonymous_cohorts(None);
         let total=999_999.9999_f64;
@@ -292,9 +293,9 @@ mod robustness {
         let mut agg=AggregationLayer::new(1);
         let cid=agg.create_cohort(&mut r);
         let cohort=agg.get_cohort_mut(&cid).unwrap();
-        for _ in 0..500 { col.ingest(&mut r,&[0.5],cohort).unwrap(); }
+        for _ in 0..500 { col.ingest(&mut r, vec![0.5],cohort).unwrap(); }
         for _ in 0..500 {
-            col.ingest(&mut r,&[0.5],cohort).unwrap();
+            col.ingest(&mut r, vec![0.5],cohort).unwrap();
             cohort.graphlets.last_mut().unwrap().created_at=T0;
         }
         let removed=cohort.purge_expired(Some(T0+DECAY_MAX_AGE));
@@ -312,7 +313,7 @@ mod robustness {
             let mut agg=AggregationLayer::new(1);
             for _ in 0..n {
                 let cid=agg.create_cohort(&mut r);
-                col.ingest(&mut r,&[0.5],agg.get_cohort_mut(&cid).unwrap()).unwrap();
+                col.ingest(&mut r, vec![0.5],agg.get_cohort_mut(&cid).unwrap()).unwrap();
             }
             let cohorts=agg.list_k_anonymous_cohorts(None);
             let shares=dist.distribute(&mut r,1.0,&cohorts,None).unwrap();
@@ -335,7 +336,7 @@ mod robustness {
         let col=CollectionLayer::new();
         let mut agg=AggregationLayer::new(1);
         let cid=agg.create_cohort(&mut r);
-        col.ingest(&mut r,&[0.1,0.5,0.9],agg.get_cohort_mut(&cid).unwrap()).unwrap();
+        col.ingest(&mut r, vec![0.1,0.5,0.9],agg.get_cohort_mut(&cid).unwrap()).unwrap();
         let json=g_to_json(&agg.get_cohort(&cid).unwrap().graphlets[0]);
         assert!(!json.contains("raw_value"));
         assert!(!json.contains("input_values"));
@@ -347,7 +348,7 @@ mod robustness {
         let col=CollectionLayer::new();
         let mut agg=AggregationLayer::new(1);
         let cid=agg.create_cohort(&mut r);
-        col.ingest(&mut r,&[0.3,0.6,0.9],agg.get_cohort_mut(&cid).unwrap()).unwrap();
+        col.ingest(&mut r, vec![0.3,0.6,0.9],agg.get_cohort_mut(&cid).unwrap()).unwrap();
         let g=&agg.get_cohort(&cid).unwrap().graphlets[0];
         assert!((g.aggregated_value-(0.3+0.6+0.9)/3.0).abs()<1e-12);
         let json=g_to_json(g);
@@ -359,8 +360,8 @@ mod robustness {
     fn serial_golden_snapshot() {
         let mut spine=VeraSpine::new(2,0.1,42);
         let cid=spine.create_cohort();
-        spine.ingest(&cid,&[0.3,0.7]).unwrap();
-        spine.ingest(&cid,&[0.4,0.6]).unwrap();
+        spine.ingest(&cid, vec![0.3,0.7]).unwrap();
+        spine.ingest(&cid, vec![0.4,0.6]).unwrap();
         let result=spine.distribute_revenue(100.0,None).unwrap();
         let revenue:f64=result.iter().map(|(_,a)|a).sum();
         let snap=format!(r#"{{"version":"{}","revenue":{:.6}}}"#,VERA_VERSION,revenue);
@@ -385,7 +386,7 @@ mod pre_lock {
         let mut agg=AggregationLayer::new(1);
         let cid=agg.create_cohort(&mut r);
         let c=agg.get_cohort_mut(&cid).unwrap();
-        let result=col.ingest(&mut r,&[f64::NAN],c);
+        let result=col.ingest(&mut r, vec![f64::NAN],c);
         assert!(result.is_err(),"NaN doit être rejeté");
     }
 
@@ -396,8 +397,8 @@ mod pre_lock {
         let mut agg=AggregationLayer::new(1);
         let cid=agg.create_cohort(&mut r);
         let c=agg.get_cohort_mut(&cid).unwrap();
-        assert!(col.ingest(&mut r,&[f64::INFINITY],c).is_err());
-        assert!(col.ingest(&mut r,&[f64::NEG_INFINITY],c).is_err());
+        assert!(col.ingest(&mut r, vec![f64::INFINITY],c).is_err());
+        assert!(col.ingest(&mut r, vec![f64::NEG_INFINITY],c).is_err());
     }
 
     #[test]
@@ -407,7 +408,7 @@ mod pre_lock {
         let mut agg=AggregationLayer::new(1);
         let dist=RevenueDistributor::new();
         let cid=agg.create_cohort(&mut r);
-        col.ingest(&mut r,&[0.5],agg.get_cohort_mut(&cid).unwrap()).unwrap();
+        col.ingest(&mut r, vec![0.5],agg.get_cohort_mut(&cid).unwrap()).unwrap();
         let cohorts=agg.list_k_anonymous_cohorts(None);
         assert!(dist.distribute(&mut r,f64::NAN,&cohorts,None).is_err());
         assert!(dist.distribute(&mut r,f64::INFINITY,&cohorts,None).is_err());
@@ -421,7 +422,7 @@ mod pre_lock {
         let cid=agg.create_cohort(&mut r);
         let c=agg.get_cohort_mut(&cid).unwrap();
         // NaN mélangé à des valeurs valides
-        assert!(col.ingest(&mut r,&[0.5,f64::NAN,0.3],c).is_err());
+        assert!(col.ingest(&mut r, vec![0.5,f64::NAN,0.3],c).is_err());
     }
 }
 pub mod dp;
@@ -437,7 +438,7 @@ mod integration {
         let mut spine = VeraSpine::new(100, 1.0, 42);
         let cid = spine.create_cohort();
         for _ in 0..100 {
-            spine.ingest(&cid, &[0.3, 0.5, 0.7]).unwrap();
+            spine.ingest(&cid, vec![0.3, 0.5, 0.7]).unwrap();
         }
 
         // 2. DP
@@ -487,10 +488,10 @@ mod adversarial {
 
         // 99 normal signals
         for _ in 0..99 {
-            col.ingest(&mut r, &[0.5], cohort).unwrap();
+            col.ingest(&mut r, vec![0.5], cohort).unwrap();
         }
         // 1 biased signal — attacker tries to push aggregate to 1.0
-        col.ingest(&mut r, &[1.0], cohort).unwrap();
+        col.ingest(&mut r, vec![1.0], cohort).unwrap();
 
         let mean: f64 = cohort.graphlets.iter().map(|g| g.aggregated_value).sum::<f64>() / cohort.graphlets.len() as f64;
         assert!(mean < 0.6, "biased injection moved mean: {}", mean);
@@ -507,7 +508,7 @@ mod adversarial {
 
         for i in 0..1000 {
             let v = if i % 2 == 0 { 0.3 } else { 0.7 };
-            col.ingest(&mut r, &[v], cohort).unwrap();
+            col.ingest(&mut r, vec![v], cohort).unwrap();
         }
 
         // After 1000 ticks, aggregate should converge to ~0.5
@@ -542,12 +543,12 @@ mod adversarial {
 
         // Normal actor
         let cid1 = agg.create_cohort(&mut r);
-        col.ingest(&mut r, &[0.5], agg.get_cohort_mut(&cid1).unwrap()).unwrap();
+        col.ingest(&mut r, vec![0.5], agg.get_cohort_mut(&cid1).unwrap()).unwrap();
 
         // Gaming actor — inflates signal to max
         let cid2 = agg.create_cohort(&mut r);
         for _ in 0..100 {
-            col.ingest(&mut r, &[1.0], agg.get_cohort_mut(&cid2).unwrap()).unwrap();
+            col.ingest(&mut r, vec![1.0], agg.get_cohort_mut(&cid2).unwrap()).unwrap();
         }
 
         let cohorts = agg.list_k_anonymous_cohorts(None);
@@ -560,5 +561,21 @@ mod adversarial {
         // Gaming actor should not get more than 95% of revenue
         let max_share = shares.iter().map(|s| s.amount).fold(0.0f64, f64::max);
         assert!(max_share < 100.0, "gaming actor got everything: {}", max_share);
+    }
+}
+
+#[cfg(test)]
+mod invariant_tests {
+    use zeroize::Zeroize;
+
+    #[test]
+    fn invariant_i_raw_buffer_is_wiped() {
+        let mut raw: Vec<f64> = vec![0.3, 0.5, 0.7];
+        let agg = raw.iter().sum::<f64>() / raw.len() as f64;
+        raw.zeroize();
+        for x in &raw {
+            assert_eq!(*x, 0.0, "brut non efface");
+        }
+        assert!((agg - 0.5).abs() < 1e-12, "agg perdu");
     }
 }
