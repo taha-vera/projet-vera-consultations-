@@ -66,7 +66,7 @@ mod tests {
         let p = RadioPipeline::new();
         for _ in 0..5 { p.tick(&mut spine, "c1").unwrap(); }
         assert_eq!(spine.calls.len(), 5);
-        let first = spine.calls[0].1;
+        let _first = spine.calls[0].1;
         for (_, v) in &spine.calls { assert!(*v >= 0.0 && *v <= 1.0, "value out of range: {}", v); }
     }
 }
