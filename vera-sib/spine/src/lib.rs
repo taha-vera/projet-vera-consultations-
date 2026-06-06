@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub const VERA_VERSION: &str = "3.1.1";
+pub const VERA_VERSION: &str = "3.1.2";
 pub const MIN_K: usize = 100;
 pub const DECAY_HALF_LIFE: f64 = 86_400.0;
 pub const DECAY_MAX_AGE: f64 = 2_592_000.0;
