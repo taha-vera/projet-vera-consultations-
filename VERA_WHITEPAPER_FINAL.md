@@ -56,7 +56,7 @@ Artists are not organized enough to enforce their rights at scale.
 Regulators are catching up slowly.
 
 VERA is built for the moment this changes — which is now,
-with the AI Act entering into force in 2026.
+with the AI Act now in force since August 2024.
 
 ---
 
@@ -240,7 +240,7 @@ Total: 39 tests, 0 failed.
 
 ### 6.1 The Regulatory Context
 
-The AI Act enters into force in 2026.
+The AI Act entered into force on 1 August 2024, with obligations applying from February 2025.
 Article 53 requires AI operators to document their
 training data sources and processing methods.
 
