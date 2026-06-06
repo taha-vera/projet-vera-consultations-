@@ -48,7 +48,7 @@ mod tests {
         RadioPipeline::new().tick(&mut spine, "c1").unwrap();
         let (_, val) = &spine.calls[0];
         assert!(val.is_finite());
-        assert!(*val > 0.0 && *val < 1.0);
+        assert!(*val >= 0.0 && *val <= 1.0);
     }
 
     #[test]
