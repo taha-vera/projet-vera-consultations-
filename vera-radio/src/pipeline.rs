@@ -1,3 +1,4 @@
+use zeroize::Zeroize;
 use crate::capture::fm::FmStream;
 use crate::analysis::extract_features;
 use crate::graphlet_builder::RadioGraphlet;
@@ -11,8 +12,9 @@ impl RadioPipeline {
     pub fn tick<S: SpineInterface>(
         &self, spine: &mut S, cohort_id: &str,
     ) -> Result<String, String> {
-        let chunk    = self.stream.next_chunk().ok_or("stream exhausted")?;
+        let mut chunk = self.stream.next_chunk().ok_or("stream exhausted")?;
         let features = extract_features(&chunk)?;
+        chunk.zeroize();
         drop(chunk);
         let graphlet = RadioGraphlet::from_features(features)?;
         RadioAdapter::ingest_into_spine(spine, cohort_id, graphlet)
