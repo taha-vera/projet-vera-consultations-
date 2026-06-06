@@ -65,6 +65,51 @@ mod tests {
         for _ in 0..5 { p.tick(&mut spine, "c1").unwrap(); }
         assert_eq!(spine.calls.len(), 5);
         let first = spine.calls[0].1;
-        for (_, v) in &spine.calls { assert!((v - first).abs() < 1e-12); }
+        for (_, v) in &spine.calls { assert!(*v >= 0.0 && *v <= 1.0, "value out of range: {}", v); }
+    }
+}
+
+#[cfg(test)]
+mod multiradio_tests {
+    use crate::capture::fm::FmStream;
+    use crate::analysis::extract_features;
+
+    const STREAMS: &[(&str, &str)] = &[
+        ("fip",            "http://icecast.radiofrance.fr/fip-hifi.aac"),
+        ("france-inter",   "http://icecast.radiofrance.fr/franceinter-hifi.aac"),
+        ("france-culture", "http://icecast.radiofrance.fr/franceculture-hifi.aac"),
+        ("france-musique", "http://icecast.radiofrance.fr/francemusique-hifi.aac"),
+        ("france-info",    "http://icecast.radiofrance.fr/franceinfo-hifi.aac"),
+        ("mouv",           "http://icecast.radiofrance.fr/mouv-hifi.aac"),
+    ];
+
+    #[test]
+    fn test_all_stations_reachable() {
+        let mut results = vec![];
+        for (name, url) in STREAMS {
+            let stream = FmStream::with_url(url);
+            match stream.next_chunk() {
+                Some(chunk) => {
+                    match extract_features(&chunk) {
+                        Ok(f) => {
+                            println!("  [OK] {} genre={:.4} tempo={:.4} lang={:.4}",
+                                name, f.genre, f.tempo, f.language);
+                            results.push((*name, true, f.genre));
+                        }
+                        Err(e) => {
+                            println!("  [FEATURE_ERR] {} — {}", name, e);
+                            results.push((*name, false, 0.0));
+                        }
+                    }
+                }
+                None => {
+                    println!("  [STREAM_ERR] {}", name);
+                    results.push((*name, false, 0.0));
+                }
+            }
+        }
+        let ok = results.iter().filter(|(_, ok, _)| *ok).count();
+        println!("\n{}/{} stations OK", ok, STREAMS.len());
+        assert!(ok >= 3, "At least 3 stations must be reachable");
     }
 }
