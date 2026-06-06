@@ -93,8 +93,8 @@ mod multiradio_tests {
                     match extract_features(&chunk) {
                         Ok(f) => {
                             println!("  [OK] {} genre={:.4} tempo={:.4} lang={:.4}",
-                                name, f.genre, f.tempo, f.language);
-                            results.push((*name, true, f.genre));
+                                name, f.energy, f.variance, f.mean);
+                            results.push((*name, true, f.energy));
                         }
                         Err(e) => {
                             println!("  [FEATURE_ERR] {} — {}", name, e);
