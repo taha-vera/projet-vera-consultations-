@@ -98,3 +98,23 @@ n'existe pas. C'est le principal chantier ouvert du projet.
 
 Ce document dit ce qui est prouvé, ce qui est mesuré, ce qui est assumé
 comme limite, et ce qui reste à faire. C'est sa fonction.
+
+## Mise a jour 2026-06-12 (soir) — Porte 7 : OUVERTE -> FERMEE (prototype)
+
+La porte 7 (differenciation par cohortes choisies, le « 49/1 ») est desormais
+fermee au niveau prototype. Implementation : vera_token.py (tokens anonymes
+a usage unique par signature aveugle RSA/Chaum, registre anti double-depense,
+un token par individu et par epoque). Validation : test_porte7.py, 7/7 :
+
+1. flux nominal — 2. double depense rejetee — 3. un seul token/individu/epoque
+4. nouvelle epoque = nouveau token — 5. token forge rejete
+6. non-liaison emetteur/agregateur — 7. attaque 49/1 simulee : 49/49 emissions refusees.
+
+La partition par epoque est donc mecaniquement forcee -> composition parallele
+-> epsilon reste 0,5 par epoque, et la cohorte de differenciation est
+inconstituable.
+
+Reserve (discipline post-DLap) : la primitive de signature aveugle est
+implementee a la main pour valider la logique ; avant production, la remplacer
+par une implementation auditee (ex. RSABSSA, RFC 9474). Le statut « FERMEE »
+est donc qualifie « prototype » jusqu a ce remplacement.
