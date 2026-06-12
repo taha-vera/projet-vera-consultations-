@@ -1,37 +1,45 @@
-# VERA Protocol
+﻿# Protocole VERA / ANCRE
 
-VERA is a proof protocol.
+*Agrégation à confidentialité différentielle, non-persistante.*
 
-VERA does not collect money. VERA does not redistribute. VERA certifies.
+VERA publie un résultat collectif (sondage sensible, consultation interne)
+sans jamais rendre lisible la contribution d'un individu — et le prouve.
 
-When data transits through VERA, raw signals are destroyed. What remains are orphaned statistics.
+- *Présentation et positionnement* : [README_VERA.md](README_VERA.md)
+- *Modèle de menace (les 7 portes)* : [VERA_THREAT_MODEL_COMPLETE.md](VERA_THREAT_MODEL_COMPLETE.md)
+- *Preuve reproductible (garantie eps-DP exacte = 0,5 via OpenDP)* : [validation_opendp.py](validation_opendp.py)
+- *Porte 7 (tokens anonymes a usage unique, prototype)* : [vera_token.py](vera_token.py) — tests : [test_porte7.py](test_porte7.py)
 
-## Five Invariants
+## Antériorité (DOI Zenodo)
 
-1. Non-persistence
-2. Irreversible aggregation
-3. Temporal decay
-4. Certified Destruction
-5. Separation of powers
+- v1.0 (2026-06-12) : https://doi.org/10.5281/zenodo.20668681
+- v1.1 (2026-06-12, porte 7 fermée en prototype) : https://doi.org/10.5281/zenodo.20671969
 
-## Three Actors
+## État des 7 portes
 
-- Radio / Media
-- SACEM / Rights holders
-- AI Operators
+| Porte | État |
+|---|---|
+| 1. Mécanisme de bruit | Fermée (preuve OpenDP) |
+| 2. MIA | Préliminaire (borne analytique) |
+| 3. Canal temporel | Préliminaire |
+| 4. Composition | Préliminaire (budget spécifié) |
+| 5. Observateur réseau | Hors-périmètre, assumé |
+| 6. Coercition | Hors-périmètre, assumé |
+| 7. Différenciation « 49/1 » | Fermée (prototype, RFC 9474 à venir) |
 
-VERA does not replace collective management organizations.
-VERA provides the proof they need to do their job.
+## Limites assumées
 
-## Tests
+L1 observateur réseau · L2 coercition · L3 petits effectifs (refus de publier
+sous seuil) · L4 qualification RGPD anonymisation/pseudonymisation (avis
+CNIL/DPO externe requis, non tranché).
 
-39 tests, 0 failed, 4 platforms.
+## Historique
 
-github.com/taha-vera/Protocole-Vera
+L'origine du projet (analyse audio Radio France, ère « VERA Radio ») est
+conservée dans archive/ et dans les modules Rust vera-radio, vera-sdk,
+vera-cli, vera-sib. Le cœur actuel du projet est le protocole
+d'agrégation DP non-persistant décrit ci-dessus.
 
+## Licence
 
-## Architecture Note
-
-The active pipeline is implemented in Rust (vera-sib, vera-radio, vera-sdk, vera-cli).
-Python scripts in archive/ are analysis utilities used during development.
-All protocol invariants are enforced by Rust code only.
+Voir [LICENSE](LICENSE). Documents : CC-BY 4.0.
