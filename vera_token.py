@@ -55,7 +55,7 @@ class Client:
         self.serial = secrets.token_bytes(32)
         self.r = None
 
-    def aveugler(self) -> int:
+    def aveugler(self, epoque: str) -> int:
         while True:
             r = secrets.randbelow(self.n - 2) + 2
             try:
@@ -64,7 +64,8 @@ class Client:
             except ValueError:
                 continue
         self.r = r
-        return (_fdh(self.serial, self.n) * pow(r, self.e, self.n)) % self.n
+
+        return (_fdh(self.serial + epoque.encode(), self.n) * pow(r, self.e, self.n)) % self.n
 
     def desaveugler(self, sig_aveugle: int):
         s = (sig_aveugle * pow(self.r, -1, self.n)) % self.n
@@ -79,7 +80,7 @@ class Agregateur:
 
     def contribuer(self, epoque: str, token, valeur):
         serial, s = token
-        if pow(s, self.e, self.n) != _fdh(serial, self.n):
+        if pow(s, self.e, self.n) != _fdh(serial + epoque.encode(), self.n):
             raise ValueError("REFUS: signature de token invalide")
         brules = self.depenses.setdefault(epoque, set())
         if serial in brules:
