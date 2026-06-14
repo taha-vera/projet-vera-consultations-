@@ -2,7 +2,7 @@
 
 *Auteur :* Taha Houari · tahahouari@hotmail.fr
 *Date :* 2026-06-12
-*Référence :* accompagne validation_opendp.py et README_VERA.md
+*Référence :* accompagne validation\_opendp.py et README\_VERA.md
 
 ## Principe
 
@@ -17,9 +17,9 @@ hors-périmètre / ouverte). Aucun état n'est embelli.
 *Menace :* un bruit mal calibré ou mal échantillonné annule la garantie DP
 (bug historique du projet : sampler maison, ratio pire cas 2,1 au lieu de 1,6487).
 *Défense :* statistique snappée sur grille entière avant bruit
-(Δ_int = 10), Laplace discret via OpenDP (bibliothèque auditée),
+(Δ\_int = 10), Laplace discret via OpenDP (bibliothèque auditée),
 garantie ε = 0,5 calculée analytiquement par meas.map() — sans Monte Carlo.
-*Preuve :* validation_opendp.py, reproductible.
+*Preuve :* validation\_opendp.py, reproductible.
 
 ## Porte 2 — Attaque par appartenance (MIA) · *PRÉLIMINAIRE*
 
@@ -43,7 +43,7 @@ environnement contrôlé.
 ## Porte 4 — Composition séquentielle · *PRÉLIMINAIRE*
 
 *Menace :* répéter k requêtes sur les mêmes données épuise la protection.
-ε_total = k·ε ; dès k=4 (ε=2,0), AUC max ≈ 0,88 : protection quasi nulle.
+ε\_total = k·ε ; dès k=4 (ε=2,0), AUC max ≈ 0,88 : protection quasi nulle.
 *Défense :* budget ε plafonné avec refus de servir au-delà (kill-switch),
 et partition par token/époque (cf. Porte 7) forçant la composition parallèle
 (ε reste 0,5 par époque).
@@ -79,22 +79,22 @@ n'existe pas. C'est le principal chantier ouvert du projet.
 
 ## Limites transverses (hors portes)
 
-- *L3 — Petits effectifs :* sous un seuil N, l'anonymat est mathématiquement
-  indélivrable quel que soit le bruit. Politique : refus de publier sous le seuil.
-- *L4 — Qualification juridique :* anonymisation vs pseudonymisation au sens
-  RGPD (art. 5(1)(e)) — relève d'un avis CNIL/DPO externe, non tranché ici.
+* *L3 — Petits effectifs :* sous un seuil N, l'anonymat est mathématiquement
+indélivrable quel que soit le bruit. Politique : refus de publier sous le seuil.
+* *L4 — Qualification juridique :* anonymisation vs pseudonymisation au sens
+RGPD (art. 5(1)(e)) — relève d'un avis CNIL/DPO externe, non tranché ici.
 
 ## Synthèse
 
-| Porte | État |
-|---|---|
-| 1. Mécanisme de bruit | Fermée (preuve OpenDP) |
-| 2. MIA | Préliminaire (borne analytique vérifiée) |
-| 3. Canal temporel | Préliminaire (pas de fuite détectable) |
-| 4. Composition | Préliminaire (budget spécifié) |
-| 5. Observateur réseau | Hors-périmètre, assumé |
-| 6. Coercition | Hors-périmètre, assumé |
-| 7. Différenciation 49/1 | *Ouverte — à implémenter* |
+|Porte|État|
+|-|-|
+|1. Mécanisme de bruit|Fermée (preuve OpenDP)|
+|2. MIA|Préliminaire (borne analytique vérifiée)|
+|3. Canal temporel|Préliminaire (pas de fuite détectable)|
+|4. Composition|Préliminaire (budget spécifié)|
+|5. Observateur réseau|Hors-périmètre, assumé|
+|6. Coercition|Hors-périmètre, assumé|
+|7. Différenciation 49/1|*Ouverte — à implémenter*|
 
 Ce document dit ce qui est prouvé, ce qui est mesuré, ce qui est assumé
 comme limite, et ce qui reste à faire. C'est sa fonction.
@@ -102,13 +102,13 @@ comme limite, et ce qui reste à faire. C'est sa fonction.
 ## Mise a jour 2026-06-12 (soir) — Porte 7 : OUVERTE -> FERMEE (prototype)
 
 La porte 7 (differenciation par cohortes choisies, le « 49/1 ») est desormais
-fermee au niveau prototype. Implementation : vera_token.py (tokens anonymes
+fermee au niveau prototype. Implementation : vera\_token.py (tokens anonymes
 a usage unique par signature aveugle RSA/Chaum, registre anti double-depense,
-un token par individu et par epoque). Validation : test_porte7.py, 7/7 :
+un token par individu et par epoque). Validation : test\_porte7.py, 7/7 :
 
 1. flux nominal — 2. double depense rejetee — 3. un seul token/individu/epoque
-4. nouvelle epoque = nouveau token — 5. token forge rejete
-6. non-liaison emetteur/agregateur — 7. attaque 49/1 simulee : 49/49 emissions refusees.
+2. nouvelle epoque = nouveau token — 5. token forge rejete
+3. non-liaison emetteur/agregateur — 7. attaque 49/1 simulee : 49/49 emissions refusees.
 
 La partition par epoque est donc mecaniquement forcee -> composition parallele
 -> epsilon reste 0,5 par epoque, et la cohorte de differenciation est
@@ -118,3 +118,108 @@ Reserve (discipline post-DLap) : la primitive de signature aveugle est
 implementee a la main pour valider la logique ; avant production, la remplacer
 par une implementation auditee (ex. RSABSSA, RFC 9474). Le statut « FERMEE »
 est donc qualifie « prototype » jusqu a ce remplacement.
+
+\## Mise a jour 2026-06-14 — Porte 7 requalifiee + Porte 8 mesuree
+
+
+
+\### Porte 7 : liaison a l'epoque corrigee (faille critique)
+
+La version initiale du prototype hashait le serial seul (\_fdh(serial)), sans
+
+lier le token a son epoque. Consequence : un token emis pour l'epoque T restait
+
+valide a toute epoque ulterieure (le registre anti-double-depense etant
+
+partitionne par epoque, le meme serial passait dans chaque nouvelle epoque).
+
+La promesse « un token par individu ET par epoque » etait donc fausse au niveau
+
+cryptographique.
+
+
+
+Correctif : le Full-Domain Hash porte desormais sur serial + epoque, a
+
+l'aveuglage comme a la verification (vera\_token.py). Un token forge pour
+
+l'epoque T est rejete a toute autre epoque. Validation : test\_porte7.py, 9/9,
+
+dont le test 8 (rejeu cross-epoque bloque) et 8b (token valide a sa propre
+
+epoque).
+
+Statut Porte 7 : « partition logique + liaison epoque VALIDEES (prototype) ».
+
+La primitive de signature aveugle reste implementee a la main (FDH/Chaum sans
+
+PSS) : forgeable par homomorphie (s1·s2), a remplacer par RSABSSA/RFC 9474
+
+avant production. La partition est validee ; la primitive cryptographique
+
+n'est PAS securisee. Statut honnete : « mecanique validee, crypto a durcir ».
+
+
+
+\### Porte 8 (nouvelle) : inference directe sur l'outlier · MESUREE
+
+Menace : l'agregat moyen (AUC \~0,62) masque la fuite sur le repondant
+
+atypique — le « 1 non sur 99 ». Metrique correcte : TPR @ bas FPR (Carlini
+
+2022), pas l'AUC moyenne. Attaque DISTINCTE de la Porte 7 : non plus la
+
+differenciation structurelle, mais l'inference directe sur la valeur de
+
+l'outlier.
+
+
+
+Mesure (test\_porte8\_outlier.py, eps=0.5, Delta=10, scale=20) :
+
+\- TPR@10% = 16,3% / TPR@1% = 1,63% / TPR@0.1% = 0,16%
+
+\- A FPR 1%, l'attaquant n'attrape le vrai dissident que 1,6% du temps
+
+&#x20; (\~1% au hasard) : fuite NEGLIGEABLE sur une observation unique.
+
+\- Baisser eps (0,1 ; 0,08) n'ameliore quasi rien : a eps=0.5 le bruit
+
+&#x20; domine deja le signal de l'outlier. Pas besoin de sacrifier l'utilite.
+
+
+
+Mesure en composition (test\_porte8\_composition.py, attaquant qui moyenne
+
+k observations du meme outlier) :
+
+\- k=1 : TPR@1% = 1,6% (protege)
+
+\- k=10 : 9,7%
+
+\- k=50 : 55,8% (anonymat effondre)
+
+La fuite croit en racine de k. La defense est la partition de la Porte 7 :
+
+un token par individu par epoque force k=1 par epoque. Les Portes 7 et 8 sont
+
+le meme rempart vu de deux cotes — la partition temporelle empeche
+
+l'accumulation qui ouvrirait la fuite outlier.
+
+
+
+L5 (nouvelle limite transverse, cross-epoque) : la partition garantit k=1
+
+PAR EPOQUE, pas k=1 a vie. Un attaquant qui suit le meme outlier repondant a
+
+la meme question sur k epoques successives peut accumuler. Borne par le budget
+
+eps global (Porte 4) et couteux en pratique. Limite assumee, a nommer.
+
+
+
+Statut Porte 8 : « mesuree, negligeable a k=1 ; defense = partition Porte 7 ;
+
+limite cross-epoque assumee (L5) ».
+
