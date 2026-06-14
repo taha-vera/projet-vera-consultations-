@@ -44,17 +44,17 @@ try:
     ok.append(("5. token forge rejete", False))
 except ValueError:
     ok.append(("5. token forge rejete", True))
-
-# --- 6. Non-liaison (sanity) : ce que voit l emetteur (messages aveugles)
-#     ne correspond a AUCUN serial depense chez l agregateur.
+# --- 6. Non-liaison : l'emetteur (identites) et l'agregateur (serials)
+#     n'ont AUCUNE valeur commune. L'emetteur ne stocke plus rien d'aveugle.
 serials_vus = set()
 for ep in ag.depenses.values():
     for srl in ep:
         serials_vus.add(srl)
-liaison = any(m in serials_vus for m in em.journal_aveugle)
+liaison = any(srl in em.emis for srl in serials_vus)
 ok.append(("6. non-liaison emetteur/agregateur", not liaison))
 
 # --- 7. SIMULATION DE L ATTAQUE 49/1 (Dinur-Nissim)
+
 em2 = Emetteur()
 n2, e2 = em2.cle_publique()
 ag2 = Agregateur(n2, e2)
