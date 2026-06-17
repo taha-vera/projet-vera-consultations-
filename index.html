@@ -1,11 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
+﻿<!DOCTYPE html>
+<html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VERA — Privacy-preserving cultural data infrastructure for AI</title>
-<meta name="description" content="VERA is an open protocol for legal AI training data with differential privacy, artist compensation, and GDPR compliance. Alternative to scraping copyrighted content.">
-<meta name="keywords" content="legal AI training data, artist compensation AI, differential privacy audio, GDPR AI data pipeline, AI Act compliance, scraping alternative, privacy preserving cultural data, SACEM AI, music data AI training">
+<title>VERA — Consultation a confidentialite differentielle, prouvee</title>
+<meta name="description" content="VERA est un protocole open source pour publier le resultat d'une consultation ou d'un sondage sensible sans jamais rendre lisible la reponse d'un individu — et le prouver mathematiquement via la confidentialite differentielle (OpenDP).">
+<meta name="keywords" content="confidentialite differentielle, consultation anonyme, sondage sensible, RGPD, anonymat prouve, OpenDP, differential privacy, protocole open source">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: system-ui, sans-serif; color: #1a1a1a; line-height: 1.6; }
@@ -14,7 +14,7 @@ a:hover { text-decoration: underline; }
 .container { max-width: 860px; margin: 0 auto; padding: 0 1.5rem; }
 header { background: #0f172a; color: white; padding: 4rem 0 3rem; }
 header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 1rem; }
-header p { font-size: 1.1rem; color: #94a3b8; max-width: 600px; }
+header p { font-size: 1.1rem; color: #94a3b8; max-width: 640px; }
 .cta { margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
 .btn { padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; }
 .btn-primary { background: #2563eb; color: white; }
@@ -26,7 +26,6 @@ ul { padding-left: 1.5rem; }
 li { margin-bottom: 0.5rem; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; }
 .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; }
-.tag { display: inline-block; background: #dbeafe; color: #1e40af; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; margin: 0.25rem; }
 .metric { font-size: 2rem; font-weight: 700; color: #2563eb; }
 footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: center; }
 </style>
@@ -34,201 +33,115 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 <body>
 <header>
 <div class="container">
-<h1>How to train AI on cultural data legally, privately, and with artist compensation.</h1>
-<p>VERA is an open protocol for aggregating cultural signals with differential privacy guarantees, no raw data retention, built-in artist remuneration, and full auditability.</p>
+<h1>Publier le resultat d'une consultation sensible — sans jamais trahir une seule reponse.</h1>
+<p>VERA est un protocole open source qui publie un resultat collectif (sondage, consultation interne) sans rendre lisible la contribution d'un individu, et qui le PROUVE mathematiquement. Pas une promesse : une garantie verifiable.</p>
 <div class="cta">
-<a href="https://github.com/taha-vera/Protocole-Vera" class="btn btn-primary">View on GitHub</a>
-<a href="https://github.com/taha-vera/Protocole-Vera/blob/main/VERA_WHITEPAPER_FINAL.md" class="btn btn-secondary">Technical Paper</a>
+<a href="https://github.com/taha-vera/Protocole-Vera" class="btn btn-primary">Voir sur GitHub</a>
+<a href="https://github.com/taha-vera/Protocole-Vera/blob/main/VERA_THREAT_MODEL_COMPLETE.md" class="btn btn-secondary">Modele de menace</a>
 </div>
 </div>
 </header>
 <main>
 <section>
 <div class="container">
-<h2>The problem with AI training data today</h2>
+<h2>Le probleme</h2>
 <div class="grid">
 <div class="card">
-<h3>Legal risk</h3>
-<p>GDPR restricts raw personal and cultural data usage. AI Act increases obligations on data provenance. Copyright blocks large-scale scraping.</p>
+<h3>"Faites-nous confiance"</h3>
+<p>Les outils de sondage classiques stockent les reponses et promettent de ne pas regarder. L'anonymat repose sur la confiance, pas sur une preuve.</p>
 </div>
 <div class="card">
-<h3>No compensation</h3>
-<p>Artists and rights holders receive nothing when their work trains AI models. No mechanism exists to track or redistribute value.</p>
+<h3>Le repondant atypique</h3>
+<p>Sur un sujet sensible, celui qui repond differemment des autres (le "1 non sur 99") reste identifiable dans un decompte exact.</p>
 </div>
 <div class="card">
-<h3>No auditability</h3>
-<p>AI operators cannot prove their training data is legally compliant. Regulators cannot verify without accessing raw data.</p>
-</div>
-</div>
-<p style="margin-top:1.5rem; color:#64748b;">Result: data is either illegal, inaccessible, or ethically contested.</p>
-</div>
-</section>
-<section>
-<div class="container">
-<h2>What VERA solves</h2>
-<div class="grid">
-<div class="card">
-<h3>Legal AI training data pipelines</h3>
-<p>GDPR-compliant irreversible aggregation. Only statistical outputs leave the system. No raw data ever stored.</p>
-</div>
-<div class="card">
-<h3>Artist compensation from AI usage</h3>
-<p>Usage-based redistribution model. 70% returns to the cultural ecosystem. SACEM and equivalent organizations distribute to artists.</p>
-</div>
-<div class="card">
-<h3>Privacy-preserving audio streams</h3>
-<p>Differential privacy with Discrete Laplace mechanism. k-anonymity threshold enforced per contributor. Resistant to Mironov 2012 float attack.</p>
-</div>
-<div class="card">
-<h3>Alternative to scraping</h3>
-<p>Only aggregated statistical patterns are exported. No individual signal is recoverable. Re-identification risk below 2.5%.</p>
+<h3>Aucune verification possible</h3>
+<p>Ni le repondant ni un tiers ne peut verifier que les donnees brutes ont reellement ete detruites.</p>
 </div>
 </div>
 </div>
 </section>
 <section>
 <div class="container">
-<h2>Core protocol invariants</h2>
-<p style="margin-bottom:1.5rem; color:#64748b;">Enforced by code, not policy. No one can override them.</p>
+<h2>Ce que VERA garantit</h2>
+<div class="grid">
+<div class="card">
+<h3>Anonymat prouve, pas promis</h3>
+<p>La garantie de confidentialite differentielle est calculee analytiquement par OpenDP, une bibliotheque auditee. epsilon = 0,5 exact, pas une estimation.</p>
+</div>
+<div class="card">
+<h3>Non-persistance</h3>
+<p>La donnee brute est detruite a l'entree. Seul un resultat agrege et bruite est publie. Rien d'individuel ne survit.</p>
+</div>
+<div class="card">
+<h3>Protection du repondant atypique</h3>
+<p>Le bruit differentiel protege chaque participant, y compris celui qui repond differemment des autres.</p>
+</div>
+<div class="card">
+<h3>Consultation, pas vote</h3>
+<p>VERA donne une tendance fiable, pas un decompte exact. Ce flou maitrise est precisement ce qui protege les personnes.</p>
+</div>
+</div>
+</div>
+</section>
+<section>
+<div class="container">
+<h2>Invariants du protocole</h2>
+<p style="margin-bottom:1.5rem; color:#64748b;">Garantis par le code, pas par une politique.</p>
 <ul>
-<li>Raw data is never stored or exposed</li>
-<li>Outputs are irreversible statistical aggregates</li>
-<li>Differential privacy enforced — ε budget tracked and bounded</li>
-<li>k-anonymity threshold ≥ 100 enforced per contributor</li>
-<li>Temporal decay — data has finite validity window (half-life 24h)</li>
-<li>No identity reconstruction possible</li>
-<li>External audit without raw data access</li>
+<li>La donnee brute n'est jamais stockee ni exposee</li>
+<li>Les sorties sont des agregats statistiques bruites, irreversibles</li>
+<li>Confidentialite differentielle : budget epsilon plafonne et borne</li>
+<li>Seuil minimum de participants (K >= 100) : refus de publier en dessous</li>
+<li>Un token anonyme par individu et par consultation (anti double-reponse)</li>
+<li>Limites du modele de menace documentees, pas dissimulees</li>
 </ul>
 </div>
 </section>
 <section>
 <div class="container">
-<h2>Validated results</h2>
+<h2>Garanties verifiables</h2>
 <div class="grid">
 <div class="card" style="text-align:center">
-<div class="metric">1.0000</div>
-<p>Spearman ρ — signal utility perfectly preserved</p>
+<div class="metric">0,5</div>
+<p>epsilon exact — garantie DP certifiee par OpenDP</p>
 </div>
 <div class="card" style="text-align:center">
-<div class="metric">37</div>
-<p>Tests passed — 0 failed across all modules</p>
+<div class="metric">&ge; 100</div>
+<p>K minimum — pas de publication sous le seuil</p>
 </div>
 <div class="card" style="text-align:center">
-<div class="metric">119</div>
-<p>K effective — k-anonymity respected</p>
+<div class="metric">0</div>
+<p>donnee brute conservee apres agregation</p>
 </div>
 <div class="card" style="text-align:center">
-<div class="metric">0.134ms</div>
-<p>Latency per signal — production ready</p>
+<div class="metric">Open</div>
+<p>code source verifiable, modele de menace public</p>
 </div>
 </div>
 </div>
 </section>
 <section>
 <div class="container">
-<h2>How it works</h2>
+<h2>Comment ca marche</h2>
 <div class="grid">
-<div class="card"><h3>1. Ingestion</h3><p>Audio and cultural streams enter the collection layer. Raw data never leaves this layer.</p></div>
-<div class="card"><h3>2. Aggregation</h3><p>Signal extraction and noise injection. k-anonymity enforced before any output.</p></div>
-<div class="card"><h3>3. Privacy</h3><p>Differential privacy with Discrete Laplace. Budget tracker enforces composition bounds.</p></div>
-<div class="card"><h3>4. Distribution</h3><p>Statistical patterns exported to AI operators via SDK. No raw signal recoverable.</p></div>
-<div class="card"><h3>5. Remuneration</h3><p>70% of revenue returns to cultural ecosystem. SACEM distributes to artists automatically.</p></div>
-</div>
-</div>
-</section>
-<section>
-<div class="container">
-<h2>Who benefits</h2>
-<div class="grid">
-<div class="card">
-<h3>AI operators</h3>
-<p>Legal, auditable training data. Reduces regulatory risk under AI Act and GDPR. SDK integration in 3 lines of code.</p>
-</div>
-<div class="card">
-<h3>Artists and rights holders</h3>
-<p>Automatic compensation proportional to contribution. Privacy preserved. Compatible with SACEM, SCPP, ADAMI.</p>
-</div>
-<div class="card">
-<h3>Regulators</h3>
-<p>Full auditability without accessing raw data. GDPR Art.17 compliant. Formal proof of invariants.</p>
-</div>
-</div>
-</div>
-</section>
-<section>
-<div class="container">
-<h2>Keywords</h2>
-<div>
-<span class="tag">legal AI training data</span>
-<span class="tag">artist compensation AI</span>
-<span class="tag">differential privacy audio</span>
-<span class="tag">GDPR Art.17</span>
-<span class="tag">AI Act compliance</span>
-<span class="tag">privacy preserving cultural data</span>
-<span class="tag">SACEM AI</span>
-<span class="tag">scraping alternative</span>
-<span class="tag">k-anonymity</span>
-<span class="tag">Discrete Laplace</span>
-<span class="tag">open protocol</span>
-<span class="tag">artist remuneration</span>
-<span class="tag">PETS 2027</span>
-<span class="tag">weak signals</span>
-<span class="tag">FFT audio</span>
-<span class="tag">Rust privacy</span>
+<div class="card"><h3>1. Ouverture</h3><p>L'organisateur ouvre une consultation. Chaque participant recoit un token anonyme a usage unique.</p></div>
+<div class="card"><h3>2. Reponses</h3><p>Les participants repondent une fois chacun. Le seuil minimum de participants est verifie.</p></div>
+<div class="card"><h3>3. Agregation + bruit</h3><p>Le resultat est agrege puis bruite par le mecanisme de Laplace (OpenDP). La donnee brute est detruite.</p></div>
+<div class="card"><h3>4. Publication</h3><p>Seule la tendance bruitee est publiee. Le budget de confidentialite est decompte ; au-dela, publication refusee.</p></div>
 </div>
 </div>
 </section>
 </main>
 <footer>
 <div class="container">
-<p>VERA is not a company. It is a protocol. Anyone can implement it. No one owns it. Every implementation is verifiable against the invariants.</p>
+<p>VERA n'est pas une entreprise. C'est un protocole open source. Chacun peut l'implementer, le verifier, l'auditer.</p>
 <p style="margin-top:1rem;">
 <a href="https://github.com/taha-vera/Protocole-Vera" style="color:#60a5fa;">GitHub</a> —
-<a href="https://github.com/taha-vera/Protocole-Vera/blob/main/VERA_WHITEPAPER_FINAL.md" style="color:#60a5fa;">Whitepaper</a> —
-<a href="https://github.com/taha-vera/Protocole-Vera/blob/main/CHANGELOG.md" style="color:#60a5fa;">Changelog</a>
+<a href="https://github.com/taha-vera/Protocole-Vera/blob/main/VERA_THREAT_MODEL_COMPLETE.md" style="color:#60a5fa;">Modele de menace</a>
 </p>
+<p style="margin-top:1rem; font-size:0.9rem;">Contact : tahahouari@hotmail.fr</p>
 </div>
 </footer>
 </body>
 </html>
-<section itemscope itemtype="https://schema.org/FAQPage">
-<div class="container">
-<h2>Questions fréquentes</h2>
-
-<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
-<h3 itemprop="name">Qu'est-ce qu'un protocole de données culturelles privacy-preserving pour l'IA ?</h3>
-<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
-<p itemprop="text">Un protocole privacy-preserving pour données culturelles est une infrastructure qui collecte des signaux audio, musicaux ou médiatiques sans jamais stocker les données brutes. VERA utilise la differential privacy et la k-anonymité pour garantir qu'aucune donnée individuelle n'est reconstructible, tout en produisant des patterns statistiques utiles pour entraîner des modèles IA.</p>
-</div>
-</div>
-
-<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
-<h3 itemprop="name">Comment rémunérer les artistes quand l'IA utilise leurs données ?</h3>
-<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
-<p itemprop="text">VERA implémente une redistribution automatique : 70% des revenus générés par la vente de patterns agrégés retournent à l'écosystème culturel. Les sociétés de gestion collective comme la SACEM distribuent ensuite ces revenus aux artistes selon leurs règles existantes. Ce mécanisme est codé dans le protocole et ne peut pas être contourné.</p>
-</div>
-</div>
-
-<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
-<h3 itemprop="name">Quelle alternative légale au scraping existe pour entraîner une IA sur des données culturelles ?</h3>
-<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
-<p itemprop="text">VERA est une alternative open-source au scraping de données culturelles. Au lieu de copier des œuvres, VERA agrège des signaux faibles anonymisés avec differential privacy. Les opérateurs IA reçoivent des patterns statistiques conformes au RGPD et à l'AI Act, sans jamais accéder aux données brutes ni violer les droits d'auteur.</p>
-</div>
-</div>
-
-<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
-<h3 itemprop="name">VERA est-il conforme au RGPD et à l'AI Act ?</h3>
-<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
-<p itemprop="text">Oui. VERA est conçu pour être conforme par construction. Les données brutes sont effacées immédiatement après agrégation (zeroize). Seuls des patterns statistiques irréversibles sont exportés. Le budget de confidentialité différentielle est tracé formellement. Aucune donnée personnelle ni aucune œuvre identifiable ne quitte le système.</p>
-</div>
-</div>
-
-<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
-<h3 itemprop="name">Comment fonctionne la differential privacy dans VERA ?</h3>
-<div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
-<p itemprop="text">VERA utilise le mécanisme de Laplace Discret, résistant à l'attaque Mironov 2012 sur les flottants. Un BudgetTracker formel suit la consommation du budget epsilon et refuse toute requête qui dépasserait la limite. L'entropie cryptographique vient directement du système d'exploitation via getrandom.</p>
-</div>
-</div>
-
-</div>
-</section>
