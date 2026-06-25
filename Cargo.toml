@@ -6,4 +6,5 @@ members = [
     "vera-cli",
     "vera-sdk/radio",
     "vera-sdk/client",
+    "vera_attribution_rust",
 ]
