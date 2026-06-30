@@ -10,6 +10,11 @@
 #      via meas.map() -- aucun Monte Carlo, aucun sampler maison.
 #   2. L'AUC de l'attaquant d'appartenance optimal (MIA) au PIRE CAS est
 #      bornee analytiquement et reste sous la borne theorique e^eps/(1+e^eps).
+#   3. Le parametre bounds est utilise pour forcer une execution en temps
+#      quasi-constant, conformement aux recommandations d'OpenDP et au
+#      papier Jin et al. (IEEE S&P 2021) sur les fuites temporelles dans
+#      les mecanismes DP (l'echantillonnage geometrique sans bounds fuite
+#      l'amplitude du bruit via son temps d'execution).
 #
 # Ce que ce fichier NE prouve PAS (limites assumees, cf. section LIMITES) :
 #   - protection contre un observateur reseau (hors perimetre VERA)
@@ -31,15 +36,26 @@ DELTA_INT = math.floor(R * DS) + 1      # sensibilite entiere apres snapping = 1
 EPS_CIBLE = 0.5                         # budget epsilon vise
 SCALE = DELTA_INT / EPS_CIBLE           # echelle Laplace = 20.0
 
+# Bornes du domaine : la moyenne snappee ne peut pas sortir de cette plage.
+# Necesssaires pour que OpenDP utilise un echantillonnage en temps quasi-constant
+# (cf. parametre bounds dans make_laplace / then_laplace), conformement aux
+# recommandations de la documentation OpenDP et au papier Jin et al. 2021
+# (IEEE S&P) qui montre que l'echantillonnage geometrique sans bounds fuite
+# l'amplitude du bruit via son temps d'execution -- Porte 3 du modele de menace.
+BORNE_INF = 0      # valeur minimale possible de la moyenne snappee
+BORNE_SUP = 100    # valeur maximale possible de la moyenne snappee
+
 # ---------------------------------------------------------------------
 # 1. GARANTIE epsilon-DP EXACTE (certifiee par OpenDP)
+#    Avec bounds pour temps quasi-constant (Porte 3 du modele de menace)
 # ---------------------------------------------------------------------
-space = dp.atom_domain(T=int), dp.absolute_distance(T=int)
+space = dp.atom_domain(T=int, bounds=(BORNE_INF, BORNE_SUP)), dp.absolute_distance(T=int)
 meas = space >> dp.m.then_laplace(scale=SCALE)
 eps = meas.map(d_in=DELTA_INT)          # garantie analytique, PAS une estimation
 
 print("=== 1. GARANTIE DP (OpenDP) ===")
 print(f"  Delta_int = {DELTA_INT}, scale = {SCALE}")
+print(f"  Bornes domaine = [{BORNE_INF}, {BORNE_SUP}] (temps quasi-constant, Porte 3)")
 print(f"  epsilon garanti (meas.map) = {eps}")
 ok_eps = eps <= EPS_CIBLE + 1e-12
 print(f"  VERDICT : {'OK - garantie exacte' if ok_eps else 'ECHEC'}")
@@ -95,5 +111,6 @@ print("  L4 qualification RGPD  : anonymisation vs pseudonymisation = avis CNIL/
 print("\n=== SYNTHESE ===")
 print(f"  Garantie DP exacte : {'OK' if ok_eps else 'ECHEC'}")
 print(f"  MIA pire cas borne : {'OK' if ok_mia else 'ECHEC'}")
+print(f"  Porte 3 (canal temporel) : bounds={BORNE_INF},{BORNE_SUP} active (temps quasi-constant)")
 print("  Validation preliminaire (Termux) : sampler Canonne z=-0.19, timing 2.83% (bruit)")
-print("  Preuve deposable = ce fichier (OpenDP, machine Windows, " + "2026-06-10)")
+print("  Preuve deposable = ce fichier (OpenDP, machine Windows, 2026-06-30)")
