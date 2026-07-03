@@ -56,3 +56,20 @@ Vérifié 02/07 -- systemd, Restart=on-failure, testé par kill -9 réel, redém
 4. Absence de superviseur de service -- corrigée, avec effet de bord sur Porte 14.
 
 **Bilan honnête** : 6 portes vérifiées empiriquement sur le code de production actuel (1, 3, 4 avec réserve, 7, 9, 10). 2 portes vérifiées avec une méthodologie simplifiée à consolider (2, 8). 1 porte critique nouvellement identifiée et non résolue (14). Ceci remplace toute affirmation antérieure de type "8 portes sur 9 fermées".
+
+## Mise a jour Porte 14 -- 03/07/2026
+
+**Statut : FERMEE, verifiee empiriquement par crash test reel**
+
+Module vera_persistance.py (SQLite, write-through, WAL) deploye et integre dans vera_consultation_api.py et vera_signature_manager.py. Persiste : budget epsilon par departement, tokens consommes (anti-rejeu), compteurs de votes, effectifs, et la cle RSA active elle-meme (nouveau -- corrige une aggravation decouverte le 02/07 ou seule la partie anti-rejeu etait persistee, laissant la cle se regenerer a chaque redemarrage et invalider tous les tokens en circulation).
+
+Trois bugs trouves et corriges pendant l'integration, chacun par test reel :
+1. Regression du fix Porte 7 (except ImportError au lieu de except Exception) presente dans une version intermediaire, jamais deployee -- confirmee absente du fichier serveur reel avant integration.
+2. Appel manquant a gestionnaire_signature.ouvrir_consultation() -- la consultation n'etait jamais activee, aucun token generable.
+3. vbs.generer_cles() retourne des list, pas des bytes -- crash a la persistance de la cle (AttributeError sur .hex()). Corrige par conversion explicite bytes(...), coherent avec le pattern deja utilise ailleurs dans generer_token_signe().
+
+**Preuve empirique (03/07/2026, kill -9 reel sur le process en production) :**
+Avant crash : departement test, effectif=1, budget_epsilon.nombre_publications=1, epsilon_consomme=0.5.
+Apres kill -9 + redemarrage automatique systemd : effectif=1, nombre_publications=1, epsilon_consomme=0.5 -- identiques. Nouveau token genere avec succes apres redemarrage, confirmant que la cle RSA a survecu (rechargee depuis SQLite, pas regeneree).
+
+**Porte 14 : OUVERTE -> FERMEE.**

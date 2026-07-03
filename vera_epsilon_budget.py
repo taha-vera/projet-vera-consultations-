@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+vera_epsilon_budget.py — Porte 4 du modele de menace VERA : composition
+sequentielle. Empeche qu'un organisateur publie plusieurs resultats sur
+la MEME cohorte (departement) au point que le budget de confidentialite
+cumule devienne trop eleve pour rester protecteur.
+
+Principe (composition sequentielle basique, Dwork & Roth) : si on publie
+k resultats sur la meme population avec un budget epsilon chacun, le
+budget cumule est k*epsilon (composition de base, pessimiste mais simple
+et correcte -- pas besoin de composition avancee/Renyi pour ce volume).
+
+Specifique au pipeline Consultation, distinct du budget du pipeline Radio
+(qui suit le meme principe mais sur un objet different -- des requetes
+d'agregation de signaux, pas des publications de resultats de sondage).
+Construit independamment apres avoir constate que le fichier historique
+(ancre_budget_ledger.py, pipeline Radio) n'etait pas exploitable depuis
+cet environnement -- le principe est repris, pas le code.
+"""
+
+import threading
+
+
+class BudgetEpuiseError(Exception):
+    """Levee quand une publication depasserait le budget epsilon autorise
+    pour ce departement."""
+
+    def __init__(self, departement: str, epsilon_demande: float, epsilon_restant: float):
+        self.departement = departement
+        self.epsilon_demande = epsilon_demande
+        self.epsilon_restant = epsilon_restant
+        super().__init__(
+            f"Budget epuise pour '{departement}': demande {epsilon_demande}, "
+            f"restant {epsilon_restant}"
+        )
+
+
+class BudgetEpsilonParDepartement:
+    """
+    Suit un budget de confidentialite cumule par departement (cohorte).
+    Chaque publication de resultat consomme une fraction du budget total
+    autorise pour cette cohorte -- une fois epuise, refus dur, pas de
+    degradation silencieuse.
+    """
+
+    def __init__(self, epsilon_total_autorise: float = 1.5):
+        self._verrou = threading.Lock()
+        self._epsilon_total_autorise = epsilon_total_autorise
+        self._epsilon_consomme: dict[str, float] = {}
+        self._nombre_publications: dict[str, int] = {}
+
+    def epsilon_restant(self, departement: str) -> float:
+        with self._verrou:
+            consomme = self._epsilon_consomme.get(departement, 0.0)
+            return self._epsilon_total_autorise - consomme
+
+    def peut_publier(self, departement: str, epsilon_requete: float) -> bool:
+        with self._verrou:
+            consomme = self._epsilon_consomme.get(departement, 0.0)
+            return (consomme + epsilon_requete) <= self._epsilon_total_autorise
+
+    def consommer(self, departement: str, epsilon_requete: float) -> None:
+        with self._verrou:
+            consomme = self._epsilon_consomme.get(departement, 0.0)
+            restant = self._epsilon_total_autorise - consomme
+            if epsilon_requete > restant:
+                raise BudgetEpuiseError(departement, epsilon_requete, restant)
+
+            self._epsilon_consomme[departement] = consomme + epsilon_requete
+            self._nombre_publications[departement] = (
+                self._nombre_publications.get(departement, 0) + 1
+            )
+
+    def etat(self, departement: str) -> dict:
+        with self._verrou:
+            consomme = self._epsilon_consomme.get(departement, 0.0)
+            return {
+                "epsilon_consomme": consomme,
+                "epsilon_restant": self._epsilon_total_autorise - consomme,
+                "epsilon_total_autorise": self._epsilon_total_autorise,
+                "nombre_publications": self._nombre_publications.get(departement, 0),
+            }
+    def injecter_etat(self, departement: str, epsilon_consomme: float, nombre_publications: int) -> None:
+        """
+        Reinjecte un etat deja connu (rechargement depuis persistance, Porte 14) --
+        contrairement a consommer(), n'applique aucune logique de refus et ne
+        rejoue pas la sequence de publications, evite toute divergence si le
+        montant par publication a change entre deux deploiements.
+        """
+        with self._verrou:
+            self._epsilon_consomme[departement] = epsilon_consomme
+            self._nombre_publications[departement] = nombre_publications
