@@ -316,7 +316,6 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
             if not deja_publie:
                 if not budget_epsilon.peut_publier(departement, EPSILON_PAR_PUBLICATION):
                     resultat_par_departement[departement] = {
-                        "effectif": effectif,
                         "refuse": True,
                         "raison": "Budget de confidentialite epuise pour ce groupe.",
                     }
@@ -332,9 +331,7 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
             }
 
             resultat_par_departement[departement] = {
-                "effectif": effectif,
                 "resultats_bruits": comptes_bruites,
-                "fiable": effectif >= K_MIN,
                 "budget_epsilon": budget_epsilon.etat(departement),
             }
 
