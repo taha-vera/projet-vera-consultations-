@@ -73,3 +73,67 @@ Avant crash : departement test, effectif=1, budget_epsilon.nombre_publications=1
 Apres kill -9 + redemarrage automatique systemd : effectif=1, nombre_publications=1, epsilon_consomme=0.5 -- identiques. Nouveau token genere avec succes apres redemarrage, confirmant que la cle RSA a survecu (rechargee depuis SQLite, pas regeneree).
 
 **Porte 14 : OUVERTE -> FERMEE.**
+
+## Mise a jour 05/07/2026 — Nouvelles portes identifiees par challenge multi-IA
+
+### Porte 11 — Acces direct a la base SQLite
+
+**Statut : OUVERTE, GRAVITE CRITIQUE, documentee 05/07/2026**
+
+La base SQLite `/root/vera_state.db` contient en clair :
+- La cle RSA privee active (hex non chiffre)
+- Les empreintes SHA256 des tokens consommes (anti-rejeu)
+- Le budget epsilon par departement
+- Les compteurs de votes agriges
+
+Tout acces root au serveur (incident Hetzner, compromission SSH, dump memoire)
+expose directement la cle privee RSA, permettant de forger des tokens valides
+pour toute consultation en cours.
+
+Attenuation minimale non implementee : chiffrer la cle RSA dans SQLite avec
+une cle derivee d'un secret externe (variable d'environnement ou fichier
+separe avec permissions 400), jamais stockee dans la base elle-meme.
+
+Non traite -- necessite une session dediee (derivation de cle, migration de
+schema, gestion du secret de chiffrement).
+
+---
+
+### Porte 12 — Secret administrateur visible dans /proc
+
+**Statut : LIMITE ASSUMEE, documentee 05/07/2026**
+
+Le secret `VERA_SECRET_CREATION_COMPTE` est defini dans le fichier systemd
+`/etc/systemd/system/vera-consultation.service` (permissions 600, lisible
+uniquement par root). Il est donc visible dans `/proc/PID/environ` pour tout
+process tournant en root sur le meme serveur.
+
+Sur un serveur solo en root (configuration actuelle), ce risque est acceptable
+-- un attaquant ayant acces root peut deja lire SQLite (Porte 11, plus grave).
+En environnement multi-utilisateur ou multi-process root, ce secret serait
+compromis.
+
+Attenuation : utiliser un gestionnaire de secrets externe (HashiCorp Vault,
+AWS Secrets Manager) ou un fichier de secrets avec permissions strictes hors
+du fichier .service. Non prioritaire tant que Porte 11 reste ouverte.
+
+---
+
+### Note sur la semantique du budget epsilon multi-consultation
+
+Le budget epsilon (epsilon_total=1.5, max 3 publications) est indexe par
+departement seul, sans identifiant de question. Ce comportement est
+intentionnel et mathematiquement correct :
+
+La composition sequentielle (Dwork & Roth) s'applique a la meme POPULATION
+sur la duree, independamment du nombre de questions posees. Autoriser un
+budget distinct par question permettrait de poser un nombre illimite de
+questions sur la meme population avec epsilon=0.5 chacune, ce qui contourne
+directement la garantie de composition (Porte 13).
+
+En pratique : une population (departement) ne peut recevoir que 3 publications
+au total, toutes consultations confondues, avant que le systeme refuse de
+publier de nouveaux resultats pour cette population. Ce comportement a ete
+verifie empiriquement le 05/07/2026 par deux cycles de vote successifs sur
+le meme departement -- le budget s'accumule correctement entre consultations
+grace a la persistance SQLite (Porte 14 fermee le 03/07/2026).
