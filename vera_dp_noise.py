@@ -27,7 +27,7 @@ dp.enable_features("contrib")
 
 DELTA_INT = 2
 SCALE = 4.0
-BOUNDS = (0, 100)
+BOUNDS = (0, 10000)
 
 _domaine = dp.atom_domain(T=int, bounds=BOUNDS)
 _metrique = dp.absolute_distance(T=int)
