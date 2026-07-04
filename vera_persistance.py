@@ -101,3 +101,64 @@ def effacer_cle_rsa():
     with _verrou_db:
         _conn.execute("DELETE FROM cle_rsa_active WHERE id = 1")
         _conn.commit()
+
+
+# --------------------------------------------------------------------------
+# Chiffrement de la cle RSA (Porte 11)
+# --------------------------------------------------------------------------
+
+import os
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+
+_PBKDF2_SALT = b"vera_rsa_key_v1"
+_PBKDF2_ITERATIONS = 100000
+
+def _get_fernet() -> Fernet:
+    secret = os.environ.get("VERA_DB_KEY", "")
+    if not secret:
+        raise RuntimeError(
+            "ERREUR CRITIQUE : VERA_DB_KEY non definie. "
+            "La cle RSA ne peut pas etre chiffree/dechiffree. "
+            "Verifiez le fichier systemd."
+        )
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=_PBKDF2_SALT,
+        iterations=_PBKDF2_ITERATIONS,
+    )
+    cle_derivee = base64.urlsafe_b64encode(kdf.derive(secret.encode("utf-8")))
+    return Fernet(cle_derivee)
+
+
+def persister_cle_rsa_chiffree(cle_privee_der: bytes, cle_publique_der: bytes, ouverture_unix: float) -> None:
+    """Ecrit la cle RSA chiffree avec VERA_DB_KEY."""
+    f = _get_fernet()
+    cle_privee_chiffree = f.encrypt(cle_privee_der).hex()
+    with _verrou_db:
+        sql = "INSERT INTO cle_rsa_active (id, cle_privee_hex, cle_publique_hex, ouverture_unix) VALUES (1, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET cle_privee_hex = excluded.cle_privee_hex, cle_publique_hex = excluded.cle_publique_hex, ouverture_unix = excluded.ouverture_unix"
+        _conn.execute(sql, (cle_privee_chiffree, cle_publique_der.hex(), ouverture_unix))
+        _conn.commit()
+
+
+def charger_cle_rsa_chiffree() -> tuple[bytes, bytes, float] | None:
+    """Charge et dechiffre la cle RSA depuis SQLite."""
+    with _verrou_db:
+        row = _conn.execute(
+            "SELECT cle_privee_hex, cle_publique_hex, ouverture_unix FROM cle_rsa_active WHERE id = 1"
+        ).fetchone()
+    if row is None:
+        return None
+    f = _get_fernet()
+    try:
+        cle_privee = f.decrypt(bytes.fromhex(row[0]))
+    except Exception as e:
+        raise RuntimeError(
+            f"Impossible de dechiffrer la cle RSA depuis SQLite : {e}. "
+            "Verifiez que VERA_DB_KEY est correcte et inchangee."
+        )
+    cle_publique = bytes.fromhex(row[1])
+    return cle_privee, cle_publique, row[2]

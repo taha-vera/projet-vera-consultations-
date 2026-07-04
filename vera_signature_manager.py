@@ -65,7 +65,7 @@ class GestionnaireSignature:
                 raise RuntimeError("Une consultation est deja active.")
             cle_rechargee = False
             if _PERSISTANCE_DISPONIBLE:
-                etat_persiste = _persistance.charger_cle_rsa()
+                etat_persiste = _persistance.charger_cle_rsa_chiffree()
                 if etat_persiste is not None:
                     cle_privee, cle_publique, ouverture_unix = etat_persiste
                     age = time.time() - ouverture_unix
@@ -82,7 +82,7 @@ class GestionnaireSignature:
                 self._cle_publique_der = bytes(self._cle_publique_der)
                 self._ouverture_ts = time.time()
                 if _PERSISTANCE_DISPONIBLE:
-                    _persistance.persister_cle_rsa(self._cle_privee_der, self._cle_publique_der, self._ouverture_ts)
+                    _persistance.persister_cle_rsa_chiffree(self._cle_privee_der, self._cle_publique_der, self._ouverture_ts)
             self._consultation_ouverte = True
         temps_ecoule = time.time() - self._ouverture_ts
         temps_restant = max(0.0, DUREE_VIE_CLE_SECONDES - temps_ecoule)
