@@ -137,3 +137,31 @@ publier de nouveaux resultats pour cette population. Ce comportement a ete
 verifie empiriquement le 05/07/2026 par deux cycles de vote successifs sur
 le meme departement -- le budget s'accumule correctement entre consultations
 grace a la persistance SQLite (Porte 14 fermee le 03/07/2026).
+
+## Mise a jour Porte 11 -- 05/07/2026 -- FERMEE
+
+**Statut : FERMEE, verifiee par crash test reel**
+
+Correction implementee : chiffrement Fernet (AES-128-CBC + HMAC-SHA256) de la
+cle RSA privee avant ecriture dans SQLite. Cle de chiffrement derivee de
+VERA_DB_KEY via PBKDF2-SHA256 (100 000 iterations, salt fixe b"vera_rsa_key_v1").
+
+La cle de chiffrement VERA_DB_KEY est definie dans le fichier systemd
+(/etc/systemd/system/vera-consultation.service, permissions 600) et injectee
+comme variable d'environnement au demarrage du service. Elle n'est jamais
+stockee dans SQLite.
+
+Preuve empirique (05/07/2026, kill -9 reel sur PID 503179) :
+- Avant crash : token genere avec cle chiffree dans SQLite
+- kill -9 503179 : process tue brutalement
+- Nouveau PID 503465 : redemarrage automatique systemd en moins d'1 seconde
+- Apres crash : nouveau token genere avec succes -- cle RSA rechargee depuis
+  SQLite et dechiffree correctement avec VERA_DB_KEY
+
+Limites documentees (non bloquantes en contexte solo-root) :
+- Salt PBKDF2 fixe (b"vera_rsa_key_v1") : risque rainbow table theorique,
+  negligeable en pratique sur serveur solo
+- Pas de mecanisme de re-chiffrement automatique a la rotation de VERA_DB_KEY
+- VERA_DB_KEY visible dans /proc/PID/environ (Porte 12, limite assumee)
+
+**Porte 11 : OUVERTE -> FERMEE.**
