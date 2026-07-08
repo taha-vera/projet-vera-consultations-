@@ -78,7 +78,8 @@ Apres kill -9 + redemarrage automatique systemd : effectif=1, nombre_publication
 
 ### Porte 11 — Acces direct a la base SQLite
 
-**Statut : OUVERTE, GRAVITE CRITIQUE, documentee 05/07/2026**
+**Statut initial (05/07/2026 matin) : OUVERTE, GRAVITE CRITIQUE.**
+**Statut final (05/07/2026 soir) : FERMEE — voir section "Mise a jour Porte 11" plus bas pour la correction et la preuve empirique.**
 
 La base SQLite `/root/vera_state.db` contient en clair :
 - La cle RSA privee active (hex non chiffre)
@@ -115,7 +116,7 @@ compromis.
 
 Attenuation : utiliser un gestionnaire de secrets externe (HashiCorp Vault,
 AWS Secrets Manager) ou un fichier de secrets avec permissions strictes hors
-du fichier .service. Non prioritaire tant que Porte 11 reste ouverte.
+du fichier .service. Porte 11 est desormais fermee (voir plus bas) ; Porte 12 reste une limite assumee independamment.
 
 ---
 
