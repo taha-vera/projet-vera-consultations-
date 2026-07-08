@@ -74,7 +74,7 @@ Apres kill -9 + redemarrage automatique systemd : effectif=1, nombre_publication
 
 **Porte 14 : OUVERTE -> FERMEE.**
 
-## Mise a jour 05/07/2026 — Nouvelles portes identifiees par challenge multi-IA
+## Mise a jour 05/07/2026 — Nouvelles portes identifiees lors d une revue de securite
 
 ### Porte 11 — Acces direct a la base SQLite
 
