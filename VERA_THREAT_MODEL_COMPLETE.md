@@ -159,10 +159,14 @@ Preuve empirique (05/07/2026, kill -9 reel sur PID 503179) :
 - Apres crash : nouveau token genere avec succes -- cle RSA rechargee depuis
   SQLite et dechiffree correctement avec VERA_DB_KEY
 
-Limites documentees (non bloquantes en contexte solo-root) :
+Limites documentees a l origine (non bloquantes en contexte solo-root) :
 - Salt PBKDF2 fixe (b"vera_rsa_key_v1") : risque rainbow table theorique,
-  negligeable en pratique sur serveur solo
+  negligeable en pratique sur serveur solo -- CORRIGE le 05/07/2026 (soir) :
+  salt aleatoire de 16 bytes (os.urandom) genere et persiste par
+  enregistrement, teste par cycle complet + crash test reel
 - Pas de mecanisme de re-chiffrement automatique a la rotation de VERA_DB_KEY
+  -- non corrige, limite toujours actuelle
 - VERA_DB_KEY visible dans /proc/PID/environ (Porte 12, limite assumee)
+  -- non corrige, limite assumee toujours actuelle
 
 **Porte 11 : OUVERTE -> FERMEE.**
