@@ -1,4 +1,4 @@
-﻿# Protocole VERA / ANCRE
+# VERA Consultation
 
 *Agrégation à confidentialité différentielle, non-persistante.*
 
@@ -41,12 +41,6 @@ L1 observateur réseau · L2 coercition · L3 petits effectifs (refus de publier
 sous seuil) · L4 qualification RGPD anonymisation/pseudonymisation (avis
 CNIL/DPO externe requis, non tranché).
 
-## Historique
-
-L'origine du projet (analyse audio Radio France, ère « VERA Radio ») est
-conservée dans archive/ et dans les modules Rust vera-radio, vera-sdk,
-vera-cli, vera-sib. Le cœur actuel du projet est le protocole
-d'agrégation DP non-persistant décrit ci-dessus.
 
 ## Licence
 
