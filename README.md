@@ -6,26 +6,34 @@ VERA publie un résultat collectif (sondage sensible, consultation interne)
 sans jamais rendre lisible la contribution d'un individu — et le prouve.
 
 - *Présentation et positionnement* : [README_VERA.md](README_VERA.md)
-- *Modèle de menace (les 7 portes)* : [VERA_THREAT_MODEL_COMPLETE.md](VERA_THREAT_MODEL_COMPLETE.md)
-- *Preuve reproductible (garantie eps-DP exacte = 0,5 via OpenDP)* : [validation_opendp.py](validation_opendp.py)
-- *Porte 7 (tokens anonymes a usage unique, prototype)* : [vera_token.py](vera_token.py) — tests : [test_porte7.py](test_porte7.py)
+- *Modèle de menace complet (14 portes)* : [VERA_THREAT_MODEL_COMPLETE.md](VERA_THREAT_MODEL_COMPLETE.md)
+- *Mécanisme de bruit en production* : [vera_dp_noise.py](vera_dp_noise.py) (OpenDP, Δ=2, scale=4, ε=0.5, bounds=(0,10000))
+- *Persistance chiffrée de l'état (Portes 11, 14)* : [vera_persistance.py](vera_persistance.py) (SQLite WAL, Fernet/AES-128)
+- *Porte 7 (signature aveugle RSABSSA, production)* : [vera_signature_manager.py](vera_signature_manager.py) — tests : [test_porte7.py](test_porte7.py)
 
 ## Antériorité (DOI Zenodo)
 
 - v1.0 (2026-06-12) : https://doi.org/10.5281/zenodo.20668681
 - v1.1 (2026-06-12, porte 7 fermée en prototype) : https://doi.org/10.5281/zenodo.20671969
 
-## État des 7 portes
+## État des 14 portes (mis à jour 05/07/2026)
 
 | Porte | État |
 |---|---|
-| 1. Mécanisme de bruit | Fermée (preuve OpenDP) |
-| 2. MIA | Préliminaire (borne analytique) |
-| 3. Canal temporel | Préliminaire |
-| 4. Composition | Préliminaire (budget spécifié) |
-| 5. Observateur réseau | Hors-périmètre, assumé |
-| 6. Coercition | Hors-périmètre, assumé |
-| 7. Différenciation « 49/1 » | Fermée (prototype, RFC 9474 à venir) |
+| 1. Mécanisme de bruit | Fermée — Δ=2, scale=4, ε=0.5 vérifié |
+| 2. MIA générale | Fermée — AUC=0.6279, TPR@1%FPR=1.65% |
+| 3. Canal temporel | Fermée — fuite sub-microseconde (0.209µs), inexploitable via réseau |
+| 4. Composition séquentielle | Fermée — budget par population, vérifié empiriquement |
+| 5. Observateur réseau | Hors-périmètre, assumé (VPN/Tor au choix utilisateur) |
+| 6. Coercition | Hors-périmètre, limite partagée par tout système de vote |
+| 7. Différenciation « 49/1 » | Fermée — signature aveugle RSABSSA RFC 9474, testée dans les deux sens |
+| 8. Inférence outlier | Fermée — AUC=0.6279, TPR@1%FPR=1.65% |
+| 9. Collusion émetteur/agrégateur | Fermée — secret admin distinct, comptes séparés |
+| 10. Sondage binaire K_MIN | Fermée — effectif/fiable retirés de l'API |
+| 11. Accès direct SQLite / clé RSA | Fermée — chiffrement Fernet/AES-128, salt PBKDF2 aléatoire, crash-testée |
+| 12. Secret admin visible /proc | Limite assumée (contexte solo-root) |
+| 13. Soustraction d'agrégats | Limite irréductible DP, atténuée par budget ε |
+| 14. Non-persistance de l'état | Fermée — SQLite WAL, crash-testée (kill -9 réel) |
 
 ## Limites assumées
 
