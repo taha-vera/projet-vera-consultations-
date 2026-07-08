@@ -1,64 +1,56 @@
-# Security Policy — VERA Protocol
+# Politique de securite -- VERA Consultation
 
-## Supported Versions
+## Versions supportees
 
-| Version | Supported |
-| --- | --- |
-| v2.7.1 | ✅ |
-| < v2.7.0 | ❌ Deprecated — upgrade immediately |
+| Version | Statut |
+|---|---|
+| Code actuel (branche main) | Supporte |
+| Toute version anterieure au 01/07/2026 (ere VERA Radio/ANCRE) | Non supporte, archive dans archive/vera_radio_era/ |
 
-Only the latest tagged release of vera_core_v271_verified.py is supported.
-Older versions have known structural bugs BUG-1 to BUG-9 and must not be used in production.
+## Signaler une vulnerabilite
 
-## Reporting a Vulnerability
+N'ouvrez pas de ticket public sur GitHub pour un probleme de securite.
 
-Do NOT open a public GitHub issue for security problems.
+Contact : tahahouari@hotmail.fr
 
-Contact: tahahouari@hotmail.fr
+A inclure dans le rapport :
+- Commit git concerne (SHA)
+- Fichier(s) affecte(s)
+- Preuve de concept ou etapes de reproduction
+- Impact estime : fuite de donnees, contournement DP, epuisement du budget epsilon, falsification de token, etc.
 
-Include in your report:
-1. VERA version + git SHA
-2. Branch: radio | edge | artist
-3. Proof-of-concept or steps to reproduce
-4. Impact: data leakage, bypass INV-2, epsilon exhaustion, etc.
+Delai de reponse : accuse de reception sous 72h. Correction visee sous 7 jours pour les problemes critiques (contournement de la garantie epsilon-DP, forge de token valide, acces non autorise a la cle RSA).
 
-SLA: We acknowledge within 72h. We aim to patch critical issues in 7 days.
-Critical = breaks INV-1, INV-2, INV-4, or allows raw data extraction.
+## Perimetre
 
-## Scope
+Dans le perimetre :
+- vera_consultation_api.py -- logique API, authentification, endpoints
+- vera_dp_noise.py -- mecanisme de bruit differentiel (Laplace, OpenDP)
+- vera_epsilon_budget.py -- composition sequentielle, budget par population
+- vera_signature_manager.py -- signature aveugle RSABSSA (RFC 9474)
+- vera_persistance.py -- persistance SQLite chiffree (Fernet/AES-128)
+- vera_token.py -- gestion des tokens
 
-In-scope:
-- vera_core_v271_verified.py — all INV-1 to INV-8 violations
-- Bypass of N_max=5, epsilon_output, or TTL=7d
-- Reconstruction error < 1% p10 on N=5
-- Side-channel via audit_state() or audit_token()
+Hors perimetre :
+- Code archive dans archive/vera_radio_era/ (ere VERA Radio/ANCRE, non maintenu)
+- Infrastructure Hetzner (reseau, systeme d'exploitation) -- signaler separement si pertinent
+- Ingenierie sociale, acces physique au serveur
+- Deni de service par epuisement de ressources reseau (hors perimetre applicatif)
 
-Out-of-scope:
-- vera_nav_final.py — report privately via email.
-- Rate-limit bypass — this is INFRA, not core.
-- Social engineering, physical access, compromised VERA_SERVER_KEY
-- Denial of service via CPU exhaustion
+## Modele de menace
 
-## Disclosure Policy
+Le modele de menace complet, avec l'etat verifie de chaque vecteur d'attaque identifie, est documente dans [VERA_THREAT_MODEL_COMPLETE.md](VERA_THREAT_MODEL_COMPLETE.md). Toute vulnerabilite signalee sera evaluee au regard de ce document -- si elle correspond a une limite deja documentee et assumee, la reponse le precisera explicitement plutot que de la traiter comme une decouverte.
 
-1. You report privately to us.
-2. We confirm + fix + release patch.
-3. We credit you in CHANGELOG.md unless you request anonymity.
-4. Public disclosure 90 days after our fix, or earlier if mutually agreed.
+## Politique de divulgation
 
-No bug bounty program yet. Good-faith researchers get attribution + thanks.
+1. Rapport confidentiel par email
+2. Confirmation, correction, puis publication du correctif avec preuve empirique dans VERA_THREAT_MODEL_COMPLETE.md
+3. Mention du rapporteur dans l'historique git, sauf demande d'anonymat
+4. Divulgation publique apres correction, delai a convenir selon la gravite
 
-## Hardening Assumptions
-
-VERA Core is FINAL LOCK v2.5. It assumes:
-1. secrets module is CSPRNG — not random
-2. Host OS provides monotonic time.time()
-3. NAV layer enforces rate-limiting. Core alone does NOT prevent cross-session averaging.
-
-Deploying Core without NAV violates the threat model. See VERA_INFRA_Spec_v11.pdf.
+Pas de programme de prime pour le moment.
 
 ## Contact
 
-Taha Houari — VERA Protocol
-tahahouari@hotmail.fr
-github.com/taha-vera/Vera-protocole-
+Taha Houari -- tahahouari@hotmail.fr
+Depot : https://github.com/taha-vera/Protocole-Vera
