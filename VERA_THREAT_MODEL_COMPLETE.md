@@ -288,3 +288,46 @@ Resultat :
 Porte 14 dispose desormais d'une preuve couvrant a la fois le crash de
 process (03/07) et le reboot systeme complet (09/07) -- niveau de
 confiance renforce sur la persistance reelle en conditions de production.
+
+## Nouvelle porte -- 09/07/2026
+
+### Porte 17 -- Correlation temporelle via horodatage_unix (anti-rejeu SQLite)
+
+**Statut : LIMITE ASSUMEE, documentee 09/07/2026**
+
+La table tokens_consommes (introduite par Porte 14, persistance SQLite)
+stocke un timestamp precis a la seconde (horodatage_unix) pour chaque token
+consomme. Verifie empiriquement le 09/07/2026 -- les timestamps sont bien
+precis a la seconde pres (ex: 1783120902.54973).
+
+Risque : un attaquant avec acces a cette table, combine a une connaissance
+externe de l'heure d'envoi d'un lien de vote a une personne precise (ex.
+surveillance de la messagerie du RH, connaissance de l'heure d'une reunion
+de distribution), pourrait recouper les deux pour desanonymiser un vote
+dans un petit groupe.
+
+Note : contrairement a la cle RSA (Porte 11), cette table n'est pas
+chiffree -- seule la cle RSA beneficie du chiffrement Fernet/AES-128.
+
+Options evaluees et raisons du choix :
+- Reduire la precision du timestamp (heure ou jour pres) : rejete, casse
+  la capacite de diagnostic technique sans reellement empecher la
+  correlation si l'attaquant a acces a d'autres sources de timing
+  (logs HTTP, timing reseau).
+- Chiffrer la table : rejete, un attaquant disposant deja de VERA_DB_KEY
+  (necessaire pour dechiffrer la cle RSA) pourrait dechiffrer cette table
+  aussi -- protection illusoire si l'attaquant a deja acces complet.
+- Limite assumee (choix retenu) : la vraie protection contre la
+  correlation temporelle vient de la taille du groupe (K_MIN=100), pas
+  du masquage du timestamp lui-meme. Un attaquant capable d'exploiter
+  cette porte a deja un acces root complet au serveur (meme prerequis
+  que Porte 11), ce qui rend la question largement redondante avec les
+  limites deja assumees en contexte solo-root (Porte 12).
+
+Attenuation partielle deja en place : la separation des roles (RH ne
+connait que departement <-> quantite de tokens, jamais l'identite
+individuelle des votants cote serveur, cf. ATTRIBUTION_FLOW.md) limite
+la capacite du RH lui-meme a exploiter cette correlation, meme s'il a
+acces aux logs de sa propre messagerie d'envoi.
+
+**Porte 17 : identifiee et assumee, pas de correction technique prevue.**
