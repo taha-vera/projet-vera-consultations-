@@ -232,3 +232,35 @@ multiple du budget detectee malgre la charge concurrente. Le verrou
 
 Aucune nouvelle porte identifiee par ce test -- confirme la robustesse
 du mecanisme de Porte 4 (composition sequentielle) sous concurrence.
+
+## Nouvelle porte -- 09/07/2026
+
+### Porte 16 -- Retention des logs applicatifs
+
+**Statut : FERMEE, verifiee empiriquement 09/07/2026**
+
+Le fichier /root/consultation.log (sortie uvicorn) journalise chaque requete
+HTTP avec adresse IP source, chemin d'URL, et code de retour -- pas les
+tokens ni mots de passe (verifie par grep, aucune occurrence trouvee). Sans
+politique de retention, ce fichier grossissait indefiniment et conservait
+des adresses IP sans limite de duree, potentiellement exploitables pour de
+la correlation temporelle si un acces au fichier etait obtenu.
+
+Correction, deux mecanismes complementaires :
+1. Script /root/purger_logs_apres_publication.sh -- purge manuelle du log
+   applicatif, a executer par l'operateur une fois une consultation cloturee
+   et ses resultats diffuses. Coherent avec le principe de non-persistance
+   applique au reste du systeme.
+2. logrotate (/etc/logrotate.d/vera-consultation) -- filet de securite
+   automatique, rotation quotidienne, retention 3 jours, compression.
+   Verifie actif via logrotate.timer (systemd, prochaine execution
+   confirmee).
+
+Preuve empirique (09/07/2026) :
+- grep sur le contenu du log : aucun token, mot de passe, ou header
+  sensible trouve
+- logrotate -d (dry run) : configuration validee sans erreur
+- systemctl status logrotate.timer : actif, enabled, prochaine execution
+  planifiee
+
+**Porte 16 : OUVERTE -> FERMEE.**
