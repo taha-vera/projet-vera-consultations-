@@ -330,4 +330,13 @@ individuelle des votants cote serveur, cf. ATTRIBUTION_FLOW.md) limite
 la capacite du RH lui-meme a exploiter cette correlation, meme s'il a
 acces aux logs de sa propre messagerie d'envoi.
 
+
+
+Extension -- attaque par volume/frequence : le meme horodatage_unix permet
+aussi de detecter qu'un groupe de tokens consommes dans une fenetre courte
+(ex. 3 tokens generes, 3 votes en moins d'une minute) revele une forte
+participation quasi-simultanee, meme sans connaitre le contenu des votes.
+Meme statut, meme justification que ci-dessus : protection reelle via
+K_MIN=100, pas via masquage du timing.
+
 **Porte 17 : identifiee et assumee, pas de correction technique prevue.**
