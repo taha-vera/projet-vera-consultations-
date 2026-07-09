@@ -170,3 +170,33 @@ Limites documentees a l origine (non bloquantes en contexte solo-root) :
   -- non corrige, limite assumee toujours actuelle
 
 **Porte 11 : OUVERTE -> FERMEE.**
+
+## Nouvelle porte -- 09/07/2026
+
+### Porte 15 -- Trafic en clair (HTTP, absence de TLS)
+
+**Statut : FERMEE, verifiee empiriquement 09/07/2026**
+
+Jusqu'au 09/07/2026, tout le trafic entre client et serveur transitait en
+HTTP non chiffre (http://167.233.49.182:8001). Consequence : mots de passe
+RH, cookies de session, et tokens de vote signes transitaient en clair sur
+le reseau, interceptables par toute personne en position d'observer le
+trafic (WiFi public, FAI, noeud intermediaire).
+
+Correction : reverse proxy Nginx + certificat Let's Encrypt (Certbot) sur
+un sous-domaine DuckDNS (vera-consultation.duckdns.org, gratuit, pas de
+domaine propre necessaire). Redirection automatique HTTP -> HTTPS (301)
+configuree par Certbot.
+
+Preuve empirique (09/07/2026) :
+- curl https://vera-consultation.duckdns.org/api/health : reponse normale,
+  trafic chiffre confirme
+- curl -I http://vera-consultation.duckdns.org/api/health : 301 Moved
+  Permanently vers https://, aucun acces HTTP direct possible
+- Cycle complet connexion RH teste avec succes via HTTPS (cookie de
+  session emis correctement)
+
+Certificat valide jusqu'au 07/10/2026, renouvellement automatique
+programme par Certbot (systemd timer).
+
+**Porte 15 : OUVERTE -> FERMEE.**
