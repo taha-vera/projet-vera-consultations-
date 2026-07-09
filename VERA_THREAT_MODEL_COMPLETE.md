@@ -216,3 +216,19 @@ multiple du budget detectee malgre la charge concurrente. Le verrou
 
 Aucune nouvelle porte identifiee par ce test -- confirme la robustesse
 du mecanisme de Porte 4 (composition sequentielle) sous concurrence.
+
+## Verification complementaire -- 09/07/2026
+
+### Robustesse du budget epsilon sous charge concurrente
+
+Teste : 10 requetes simultanees (bash, execution parallele via &) sur
+/api/rh/resultats, portant sur 5 departements distincts deja publies une
+fois chacun.
+
+Resultat : nombre_publications=1 et epsilon_consomme=0.5 identiques sur
+les 10 reponses, pour chacun des 5 departements -- aucune consommation
+multiple du budget detectee malgre la charge concurrente. Le verrou
+(threading.Lock, logique deja_publie) protege correctement.
+
+Aucune nouvelle porte identifiee par ce test -- confirme la robustesse
+du mecanisme de Porte 4 (composition sequentielle) sous concurrence.
