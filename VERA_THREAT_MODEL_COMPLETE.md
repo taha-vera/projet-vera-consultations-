@@ -264,3 +264,27 @@ Preuve empirique (09/07/2026) :
   planifiee
 
 **Porte 16 : OUVERTE -> FERMEE.**
+
+## Renforcement de preuve -- Porte 14 -- 09/07/2026
+
+**Test complementaire : reboot systeme complet (pas seulement crash de process)**
+
+Le test du 03/07/2026 validait la survie de l'etat via kill -9 (crash du
+process uvicorn, redemarrage automatique par systemd Restart=on-failure).
+Ce test etait insuffisant pour couvrir un vrai reboot serveur (arret complet
+du systeme, reinitialisation reseau, ordre de demarrage des services).
+
+Test effectue (09/07/2026) : systemctl reboot reel sur le serveur de
+production, avec mise a jour noyau (7.0.0-15 -> 7.0.0-27) au passage.
+
+Resultat :
+- vera-consultation.service et nginx.service redemarres automatiquement
+  au boot (systemctl status confirme active/running, PID differents,
+  aucune intervention manuelle)
+- Healthcheck HTTPS repond normalement apres reboot
+- 5 departements de test verifies : nombre_publications=1 et
+  epsilon_consomme=0.5 identiques avant et apres le reboot complet
+
+Porte 14 dispose desormais d'une preuve couvrant a la fois le crash de
+process (03/07) et le reboot systeme complet (09/07) -- niveau de
+confiance renforce sur la persistance reelle en conditions de production.
