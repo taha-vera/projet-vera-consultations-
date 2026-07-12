@@ -82,6 +82,7 @@ et le prouve mathematiquement.
 | Anti-rejeu | Empreinte SHA-256 du token + horodatage_unix (precis a la seconde, NON chiffre) |
 | Transport | TLS via Nginx + Let's Encrypt, redirection HTTP->HTTPS 301 |
 | Fail-closed | Si vera_blind_sig ne charge pas : RuntimeError, refus de demarrer |
+| Anti-bruteforce | /api/resoudre_code : 5 echecs max par IP, blocage 5 minutes. Protection en memoire (perdue au redemarrage -- limite assumee) |
 
 
 ---

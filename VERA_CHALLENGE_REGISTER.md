@@ -56,7 +56,7 @@ Commence par le probleme le plus grave."
 
 Tour 1 -- a realiser en sessions fraiches :
 - Claude (nouvelle conversation, sans contexte de cette session)
-- GPT-4o
+- GPT-4o (ChatGPT) -- 09/07/2026 : 0 nouvelle porte. Bruteforce resoudre_code deja couvert (5 echecs/IP, blocage 5min). Nuances valides : timing Fernet Porte 3, race condition Porte 4 (meme point que Copilot).
 - Gemini 1.5 Pro
 - Mistral Large
 - Fable 5
