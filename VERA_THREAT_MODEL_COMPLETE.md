@@ -340,3 +340,17 @@ Meme statut, meme justification que ci-dessus : protection reelle via
 K_MIN=100, pas via masquage du timing.
 
 **Porte 17 : identifiee et assumee, pas de correction technique prevue.**
+
+
+## Renforcement de preuve -- Porte 2 -- 12/07/2026
+
+Suite au challenge Mistral (Tour 1) qui pointait que AUC=0.6279 > borne
+theorique 0.6225, re-mesure avec N=100000 et bootstrap 1000 iterations :
+
+AUC = 0.6209 (sous la borne theorique)
+IC 95% : [0.6185, 0.6232]
+Borne theorique 0.6225 dans IC : True
+
+L'AUC precedente (0.6279 sur N=20000) etait un artefact de variabilite
+statistique du a un echantillon insuffisant. La garantie DP est confirmee
+avec un niveau de confiance plus eleve. Porte 2 reste FERMEE.

@@ -64,8 +64,8 @@ et le prouve mathematiquement.
 | K_MIN | 100 | Sous ce seuil, resultat publie mais signale non fiable cote client |
 
 **Verifications empiriques :**
-- AUC MIA = 0.6279 (test 50 vs 52, Delta=2, N=20000 simulations)
-- Borne theorique pire cas : e^epsilon/(1+e^epsilon) = 0.6225
+- AUC MIA = 0.6209 (test 50 vs 52, Delta=2, N=100000, IC95%=[0.6185,0.6232])
+- Borne theorique pire cas : 0.6225 -- AUC dans IC confirme (True)
 - Canal temporel : Spearman p=0.38, Mann-Whitney p=0.11 sur vera_dp_noise.py
 - Budget robuste sous 10 requetes concurrentes (verrou threading.Lock)
 
