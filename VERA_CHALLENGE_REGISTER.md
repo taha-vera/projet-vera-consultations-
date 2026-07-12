@@ -57,8 +57,8 @@ Commence par le probleme le plus grave."
 Tour 1 -- a realiser en sessions fraiches :
 - Claude (nouvelle conversation, sans contexte de cette session)
 - GPT-4o (ChatGPT) -- 09/07/2026 : 0 nouvelle porte. Bruteforce resoudre_code deja couvert (5 echecs/IP, blocage 5min). Nuances valides : timing Fernet Porte 3, race condition Porte 4 (meme point que Copilot).
-- Gemini 1.5 Pro
-- Mistral Large
+- Gemini 1.5 Pro -- 12/07/2026 : 0 nouvelle porte. Nuances : Porte 3 attaquant local, Porte 11 substitution cle sans contexte (limite assumee), backup absent (deja documente).
+- Mistral Large -- 12/07/2026 : 1 point traite. AUC=0.6279 > borne theorique soulevee -- re-mesure N=100000 confirme AUC=0.6209 dans IC95% [0.6185,0.6232], borne 0.6225 incluse. Porte 2 confirmee fermee.
 - Fable 5
 
 Document a soumettre : VERA_AUDIT_REFERENCE.md (version 1.0, 09/07/2026)
