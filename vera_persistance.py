@@ -16,7 +16,8 @@ _SQL_TABLES = [
     "CREATE TABLE IF NOT EXISTS tokens_consommes (empreinte TEXT PRIMARY KEY, horodatage_unix REAL NOT NULL)",
     "CREATE TABLE IF NOT EXISTS compteurs_votes (departement TEXT NOT NULL, reponse TEXT NOT NULL, compte INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (departement, reponse))",
     "CREATE TABLE IF NOT EXISTS effectifs (departement TEXT PRIMARY KEY, effectif INTEGER NOT NULL DEFAULT 0)",
-    "CREATE TABLE IF NOT EXISTS cle_rsa_active (id INTEGER PRIMARY KEY CHECK (id = 1), cle_privee_hex TEXT NOT NULL, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS resultats_publies (departement TEXT PRIMARY KEY, resultat_json TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS cle_rsa_active (id INTEGER PRIMARY KEY CHECK (id = 1), cle_privee_hex TEXT NOT NULL, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL, salt_hex TEXT)",
 ]
 
 
@@ -168,3 +169,22 @@ def charger_cle_rsa_chiffree() -> tuple[bytes, bytes, float] | None:
         )
     cle_publique = bytes.fromhex(row[1])
     return cle_privee, cle_publique, row[2]
+
+
+def persister_resultat_publie(departement, resultat_dict):
+    """Stocke le resultat bruite fige d'un departement (calcule une seule fois)."""
+    import json
+    with _verrou_db:
+        sql = "INSERT INTO resultats_publies (departement, resultat_json) VALUES (?, ?) ON CONFLICT(departement) DO UPDATE SET resultat_json = excluded.resultat_json"
+        _conn.execute(sql, (departement, json.dumps(resultat_dict)))
+        _conn.commit()
+
+
+def charger_resultat_publie(departement):
+    """Recupere le resultat bruite fige d'un departement, ou None s'il n'existe pas."""
+    import json
+    with _verrou_db:
+        row = _conn.execute("SELECT resultat_json FROM resultats_publies WHERE departement = ?", (departement,)).fetchone()
+    if row is None:
+        return None
+    return json.loads(row[0])

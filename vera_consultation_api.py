@@ -324,11 +324,26 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
                 etat_apres = budget_epsilon.etat(departement)
                 persistance.persister_budget_epsilon(departement, etat_apres["epsilon_consomme"], etat_apres["nombre_publications"])
 
-            comptes_bruts = compteurs_par_departement.get(departement, {})
-            comptes_bruites = {
-                option["valeur"]: appliquer_bruit_dp(comptes_bruts.get(option["valeur"], 0))
-                for option in QUESTION_ACTIVE["options"]
-            }
+                # Le bruit DP est tire UNE SEULE FOIS, a la premiere publication,
+                # puis fige. Republier ne re-tire pas de bruit -- sinon un appelant
+                # pourrait moyenner N tirages et supprimer le bruit (epsilon -> infini).
+                comptes_bruts = compteurs_par_departement.get(departement, {})
+                comptes_bruites = {
+                    option["valeur"]: appliquer_bruit_dp(comptes_bruts.get(option["valeur"], 0))
+                    for option in QUESTION_ACTIVE["options"]
+                }
+                persistance.persister_resultat_publie(departement, comptes_bruites)
+            else:
+                # Deja publie : on renvoie le resultat bruite fige, jamais un nouveau tirage.
+                comptes_bruites = persistance.charger_resultat_publie(departement)
+                if comptes_bruites is None:
+                    # Cas limite : publie mais resultat non trouve (etat incoherent),
+                    # on refuse plutot que de re-tirer du bruit et casser la garantie DP.
+                    resultat_par_departement[departement] = {
+                        "refuse": True,
+                        "raison": "Resultat fige introuvable, publication refusee par securite.",
+                    }
+                    continue
 
             resultat_par_departement[departement] = {
                 "resultats_bruits": comptes_bruites,
