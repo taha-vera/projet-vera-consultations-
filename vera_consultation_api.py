@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import vera_admin_auth as auth
-from vera_epsilon_budget import BudgetEpsilonParDepartement, BudgetEpuiseError
+from vera_epsilon_budget import BudgetEpsilonParDepartement
 from vera_dp_noise import appliquer_bruit_dp
 
 app = FastAPI(title="VERA Consultation")
