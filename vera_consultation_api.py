@@ -29,6 +29,35 @@ from vera_dp_noise import appliquer_bruit_dp
 
 app = FastAPI(title="VERA Consultation")
 
+# --------------------------------------------------------------------------
+# GARDE CRITIQUE : un seul worker autorise.
+# L'etat (budget epsilon, verrou, registre tokens) est en memoire de
+# processus et protege par un threading.Lock, qui ne synchronise PAS entre
+# plusieurs processus. Avec 2+ workers uvicorn, deux requetes paralleles
+# peuvent chacune consommer le budget epsilon du meme departement -> la
+# composition sequentielle DP est cassee silencieusement (epsilon reel
+# double). On refuse donc de demarrer si plus d'un worker est detecte.
+# --------------------------------------------------------------------------
+def _verifier_worker_unique():
+    import os
+    # uvicorn --workers N definit WEB_CONCURRENCY ou lance N processus.
+    # On lit la variable d'environnement que uvicorn/gunicorn propagent.
+    nb_workers = os.environ.get("WEB_CONCURRENCY")
+    if nb_workers is not None:
+        try:
+            if int(nb_workers) > 1:
+                raise RuntimeError(
+                    f"VERA REFUSE DE DEMARRER : {nb_workers} workers detectes. "
+                    "L'etat DP est en memoire de processus et n'est pas partage "
+                    "entre workers -- lancer plusieurs workers casse la garantie "
+                    "de composition epsilon (Porte 4). Lancez uvicorn avec un seul "
+                    "worker (comportement par defaut, sans --workers)."
+                )
+        except ValueError:
+            pass
+
+_verifier_worker_unique()
+
 # Compte RH de démarrage, créé une seule fois si les variables d'environnement
 # VERA_ADMIN_USER et VERA_ADMIN_PASS sont fournies -- pratique pour le premier
 # déploiement, à remplacer par un vrai flux de création de compte si plusieurs
