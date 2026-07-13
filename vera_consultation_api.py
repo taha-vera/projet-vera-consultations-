@@ -413,7 +413,16 @@ def resoudre_code(payload: CodeCourtEntrant, request: Request):
     10000 combinaisons possibles, sans cette protection le code serait
     devinable en quelques minutes par un script automatise.
     """
-    ip_client = request.client.host if request.client else "inconnue"
+    # Derriere un reverse proxy (Nginx), request.client.host vaut 127.0.0.1
+    # pour tous les clients. On lit l'IP reelle transmise par Nginx.
+    # X-Real-IP en priorite (defini par Nginx), sinon premier element de
+    # X-Forwarded-For, sinon fallback sur l'IP directe.
+    ip_client = request.headers.get("x-real-ip")
+    if not ip_client:
+        xff = request.headers.get("x-forwarded-for", "")
+        ip_client = xff.split(",")[0].strip() if xff else None
+    if not ip_client:
+        ip_client = request.client.host if request.client else "inconnue"
     _verifier_anti_bruteforce(ip_client)
 
     code_normalise = payload.code.strip()
