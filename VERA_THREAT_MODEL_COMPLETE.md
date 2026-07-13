@@ -354,3 +354,53 @@ Borne theorique 0.6225 dans IC : True
 L'AUC precedente (0.6279 sur N=20000) etait un artefact de variabilite
 statistique du a un echantillon insuffisant. La garantie DP est confirmee
 avec un niveau de confiance plus eleve. Porte 2 reste FERMEE.
+
+## Audit Fable 5 sur code reel -- 13/07/2026 -- 4 vrais bugs corriges
+
+Fable 5 est la seule IA du Tour 1 a avoir lu le CODE reel (pas seulement
+la description). Elle a trouve 4 vrais bugs, dont un critique invalidant
+la garantie DP. Tous corriges et verifies empiriquement le 13/07/2026.
+
+### BUG CRITIQUE -- Porte 1/2 : bruit DP re-tire a chaque appel
+
+Avant correction : /api/rh/resultats re-tirait un nouveau bruit Laplace a
+CHAQUE appel, y compris apres la premiere publication (le compteur de
+budget restait a 1, ce qui masquait le probleme). Un compte RH pouvait
+appeler N fois, obtenir N tirages bruites independants de la meme valeur,
+et les moyenner -- le bruit s'annule, epsilon reel -> infini. La garantie
+DP etait cassee des la 2e lecture.
+
+Le test de concurrence precedent (10 requetes -> publications=1) ne
+detectait pas ce bug car il verifiait le compteur, pas la variance du
+bruit renvoye.
+
+Correction : le resultat bruite est calcule UNE SEULE FOIS a la premiere
+publication, persiste dans une nouvelle table SQLite resultats_publies,
+et renvoye fige a tous les appels suivants. Verifie : 5 appels successifs
+renvoient un resultat identique (bruit fige, moyennage impossible).
+
+### BUG eleve -- endpoints /api/test/* en production
+
+/api/test/verifier_token_signe appelait verifier_et_consommer(), brulant
+un vrai token (ajout a l'anti-rejeu). Exploitable en DoS : bruler les
+tokens des participants avant qu'ils votent. Corrige : endpoints supprimes
+de la production (404 confirme).
+
+### BUG eleve -- schema salt_hex manquant (deploiement from scratch)
+
+La table cle_rsa_active etait creee sans colonne salt_hex dans le CREATE
+TABLE, alors que persister_cle_rsa_chiffree fait un INSERT avec salt_hex.
+Fonctionnait sur le serveur actuel (ALTER TABLE manuel de juillet) mais
+un deploiement propre from scratch aurait plante. Corrige : salt_hex
+ajoute au schema.
+
+### BUG moyen -- anti-bruteforce voyait 127.0.0.1
+
+Derriere Nginx, request.client.host valait 127.0.0.1 pour tous les
+clients. L'anti-bruteforce de /api/resoudre_code etait donc soit global
+(tout le monde bloque apres 5 echecs cumules), soit inefficace. Corrige :
+lecture de X-Real-IP / X-Forwarded-For. Verifie : 5x404 puis 429.
+
+**Lecon : une porte "Fermee" sur description n'est pas fermee sur code.
+Seul l'audit du code reel a revele ces 4 bugs. Les 4 autres IA, auditant
+la description, avaient valide un systeme qui contenait un bug critique.**
