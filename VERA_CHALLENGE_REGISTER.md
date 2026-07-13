@@ -59,7 +59,11 @@ Tour 1 -- a realiser en sessions fraiches :
 - GPT-4o (ChatGPT) -- 09/07/2026 : 0 nouvelle porte. Bruteforce resoudre_code deja couvert (5 echecs/IP, blocage 5min). Nuances valides : timing Fernet Porte 3, race condition Porte 4 (meme point que Copilot).
 - Gemini 1.5 Pro -- 12/07/2026 : 0 nouvelle porte. Nuances : Porte 3 attaquant local, Porte 11 substitution cle sans contexte (limite assumee), backup absent (deja documente).
 - Mistral Large -- 12/07/2026 : 1 point traite. AUC=0.6279 > borne theorique soulevee -- re-mesure N=100000 confirme AUC=0.6209 dans IC95% [0.6185,0.6232], borne 0.6225 incluse. Porte 2 confirmee fermee.
-- Fable 5
+- Fable 5 -- 13/07/2026 : SEULE IA a lire le CODE reel (via URLs GitHub) au lieu de la description. A trouve 4 VRAIS BUGS que les 4 autres IA avaient manques :
+  1. CRITIQUE : bruit DP re-tire a chaque appel /api/rh/resultats -> moyennage possible -> garantie epsilon cassee des la 2e lecture. Corrige (resultat fige, table resultats_publies). Verifie 5 appels identiques.
+  2. Endpoints /api/test/* en prod brulaient de vrais tokens (DoS). Corrige (404).
+  3. Schema salt_hex manquant -> deploiement from scratch cassait. Corrige.
+  4. Anti-bruteforce voyait 127.0.0.1 derriere Nginx. Corrige (X-Real-IP, teste 5x404+429).
 
 Document a soumettre : VERA_AUDIT_REFERENCE.md (version 1.0, 09/07/2026)
 Prompt : prompt adversarial standard (voir ci-dessus)
