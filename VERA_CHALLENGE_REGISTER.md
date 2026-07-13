@@ -77,3 +77,5 @@ Si aucune nouvelle porte n'emerge sur ce tour --> limite 2026 atteinte.
 | Version | Date | Changements majeurs |
 |---|---|---|
 | 1.0 | 09/07/2026 | Creation, 17 portes, parametres DP recalibres, HTTPS |
+
+- Meta AI (Llama) -- 13/07/2026 : audit post-correction. Point souleve : race condition lors du figeage du resultat (concurrence entre verification deja_publie et persistance). FAUX POSITIF -- le with verrou (threading.Lock global) englobe toute la section critique, double consommation impossible. Verifie dans le code. Autres points : reprises de limites deja assumees (P13, P17).
