@@ -35,7 +35,7 @@ sans jamais rendre lisible la contribution d'un individu — et le prouve.
 | 14. Non-persistance de l'état | Fermée — SQLite WAL, crash-testée (kill -9 réel) |
 | 15. Trafic en clair (HTTP) | Fermée — HTTPS via Nginx + Let's Encrypt, redirection automatique verifiee |
 | 16. Retention des logs applicatifs | Fermée — purge manuelle a cloture + logrotate 3 jours en filet de securite |
-| 17. Correlation temporelle (horodatage_unix) | Limite assumee — protection reelle via K_MIN=100, pas via masquage du timing |
+| 17. Correlation temporelle (horodatage_unix) | Limite assumee — protection reelle via K_MIN=240, pas via masquage du timing |
 
 ## Corrections suite à audit de code (13/07/2026)
 
@@ -48,6 +48,29 @@ Un audit du code réel (pas seulement de la documentation) a révélé et permis
 - Schéma SQLite complété pour un déploiement propre from scratch.
 
 Détail complet et preuves dans VERA_THREAT_MODEL_COMPLETE.md et VERA_CHALLENGE_REGISTER.md.
+
+## Précision réelle et seuil de publication (mesuré le 14/07/2026)
+
+VERA publie une **estimation certifiée**, pas un décompte exact. Le bruit est le prix de l'anonymat.
+
+**Seuil de publication : K_MIN = 240.** En dessous, VERA **refuse de publier** — pas de version dégradée, pas de résultat "peu fiable", rien du tout.
+
+Ce seuil n'est pas choisi arbitrairement, il est **mesuré**. À ε=0.5, avec projection sur le simplexe, l'erreur maximale sur les trois options (95e centile, pire répartition, 3000 simulations) :
+
+| Effectif | Erreur max (95e centile) |
+|---|---|
+| n = 100 | 12 % |
+| n = 150 | 8 % |
+| n = 200 | 6 % |
+| **n = 240** | **5 %** ← seuil de publication |
+| n = 300 | 4 % |
+| n = 500 | 2,5 % |
+
+**Ce que voit l'organisation** : des comptages entiers qui somment exactement à l'effectif réel (grâce à la projection, post-traitement gratuit en ε). Exemple vérifié en production sur 250 votants réels : vérité 130/80/40 → publié 123/84/43, somme exacte 250, erreur max 2,8 %.
+
+**Pour qui VERA est conçu** : organisations dont les groupes consultés dépassent 240 personnes — grandes entreprises et groupes, fonction publique, hôpitaux, universités, syndicats de branche. Les structures plus petites ne peuvent pas obtenir un résultat à la fois anonyme et suffisamment précis à ε=0.5 : c'est une contrainte mathématique, pas un choix commercial.
+
+**Sur ε=0.5** : c'est un régime de confidentialité plus strict que les déploiements DP industriels connus (Apple : ε=2–16 ; Google RAPPOR : ε=2–9 ; US Census 2020 : ε≈19,6). L'imprécision sur les petites cohortes n'est pas un défaut d'implémentation — c'est la garantie qui s'exerce.
 
 ## Limites assumées
 
