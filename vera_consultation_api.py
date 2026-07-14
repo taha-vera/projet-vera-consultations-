@@ -339,6 +339,19 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
     with verrou:
         for departement, effectif in effectif_par_departement.items():
 
+            # SEUIL K_MIN : on refuse de publier un resultat pour une cohorte
+            # trop petite. Ce n'est pas une degradation ni un bruit renforce --
+            # c'est un refus pur et simple. En dessous de K_MIN participants,
+            # meme un resultat bruite reste trop informatif sur les individus,
+            # et l'erreur relative rend de toute facon le chiffre inutilisable.
+            # Verifie AVANT toute consommation de budget epsilon.
+            if effectif < K_MIN:
+                resultat_par_departement[departement] = {
+                    "refuse": True,
+                    "raison": f"Effectif insuffisant : {effectif} participants, minimum requis {K_MIN}.",
+                }
+                continue
+
             etat_avant = budget_epsilon.etat(departement)
             deja_publie = etat_avant["nombre_publications"] > 0
 
