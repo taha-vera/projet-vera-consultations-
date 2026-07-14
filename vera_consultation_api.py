@@ -25,7 +25,7 @@ from pydantic import BaseModel
 
 import vera_admin_auth as auth
 from vera_epsilon_budget import BudgetEpsilonParDepartement
-from vera_dp_noise import appliquer_bruit_dp
+from vera_dp_noise import appliquer_bruit_dp, publier_histogramme_dp
 
 app = FastAPI(title="VERA Consultation")
 
@@ -198,7 +198,11 @@ QUESTION_ACTIVE = {
     ],
 }
 
-K_MIN = 100
+# K_MIN = 240 : seuil MESURE (14/07/2026), pas choisi arbitrairement.
+# A eps=0.5 avec projection sur le simplexe, l'erreur max sur les 3 options
+# reste sous 5% de l'effectif dans 95% des publications a partir de n=240.
+# En dessous (n=100 : 9%, n=200 : 6%), la promesse de precision ne tient pas.
+K_MIN = 240
 
 
 # --------------------------------------------------------------------------
@@ -370,10 +374,16 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
                 # puis fige. Republier ne re-tire pas de bruit -- sinon un appelant
                 # pourrait moyenner N tirages et supprimer le bruit (epsilon -> infini).
                 comptes_bruts = compteurs_par_departement.get(departement, {})
-                comptes_bruites = {
-                    option["valeur"]: appliquer_bruit_dp(comptes_bruts.get(option["valeur"], 0))
+                comptes_ordonnes = {
+                    option["valeur"]: comptes_bruts.get(option["valeur"], 0)
                     for option in QUESTION_ACTIVE["options"]
                 }
+                # Laplace vectoriel (Delta_1 = 2, scale = 4, eps = 0.5) PUIS
+                # projection sur le simplexe {x >= 0, somme = effectif}.
+                # La projection est du post-traitement : gratuite en epsilon,
+                # elle reduit l'erreur de ~25% et garantit que les comptages
+                # publies somment exactement a l'effectif reel.
+                comptes_bruites = publier_histogramme_dp(comptes_ordonnes, effectif)
                 persistance.persister_resultat_publie(departement, comptes_bruites)
             else:
                 # Deja publie : on renvoie le resultat bruite fige, jamais un nouveau tirage.
