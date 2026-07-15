@@ -61,7 +61,7 @@ et le prouve mathematiquement.
 | Bounds | (0, 10000) | Plafond effectif d'un departement |
 | Budget total | epsilon_total = 1.5 | Max 3 publications par population |
 | Indexation budget | Par departement (population), pas par question | Composition sequentielle globale |
-| K_MIN | 240 | Seuil MESURE (14/07/2026), pas suppose. Sous ce seuil : REFUS de publier (pas de version degradee, rien). A eps=0.5 avec projection, l'erreur max sur les 3 options reste sous 5% de l'effectif dans 95% des publications a partir de n=240. En dessous : n=200 -> 6%, n=100 -> 9%. |
+| K_MIN | 240 | Seuil MESURE (14/07/2026), pas suppose. Sous ce seuil : REFUS de publier (pas de version degradee, rien). A eps=0.5 avec projection, l'erreur max sur les 3 options reste sous 5% de l'effectif dans 95% des publications a partir de n=240. En dessous : n=200 -> 6%, n=150 -> 8%, n=100 -> 12%. (Erreur absolue constante ~12 votes au 95e centile, independante de n : le pourcentage = 12/n.) |
 
 **Verifications empiriques :**
 - AUC MIA = 0.6209 (test 50 vs 52, Delta=2, N=100000, IC95%=[0.6185,0.6232])
