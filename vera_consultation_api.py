@@ -168,8 +168,22 @@ def _verifier_anti_bruteforce(ip: str) -> None:
             )
 
 
+def _purger_ip_expirees() -> None:
+    """Supprime les entrees dont le blocage est expire et qui n'ont plus
+    d'echecs en cours. Empeche _tentatives_par_ip de croitre sans borne
+    (protection contre une fuite memoire pilotable). Appele sous verrou."""
+    maintenant = time.time()
+    a_supprimer = [
+        ip for ip, info in _tentatives_par_ip.items()
+        if info.get("bloque_jusqu_a", 0) < maintenant and info.get("echecs", 0) == 0
+    ]
+    for ip in a_supprimer:
+        _tentatives_par_ip.pop(ip, None)
+
+
 def _enregistrer_echec(ip: str) -> None:
     with verrou:
+        _purger_ip_expirees()
         info = _tentatives_par_ip.setdefault(ip, {"echecs": 0, "bloque_jusqu_a": 0})
         info["echecs"] += 1
         if info["echecs"] >= SEUIL_ECHECS_AVANT_BLOCAGE:
@@ -469,10 +483,12 @@ def resoudre_code(payload: CodeCourtEntrant, request: Request):
     # pour tous les clients. On lit l'IP reelle transmise par Nginx.
     # X-Real-IP en priorite (defini par Nginx), sinon premier element de
     # X-Forwarded-For, sinon fallback sur l'IP directe.
+    # X-Real-IP est defini par Nginx avec la vraie IP source
+    # (proxy_set_header X-Real-IP $remote_addr) et n'est PAS falsifiable par
+    # le client. On NE lit PAS X-Forwarded-For : Nginx y ajoute la vraie IP
+    # mais ne remplace pas le premier element, que le client controle --
+    # le lire permettrait de contourner l'anti-bruteforce en usurpant une IP.
     ip_client = request.headers.get("x-real-ip")
-    if not ip_client:
-        xff = request.headers.get("x-forwarded-for", "")
-        ip_client = xff.split(",")[0].strip() if xff else None
     if not ip_client:
         ip_client = request.client.host if request.client else "inconnue"
     _verifier_anti_bruteforce(ip_client)
