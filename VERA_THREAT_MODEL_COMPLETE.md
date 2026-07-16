@@ -8,19 +8,21 @@ Chaque statut n'est marqué "vérifié" que s'il a été testé directement sur 
 
 ## État des portes — 2 juillet 2026
 
-| # | Porte | Statut | Preuve |
+| # | Porte | Statut | Preuve (a jour 16/07/2026) |
 |---|---|---|---|
-| 1 | Mécanisme de bruit | Vérifié 01/07 | Bruit Laplace réel (vera_dp_noise.py, OpenDP, eps=0.5, Delta_int=10, scale=20, bounds=(0,100)) applique sur /api/rh/resultats, teste par cycle complet vote->publication |
-| 2 | MIA générale | Vérifié 02/07, méthodologie simplifiée | AUC=0.6219 sur écart de sensibilité (50 vs 60, Delta_int=10). Un seul test commun avec Porte 8 -- ne couvre pas individus proches des bornes, distributions asymétriques, adversaire bayésien. A re-décorréler de Porte 8 |
-| 3 | Canal temporel | Vérifié 02/07 | Spearman rho=-0.39 p=0.38, Mann-Whitney p=0.11, écart médian 0.50% sur vera_dp_noise.py |
-| 4 | Composition séquentielle | Vérifié 01/07, portée limitée -- voir Porte 14 | Budget epsilon confirmé en conditions réelles. Indexé uniquement par département (pas par question) -- plusieurs questions successives réinitialisent le budget par question, pas par département dans l'absolu |
-| 5 | Observateur réseau (L1) | Ouvert, assumé | Non touché cette session |
-| 6 | Coercition (L2) | Hors-périmètre | Non touché cette session |
-| 7 | Différenciation 49/1 (crypto) | Vérifié 01-02/07, testé dans les deux sens | Nominal + 2 tests d'échec réel (kill du module), faille de couverture trouvée (except ImportError insuffisant, collision de nom de dossier) et corrigée en except Exception |
-| 8 | Inférence outlier | Vérifié 02/07, méthodologie simplifiée | Même test que Porte 2 (50 vs 60). Ne teste pas un vrai scénario 99 vs 1 avec proximité des bornes |
-| 9 | Collusion émetteur/agrégateur | Vérifié 02/07 | Régression trouvée (VERA_SECRET_CREATION_COMPTE perdu à la migration systemd, jamais persisté) et corrigée. Isolation testée avec vrai secret aléatoire |
-| 10 | Sondage binaire (K_MIN) | Vérifié 01/07 | Département sous K_MIN reste visible, fiable:false |
-| 13 | Soustraction d'agrégats | Limite irréductible assumée | Non touché cette session |
+| 1 | Mécanisme de bruit | Fermée | Laplace vectoriel OpenDP (Laplace discret), Delta_1=2, scale=4, eps=0.5, bounds=(0,10000). Projection sur le simplexe (Hay et al. 2010). Verifie par test_precision_kmin.py |
+| 2 | MIA générale | Fermée | AUC=0.6209, IC95% [0.6185, 0.6232], borne theorique 0.6225 incluse (N=100000, bootstrap) |
+| 3 | Canal temporel | Fermée | Fuite sub-microseconde. Test etendu 7 valeurs N=10000 : Spearman rho=-0.14 p=0.76, pas de correlation valeur/temps. Inexploitable via reseau (latence 50-100ms) |
+| 4 | Composition séquentielle | Fermée | Budget eps=0.5 par population = UNE publication (resultat fige a la premiere, republier renvoie le meme resultat -> pas de moyennage) |
+| 5 | Observateur réseau (L1) | Limite assumée | Hors-perimetre (VPN/Tor au choix de l'utilisateur) |
+| 6 | Coercition (L2) | Limite assumée | Hors-perimetre, partagee par tout systeme de vote |
+| 7 | Différenciation 49/1 (crypto) | Fermée | Signature aveugle RSABSSA RFC 9474. test_porte7.py : 9/9 (nominal, double-depense, attaque 49/1 bloquee, rejeu cross-epoque) |
+| 8 | Inférence outlier | Fermée | AUC=0.6209 (meme mesure que Porte 2). Composition : fuite k=1 garantie par la partition (Porte 7), TPR@1%FPR=1.6% |
+| 9 | Collusion émetteur/agrégateur | Fermée | Secret admin distinct, comptes separes, isolation testee avec secret aleatoire |
+| 10 | Sondage binaire (K_MIN) | Fermée | REFUS de publier sous K_MIN=240 (aucun resultat, pas de version degradee). Champs effectif/fiable retires. Effectif exact des petites cohortes non expose |
+| 11 | Accès direct SQLite / clé RSA | Fermée | Chiffrement Fernet/AES-128, sel PBKDF2 aleatoire, crash-testee |
+| 12 | Secret admin visible /proc | Limite assumée | Contexte solo-root |
+| 13 | Soustraction d'agrégats | Limite assumée | Limite irreductible DP, attenuee par publication unique (eps=0.5, resultat fige) |
 
 ## NOUVELLE PORTE — 14 — Non-persistance de l'état de confidentialité
 
