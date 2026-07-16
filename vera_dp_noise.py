@@ -41,9 +41,18 @@ def appliquer_bruit_dp(valeur_brute: int) -> int:
 
 
 # --------------------------------------------------------------------------
-# Publication d'un histogramme a 3 cases avec projection sur le simplexe
-# (Hay et al. 2010, "Boosting the Accuracy of Differentially Private
-# Histograms Through Consistency")
+# Publication d'un histogramme a 3 cases avec projection sur le simplexe.
+#
+# PRINCIPE (Hay et al. 2010, "Boosting the Accuracy of Differentially Private
+# Histograms Through Consistency", VLDB) : imposer une contrainte de coherence
+# connue a posteriori sur un histogramme bruite, par post-traitement, reduit
+# l'erreur sans cout en epsilon. Hay et al. traitent le cas general (contraintes
+# hierarchiques). Notre cas est l'instance la plus simple : une seule contrainte,
+# la somme exacte = N.
+#
+# ALGORITHME : projection euclidienne sur le simplexe {x >= 0, somme = N}
+# (probleme d'optimisation convexe classique, cf. Duchi et al. 2008). Le total N
+# est publie exact car invariant sous substitution (sensibilite 0).
 #
 # PREUVE DE SENSIBILITE (corrigee le 14/07/2026) :
 # Adjacence par SUBSTITUTION : un individu qui change d'avis retire son vote

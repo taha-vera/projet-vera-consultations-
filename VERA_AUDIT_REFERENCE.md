@@ -179,8 +179,13 @@ correct, mais la preuve etait invalide. Preuve correcte : mecanisme de Laplace
 VECTORIEL sur R^3 avec Delta_1 = 2, scale = Delta_1/epsilon = 4.
 
 ### Amelioration apportee : projection sur le simplexe
-Reference : Hay et al. 2010, "Boosting the Accuracy of Differentially Private
-Histograms Through Consistency".
+PRINCIPE : Hay et al. 2010 ("Boosting the Accuracy of Differentially Private
+Histograms Through Consistency", VLDB) montrent qu'imposer une contrainte de
+coherence connue sur un histogramme bruite, par post-traitement, reduit l'erreur
+sans cout en epsilon. Ils traitent le cas general (contraintes hierarchiques) ;
+notre cas est l'instance la plus simple : une seule contrainte, somme = N.
+ALGORITHME : projection euclidienne sur le simplexe {x >= 0, somme = N}
+(optimisation convexe, cf. Duchi et al. 2008).
 L'effectif total N est invariant sous substitution (sensibilite 0), donc
 publiable exactement sans cout en epsilon. Le vecteur bruite est projete sur
 {x >= 0, somme(x) = N}. C'est du POST-TRAITEMENT (theoreme de post-traitement
