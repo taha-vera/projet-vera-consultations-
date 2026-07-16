@@ -174,14 +174,21 @@ def _verifier_anti_bruteforce(ip: str) -> None:
             )
 
 
+# Duree apres laquelle une entree IP inactive est purgee (aucun echec recent
+# et blocage expire). Empeche _tentatives_par_ip de croitre sans borne, y
+# compris pour des IP a 1-4 echecs qui disparaissent (fuite pilotable sinon).
+DUREE_RETENTION_IP_SECONDES = 3600  # 1h
+
+
 def _purger_ip_expirees() -> None:
-    """Supprime les entrees dont le blocage est expire et qui n'ont plus
-    d'echecs en cours. Empeche _tentatives_par_ip de croitre sans borne
-    (protection contre une fuite memoire pilotable). Appele sous verrou."""
+    """Supprime toute entree inactive depuis DUREE_RETENTION_IP_SECONDES et
+    dont le blocage est expire, QUEL QUE SOIT le nombre d'echecs. Appele sous
+    verrou. Corrige la fuite ou une IP a echecs != 0 restait indefiniment."""
     maintenant = time.time()
     a_supprimer = [
         ip for ip, info in _tentatives_par_ip.items()
-        if info.get("bloque_jusqu_a", 0) < maintenant and info.get("echecs", 0) == 0
+        if info.get("bloque_jusqu_a", 0) < maintenant
+        and (maintenant - info.get("derniere_activite", 0)) > DUREE_RETENTION_IP_SECONDES
     ]
     for ip in a_supprimer:
         _tentatives_par_ip.pop(ip, None)
@@ -190,8 +197,9 @@ def _purger_ip_expirees() -> None:
 def _enregistrer_echec(ip: str) -> None:
     with verrou:
         _purger_ip_expirees()
-        info = _tentatives_par_ip.setdefault(ip, {"echecs": 0, "bloque_jusqu_a": 0})
+        info = _tentatives_par_ip.setdefault(ip, {"echecs": 0, "bloque_jusqu_a": 0, "derniere_activite": 0})
         info["echecs"] += 1
+        info["derniere_activite"] = time.time()
         if info["echecs"] >= SEUIL_ECHECS_AVANT_BLOCAGE:
             info["bloque_jusqu_a"] = time.time() + DUREE_BLOCAGE_SECONDES
             info["echecs"] = 0
@@ -336,14 +344,18 @@ def generer_tokens(payload: GenererTokensRequete, session_vera: Optional[str] = 
 
     if payload.quantite < 1 or payload.quantite > 1000:
         raise HTTPException(status_code=422, detail="Quantité doit être entre 1 et 1000")
-    if payload.quantite > 9000:
-        raise HTTPException(
-            status_code=422,
-            detail="Quantité trop élevée pour des codes à 4 chiffres (10 000 combinaisons max).",
-        )
 
     resultats_generes = []
     with verrou:
+        # Verification de saturation AVANT la boucle : on refuse d'emblee si la
+        # demande ne tient pas dans l'espace restant. Cela evite de commettre un
+        # etat partiel (k tokens deja generes et enregistres) puis de lever une
+        # erreur au milieu de la boucle -> tokens orphelins. Tout ou rien.
+        if len(registre_codes_courts) + payload.quantite > SEUIL_SATURATION_CODES:
+            raise HTTPException(
+                status_code=503,
+                detail="Espace des codes insuffisant pour cette demande. Redemarrez le service pour repartir d'un espace vide.",
+            )
         for _ in range(payload.quantite):
             if SIGNATURE_AVEUGLE_DISPONIBLE:
                 # Porte 7 durcie : le token est desormais un token SIGNE
@@ -518,18 +530,22 @@ def resoudre_code(payload: CodeCourtEntrant, request: Request):
     10000 combinaisons possibles, sans cette protection le code serait
     devinable en quelques minutes par un script automatise.
     """
-    # Derriere un reverse proxy (Nginx), request.client.host vaut 127.0.0.1
-    # pour tous les clients. On lit l'IP reelle transmise par Nginx.
-    # X-Real-IP en priorite (defini par Nginx), sinon premier element de
-    # X-Forwarded-For, sinon fallback sur l'IP directe.
-    # X-Real-IP est defini par Nginx avec la vraie IP source
-    # (proxy_set_header X-Real-IP $remote_addr) et n'est PAS falsifiable par
-    # le client. On NE lit PAS X-Forwarded-For : Nginx y ajoute la vraie IP
-    # mais ne remplace pas le premier element, que le client controle --
-    # le lire permettrait de contourner l'anti-bruteforce en usurpant une IP.
-    ip_client = request.headers.get("x-real-ip")
-    if not ip_client:
-        ip_client = request.client.host if request.client else "inconnue"
+    # Lecture de l'IP client, robuste au deploiement :
+    # - Si la connexion vient de localhost (127.0.0.1 / ::1), c'est Nginx qui
+    #   relaie : on fait confiance a X-Real-IP, qu'il pose avec la vraie IP
+    #   source (proxy_set_header X-Real-IP $remote_addr, non falsifiable).
+    # - Sinon (app exposee directement, sans proxy), X-Real-IP serait pose par
+    #   le client lui-meme et donc falsifiable : on l'IGNORE et on prend l'IP
+    #   directe de connexion. Cela evite deux failles :
+    #     (a) sans Nginx, un client usurpant X-Real-IP contournerait l'anti-bruteforce ;
+    #     (b) sans le check localhost, tous les clients tomberaient dans le
+    #         meme bucket 127.0.0.1 -> 5 echecs de n'importe qui bloquent tout le monde.
+    # On ne lit jamais X-Forwarded-For (premier element controle par le client).
+    ip_directe = request.client.host if request.client else "inconnue"
+    if ip_directe in ("127.0.0.1", "::1"):
+        ip_client = request.headers.get("x-real-ip") or ip_directe
+    else:
+        ip_client = ip_directe
     _verifier_anti_bruteforce(ip_client)
 
     code_normalise = payload.code.strip()
