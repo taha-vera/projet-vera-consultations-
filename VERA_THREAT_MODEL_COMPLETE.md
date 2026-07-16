@@ -122,7 +122,7 @@ du fichier .service. Porte 11 est desormais fermee (voir plus bas) ; Porte 12 re
 
 ### Note sur la semantique du budget epsilon multi-consultation
 
-Le budget epsilon (epsilon_total=1.5, max 3 publications) est indexe par
+Le budget epsilon (epsilon_total=0.5, UNE publication par population) est indexe par
 departement seul, sans identifiant de question. Ce comportement est
 intentionnel et mathematiquement correct :
 
@@ -132,7 +132,7 @@ budget distinct par question permettrait de poser un nombre illimite de
 questions sur la meme population avec epsilon=0.5 chacune, ce qui contourne
 directement la garantie de composition (Porte 13).
 
-En pratique : une population (departement) ne peut recevoir que 3 publications
+En pratique : une population (departement) ne recoit qu'UNE publication (le resultat bruite est fige a la premiere publication, republier renverrait le meme resultat -- ce qui empeche le moyennage du bruit). L'ancienne mention de "3 publications" etait de la logique morte : le code figeait deja le resultat des la premiere.
 au total, toutes consultations confondues, avant que le systeme refuse de
 publier de nouveaux resultats pour cette population. Ce comportement a ete
 verifie empiriquement le 05/07/2026 par deux cycles de vote successifs sur

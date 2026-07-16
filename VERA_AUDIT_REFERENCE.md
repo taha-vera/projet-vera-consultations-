@@ -59,7 +59,7 @@ et le prouve mathematiquement.
 | Scale | 4 | scale = Delta_1 / epsilon = 2 / 0.5 = 4 |
 | epsilon par publication | 0.5 | Calcule analytiquement par meas.map() |
 | Bounds | (0, 10000) | Plafond effectif d'un departement |
-| Budget total | epsilon_total = 1.5 | Max 3 publications par population |
+| Budget total | epsilon_total = 0.5 | UNE publication par population (resultat fige, pas de re-publication -- voir Porte 1) |
 | Indexation budget | Par departement (population), pas par question | Composition sequentielle globale |
 | K_MIN | 240 | Seuil MESURE (14/07/2026), pas suppose. Sous ce seuil : REFUS de publier (pas de version degradee, rien). A eps=0.5 avec projection, l'erreur max sur les 3 options reste sous 5% de l'effectif dans 95% des publications a partir de n=240. En dessous : n=200 -> 6%, n=150 -> 8%, n=100 -> 12%. (Erreur absolue constante ~12 votes au 95e centile, independante de n : le pourcentage = 12/n.) |
 
@@ -103,7 +103,7 @@ et le prouve mathematiquement.
 | 10 | Sondage binaire K_MIN | Fermee | Champs effectif/fiable retires de l API |
 | 11 | Acces SQLite / cle RSA | Fermee | Fernet/AES-128, salt PBKDF2 aleatoire, crash-teste + reboot complet |
 | 12 | Secret admin visible /proc | Assumee | Solo-root : acces root couvre deja Porte 11 |
-| 13 | Soustraction d agregats | Assumee | Limite irreductible DP, attenuee par budget epsilon=1.5 |
+| 13 | Soustraction d agregats | Assumee | Limite irreductible DP, attenuee par publication unique (epsilon=0.5, resultat fige, pas de re-publication) |
 | 14 | Non-persistance de l etat | Fermee | SQLite WAL, teste crash process ET reboot systeme complet |
 | 15 | Trafic HTTP en clair | Fermee | HTTPS Nginx + Let Encrypt, redirection 301 verifiee |
 | 16 | Retention logs applicatifs | Fermee | Purge manuelle a cloture + logrotate 3 jours |

@@ -103,7 +103,13 @@ effectif_par_departement: dict[str, int] = {}
 # publications successives sur la meme population pour en deduire plus
 # que ce qu'une seule publication ne revelerait (cf. LIMITS.md).
 EPSILON_PAR_PUBLICATION = 0.5  # coherent avec validation_opendp.py existant
-budget_epsilon = BudgetEpsilonParDepartement(epsilon_total_autorise=1.5)
+# Budget epsilon = 0.5 par population = UNE seule publication par departement.
+# Le resultat bruite est fige a la premiere publication (voir deja_publie plus
+# bas) : republier renverrait le meme resultat, jamais un nouveau tirage. Il
+# n'y a donc volontairement AUCUNE re-publication -- c'est ce qui empeche le
+# moyennage du bruit. Le budget est aligne sur ce comportement reel (0.5, pas
+# 1.5) pour ne pas laisser croire a 3 publications possibles.
+budget_epsilon = BudgetEpsilonParDepartement(epsilon_total_autorise=0.5)
 
 import vera_persistance as persistance
 
@@ -421,20 +427,27 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
 
 @app.get("/api/rh/etat_departements")
 def etat_departements(session_vera: Optional[str] = Cookie(None)):
-    """Vue d'ensemble pour le tableau de bord RH : combien de tokens
-    generes/consommes par departement, sans jamais montrer les reponses
-    elles-memes (juste les comptes de progression)."""
+    """Vue d'ensemble pour le tableau de bord RH : progression des votes
+    par departement (nombre de votes recus, seuil K_MIN atteint ou non),
+    sans jamais montrer les reponses elles-memes.
+
+    NOTE : en mode signature aveugle (production), le serveur ne conserve
+    AUCUNE trace des tokens emis -- c'est precisement ce qui garantit
+    l'anonymat (impossible de lier un token a un participant). On ne peut
+    donc pas afficher "tokens generes/consommes" : cette information
+    n'existe pas cote serveur, par conception. On affiche la seule chose
+    reelle et non identifiante : le nombre de votes recus par departement."""
     exiger_session(session_vera)
 
     etat = {}
     with verrou:
-        for token, info in registre_tokens.items():
-            dep = info["departement"]
-            if dep not in etat:
-                etat[dep] = {"generes": 0, "consommes": 0}
-            etat[dep]["generes"] += 1
-            if info["consomme"]:
-                etat[dep]["consommes"] += 1
+        for dep, nb_votes in effectif_par_departement.items():
+            etat[dep] = {
+                "votes_recus": nb_votes,
+                "seuil_k_min": K_MIN,
+                "publiable": nb_votes >= K_MIN,
+                "manque_pour_publier": max(0, K_MIN - nb_votes),
+            }
 
     return etat
 
