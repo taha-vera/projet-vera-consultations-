@@ -387,7 +387,7 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
             if effectif < K_MIN:
                 resultat_par_departement[departement] = {
                     "refuse": True,
-                    "raison": f"Effectif insuffisant : {effectif} participants, minimum requis {K_MIN}.",
+                    "raison": f"Effectif insuffisant : moins de {K_MIN} participants (seuil minimum de publication). Le nombre exact n'est pas communique pour ne pas exposer la taille d'une petite cohorte.",
                 }
                 continue
 
@@ -457,12 +457,23 @@ def etat_departements(session_vera: Optional[str] = Cookie(None)):
     etat = {}
     with verrou:
         for dep, nb_votes in effectif_par_departement.items():
-            etat[dep] = {
-                "votes_recus": nb_votes,
-                "seuil_k_min": K_MIN,
-                "publiable": nb_votes >= K_MIN,
-                "manque_pour_publier": max(0, K_MIN - nb_votes),
-            }
+            publiable = nb_votes >= K_MIN
+            if publiable:
+                # Au-dessus du seuil : l'effectif exact n'est plus sensible.
+                etat[dep] = {
+                    "votes_recus": nb_votes,
+                    "seuil_k_min": K_MIN,
+                    "publiable": True,
+                }
+            else:
+                # Sous le seuil : on n'expose NI l'effectif exact, NI le manque
+                # exact (qui permettrait de le deduire). On indique seulement
+                # que le departement n'est pas encore publiable.
+                etat[dep] = {
+                    "votes_recus": f"< {K_MIN}",
+                    "seuil_k_min": K_MIN,
+                    "publiable": False,
+                }
 
     return etat
 
