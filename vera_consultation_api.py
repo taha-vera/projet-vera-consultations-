@@ -202,12 +202,27 @@ def _reinitialiser_echecs(ip: str) -> None:
         _tentatives_par_ip.pop(ip, None)
 
 
+CAPACITE_CODES = 10000
+SEUIL_SATURATION_CODES = 9000  # au-dela, on refuse de generer
+
 def _generer_code_court_unique() -> str:
-    """Genere un code a 4 chiffres non deja attribue."""
-    while True:
-        code = f"{secrets.randbelow(10000):04d}"
+    """Genere un code a 4 chiffres non deja attribue.
+
+    Leve une erreur si l'espace des codes est sature, plutot que de boucler
+    a l'infini sous le verrou global (ce qui gelerait toute l'API)."""
+    if len(registre_codes_courts) >= SEUIL_SATURATION_CODES:
+        raise HTTPException(
+            status_code=503,
+            detail="Espace des codes sature. Cloturez une consultation avant d'en ouvrir une nouvelle.",
+        )
+    for _ in range(200):
+        code = f"{secrets.randbelow(CAPACITE_CODES):04d}"
         if code not in registre_codes_courts:
             return code
+    raise HTTPException(
+        status_code=503,
+        detail="Impossible de generer un code unique. Espace probablement sature.",
+    )
 
 QUESTION_ACTIVE = {
     "question": "Êtes-vous favorable à la proposition soumise à cette consultation ?",
