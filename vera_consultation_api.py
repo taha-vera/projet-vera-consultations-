@@ -79,7 +79,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 verrou = threading.Lock()
 
-registre_tokens: dict[str, dict] = {}
 
 # Compteurs cumules par departement, jamais une liste de reponses
 # individuelles -- decision actee apres challenge multi-IA (ChatGPT + Grok,
@@ -357,23 +356,15 @@ def generer_tokens(payload: GenererTokensRequete, session_vera: Optional[str] = 
                 detail="Espace des codes insuffisant pour cette demande. Redemarrez le service pour repartir d'un espace vide.",
             )
         for _ in range(payload.quantite):
-            if SIGNATURE_AVEUGLE_DISPONIBLE:
-                # Porte 7 durcie : le token est desormais un token SIGNE
-                # (RSABSSA), encode en une chaine compacte pour le
-                # registre_codes_courts -- le code court a 4 chiffres
-                # reste le seul element transmis au participant, exactement
-                # comme avant. Le registre_tokens classique n'est PAS
-                # utilise dans ce chemin : la verification se fait par la
-                # signature elle-meme, pas par une recherche dans un
-                # dictionnaire.
-                token_signe = gestionnaire_signature.generer_token_signe(payload.departement)
-                token = encoder_token_pour_url(token_signe)
-            else:
-                token = secrets.token_urlsafe(24)
-                registre_tokens[token] = {
-                    "departement": payload.departement,
-                    "consomme": False,
-                }
+            # Token SIGNE (RSABSSA, Porte 7). La signature aveugle est
+            # OBLIGATOIRE : le service refuse de demarrer sans elle (voir le
+            # bloc d'import fail-closed en haut du fichier). Le code court a 4
+            # chiffres reste le seul element transmis au participant. La
+            # verification se fait par la signature elle-meme, pas par une
+            # recherche dans un dictionnaire -- aucun registre_tokens n'est
+            # tenu cote serveur (c'est ce qui garantit la non-liaison).
+            token_signe = gestionnaire_signature.generer_token_signe(payload.departement)
+            token = encoder_token_pour_url(token_signe)
 
             code_court = _generer_code_court_unique()
             registre_codes_courts[code_court] = token
@@ -589,14 +580,10 @@ def obtenir_question(token: str):
             raise HTTPException(status_code=404, detail=f"Token invalide: {e}")
         return QUESTION_ACTIVE
 
-    with verrou:
-        info = registre_tokens.get(token)
-        if info is None:
-            raise HTTPException(status_code=404, detail="Token inconnu")
-        if info["consomme"]:
-            raise HTTPException(status_code=410, detail="Token déjà consommé")
-
-    return QUESTION_ACTIVE
+    # Signature aveugle obligatoire : un token non signe ne peut pas exister
+    # en fonctionnement normal (le service refuse de demarrer sans signature).
+    # On refuse explicitement plutot que de retomber sur un chemin legacy.
+    raise HTTPException(status_code=404, detail="Token invalide ou non signe.")
 
 
 @app.post("/api/repondre")
@@ -632,19 +619,10 @@ def repondre(payload: ReponseEntrante, x_vera_token: Optional[str] = Header(None
 
         return {"statut": "enregistré"}
 
-    # Ancien format (registre simple) -- inchange.
-    with verrou:
-        info = registre_tokens.get(token)
-        if info is None:
-            raise HTTPException(status_code=404, detail="Token inconnu")
-        if info["consomme"]:
-            raise HTTPException(status_code=410, detail="Token déjà consommé")
-
-        departement = info["departement"]
-        _incrementer_compteur(departement, payload.reponse)
-        info["consomme"] = True
-
-    return {"statut": "enregistré"}
+    # Signature aveugle obligatoire : un token non signe ne peut pas exister
+    # en fonctionnement normal (fail-closed au demarrage). On refuse
+    # explicitement plutot que de retomber sur un chemin legacy.
+    raise HTTPException(status_code=404, detail="Token invalide ou non signe.")
 
 
 @app.get("/api/health")

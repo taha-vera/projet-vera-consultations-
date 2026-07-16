@@ -58,3 +58,18 @@ VERA agrege des OPINIONS. Il n'est PAS concu pour des donnees de sante de
 patients au sens RGPD article 9 (HDS, AIPD, MR-004 non couverts). Il peut servir
 a des consultations de climat social en etablissement de sante, pas a traiter
 des donnees cliniques individuelles.
+
+## 8. Canal temporel du tableau de bord RH
+
+Le tableau de bord (`/api/rh/etat_departements`) est un compteur live. Un
+organisateur qui le consulte de façon répétée peut observer, au-dessus du
+seuil K_MIN, l'arrivée des votes en temps réel (chaque vote incrémente le
+compteur). Cela révèle le *rythme* de participation et l'instant de chaque
+vote, mais jamais le *contenu* d'une réponse.
+
+C'est la même classe de canal que la Porte 3 (corrélation temporelle) : la
+participation et son timing ne sont pas masqués, seule la réponse l'est. Sous
+le seuil K_MIN, l'effectif exact n'est de toute façon pas exposé (voir §1).
+Pour un contexte où le timing de participation serait lui-même sensible, il
+faudrait un rafraîchissement différé ou un arrondi du compteur — non
+implémenté à ce jour, documenté ici comme limite assumée.
