@@ -127,6 +127,23 @@ def persister_cle_rsa(cle_privee_der, cle_publique_der, ouverture_unix):
         _conn.commit()
 
 
+def effacer_etat_consultation():
+    """Efface TOUT l'etat brut d'une consultation : compteurs, effectifs,
+    codes courts, tokens consommes, budget epsilon, resultats publies.
+    NE touche PAS a la cle RSA (infrastructure, pas donnee de consultation).
+
+    Apres cet appel, le serveur ne conserve plus AUCUNE donnee de la
+    consultation cloturee : ni resultat, ni compteur, ni code. C'est la
+    garantie de minimisation de VERA rendue operationnelle -- un acces au
+    serveur apres cloture ne revele rien de la consultation passee.
+    Operation atomique (une seule transaction)."""
+    with _verrou_db:
+        for table in ("compteurs_votes", "effectifs", "codes_courts",
+                      "tokens_consommes", "budget_epsilon", "resultats_publies"):
+            _conn.execute(f"DELETE FROM {table}")
+        _conn.commit()
+
+
 def effacer_cle_rsa():
     with _verrou_db:
         _conn.execute("DELETE FROM cle_rsa_active WHERE id = 1")

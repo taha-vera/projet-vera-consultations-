@@ -455,6 +455,74 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
     return resultat_par_departement
 
 
+@app.post("/api/rh/cloturer")
+def cloturer_consultation(session_vera: Optional[str] = Cookie(None)):
+    """Cloture la consultation en cours. Renvoie UNE DERNIERE FOIS les
+    resultats finaux (le RH doit les sauvegarder de son cote), puis efface
+    TOUT l'etat brut du serveur : compteurs, effectifs, codes courts, tokens
+    consommes, budget, resultats publies, et la cle de signature.
+
+    Apres cet appel, le serveur ne conserve PLUS AUCUNE donnee de la
+    consultation. C'est la garantie de minimisation de VERA rendue
+    operationnelle et verifiable. Une nouvelle consultation (nouvelle cle)
+    est immediatement ouverte pour un usage ulterieur.
+
+    ATTENTION : operation irreversible. Les resultats non sauvegardes par le
+    RH a la reception de cette reponse sont definitivement perdus."""
+    exiger_session(session_vera)
+
+    # 1. Figer/recuperer les resultats finaux des departements publiables.
+    resultats_finaux = {}
+    with verrou:
+        for departement, effectif in effectif_par_departement.items():
+            if effectif < K_MIN:
+                resultats_finaux[departement] = {
+                    "refuse": True,
+                    "raison": f"Effectif insuffisant : moins de {K_MIN} participants.",
+                }
+                continue
+            comptes_bruts = compteurs_par_departement.get(departement, {})
+            comptes_ordonnes = {
+                option["valeur"]: comptes_bruts.get(option["valeur"], 0)
+                for option in QUESTION_ACTIVE["options"]
+            }
+            deja = persistance.charger_resultat_publie(departement)
+            if deja is not None:
+                resultats_finaux[departement] = {"resultats_bruits": deja}
+            else:
+                resultats_finaux[departement] = {
+                    "resultats_bruits": publier_histogramme_dp(comptes_ordonnes, effectif)
+                }
+
+    # 2. Detruire la cle de signature -> tous les tokens en circulation
+    #    deviennent cryptographiquement invalides.
+    gestionnaire_signature.fermer_consultation()
+
+    # 3. Effacer tout l'etat brut cote base.
+    persistance.effacer_etat_consultation()
+
+    # 4. Vider les registres memoire.
+    with verrou:
+        compteurs_par_departement.clear()
+        effectif_par_departement.clear()
+        registre_codes_courts.clear()
+
+    # 5. Vider le set des tokens consommes du gestionnaire.
+    try:
+        gestionnaire_signature._tokens_consommes.clear()
+    except Exception:
+        pass
+
+    # 6. Rouvrir une consultation neuve (nouvelle cle) pour un usage ulterieur.
+    gestionnaire_signature.ouvrir_consultation()
+
+    return {
+        "statut": "consultation cloturee",
+        "avertissement": "Sauvegardez ces resultats : le serveur ne les conserve plus.",
+        "resultats_finaux": resultats_finaux,
+    }
+
+
 @app.get("/api/rh/etat_departements")
 def etat_departements(session_vera: Optional[str] = Cookie(None)):
     """Vue d'ensemble pour le tableau de bord RH : progression des votes
