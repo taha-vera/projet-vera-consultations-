@@ -153,6 +153,13 @@ except Exception as e:
 # Permet d'envoyer "4827" plutot que le token long, sans jamais exposer
 # le vrai token tant que le code n'a pas ete verifie cote serveur.
 registre_codes_courts: dict[str, str] = {}
+# Rechargement au demarrage : sans cela, un redemarrage pendant une
+# consultation active invaliderait tous les codes courts deja distribues.
+try:
+    registre_codes_courts.update(persistance.charger_codes_courts())
+except Exception as _e:
+    import logging
+    logging.warning("Impossible de recharger les codes courts au demarrage: %s", _e)
 
 # Protection anti-brute-force : avec seulement 10000 combinaisons a 4
 # chiffres, il faut limiter les tentatives. IP -> {"echecs": int, "bloque_jusqu_a": float}
@@ -372,6 +379,7 @@ def generer_tokens(payload: GenererTokensRequete, session_vera: Optional[str] = 
 
             code_court = _generer_code_court_unique()
             registre_codes_courts[code_court] = token
+            persistance.persister_code_court(code_court, token)
             resultats_generes.append({"token": token, "code_court": code_court})
 
     return {"resultats": resultats_generes, "departement": payload.departement, "genere_par": compte}

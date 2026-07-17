@@ -17,6 +17,7 @@ _SQL_TABLES = [
     "CREATE TABLE IF NOT EXISTS compteurs_votes (departement TEXT NOT NULL, reponse TEXT NOT NULL, compte INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (departement, reponse))",
     "CREATE TABLE IF NOT EXISTS effectifs (departement TEXT PRIMARY KEY, effectif INTEGER NOT NULL DEFAULT 0)",
     "CREATE TABLE IF NOT EXISTS resultats_publies (departement TEXT PRIMARY KEY, resultat_json TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS codes_courts (code TEXT PRIMARY KEY, token TEXT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS cle_rsa_active (id INTEGER PRIMARY KEY CHECK (id = 1), cle_privee_hex TEXT NOT NULL, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL, salt_hex TEXT)",
 ]
 
@@ -80,6 +81,34 @@ def persister_vote(departement, reponse, nouveau_compte, nouvel_effectif):
         _conn.execute(sql1, (departement, reponse, nouveau_compte))
         sql2 = "INSERT INTO effectifs (departement, effectif) VALUES (?, ?) ON CONFLICT(departement) DO UPDATE SET effectif = excluded.effectif"
         _conn.execute(sql2, (departement, nouvel_effectif))
+        _conn.commit()
+
+
+def charger_codes_courts():
+    """Recharge le mapping {code_court: token} au demarrage. Sans cela, un
+    redemarrage pendant une consultation active invaliderait tous les codes
+    a 4 chiffres deja distribues aux participants."""
+    with _verrou_db:
+        rows = _conn.execute("SELECT code, token FROM codes_courts").fetchall()
+    return {row[0]: row[1] for row in rows}
+
+
+def persister_code_court(code, token):
+    """Enregistre un code court a sa generation."""
+    with _verrou_db:
+        _conn.execute(
+            "INSERT INTO codes_courts (code, token) VALUES (?, ?) "
+            "ON CONFLICT(code) DO UPDATE SET token = excluded.token",
+            (code, token),
+        )
+        _conn.commit()
+
+
+def supprimer_code_court(code):
+    """Supprime un code court une fois le token consomme. Libere l'espace des
+    codes (evite la saturation a long terme) et empeche toute reutilisation."""
+    with _verrou_db:
+        _conn.execute("DELETE FROM codes_courts WHERE code = ?", (code,))
         _conn.commit()
 
 
