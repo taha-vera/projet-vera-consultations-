@@ -21,7 +21,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Header, Cookie, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import vera_admin_auth as auth
 from vera_epsilon_budget import BudgetEpsilonParDepartement
@@ -333,8 +333,12 @@ def creer_compte_rh(payload: CreerCompteRequete):
 # --------------------------------------------------------------------------
 
 class GenererTokensRequete(BaseModel):
-    departement: str
-    quantite: int
+    # Contraintes de robustesse : un departement non vide et de longueur
+    # bornee (evite les departements fantomes vides et les chaines geantes
+    # qui pollueraient dicts et base). Quantite bornee cote schema (le 422
+    # est alors automatique et clair, plutot qu'une verification manuelle).
+    departement: str = Field(min_length=1, max_length=100)
+    quantite: int = Field(ge=1, le=1000)
 
 
 @app.post("/api/rh/generer_tokens")
@@ -501,7 +505,26 @@ def _incrementer_compteur(departement: str, reponse: str) -> None:
         compteurs_par_departement[departement].get(reponse, 0) + 1
     )
     effectif_par_departement[departement] = effectif_par_departement.get(departement, 0) + 1
-    persistance.persister_vote(departement, reponse, compteurs_par_departement[departement][reponse], effectif_par_departement[departement])
+    # Le vote est deja compte en memoire (ci-dessus) AVANT la persistance.
+    # Si la persistance echoue (disque plein, base verrouillee), le vote n'est
+    # PAS perdu pour la session en cours : il compte deja. On logge l'incident
+    # pour reconciliation, mais on ne leve pas -- sinon l'utilisateur recevrait
+    # un 500 alors que son token est deja consomme (il ne pourrait pas revoter)
+    # et que son vote est bel et bien comptabilise. Le risque residuel est la
+    # perte de ce vote a un futur redemarrage ; il est trace dans les logs.
+    try:
+        persistance.persister_vote(
+            departement, reponse,
+            compteurs_par_departement[departement][reponse],
+            effectif_par_departement[departement],
+        )
+    except Exception as e:
+        import logging
+        logging.error(
+            "ECHEC persistance vote (departement=%s) : %s -- vote compte en "
+            "memoire, a reconcilier. Ne pas perdre au prochain redemarrage.",
+            departement, e,
+        )
 
 
 class ReponseEntrante(BaseModel):
