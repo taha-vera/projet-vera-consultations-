@@ -406,3 +406,24 @@ lecture de X-Real-IP / X-Forwarded-For. Verifie : 5x404 puis 429.
 **Lecon : une porte "Fermee" sur description n'est pas fermee sur code.
 Seul l'audit du code reel a revele ces 4 bugs. Les 4 autres IA, auditant
 la description, avaient valide un systeme qui contenait un bug critique.**
+
+
+## Renforcement Porte 14 -- 17/07/2026 -- Effacement actif (cloture)
+
+La non-persistance passive (l'etat ne survit pas a un crash) est desormais
+completee par un effacement ACTIF et verifiable : l'endpoint
+POST /api/rh/cloturer efface l'integralite de l'etat brut de la consultation
+(compteurs_votes, effectifs, codes_courts, tokens_consommes, budget_epsilon,
+resultats_publies) en une transaction, detruit la cle de signature, puis
+rouvre une consultation neuve.
+
+Difference avec la non-persistance seule : la Porte 14 garantissait qu'un
+crash ne laisse pas d'etat exploitable en memoire ; la cloture garantit que
+meme la base SQLite ne contient plus rien apres l'operation. L'organisateur
+peut donc PROUVER la minimisation (RGPD art. 5(1)(e)) : avant cloture N
+departements, apres cloture 0. Teste en conditions reelles (10 -> 0).
+
+Fonction de persistance : effacer_etat_consultation() dans vera_persistance.py
+(ne touche PAS a la cle RSA d'infrastructure -- seulement l'etat de la
+consultation). Endpoint authentifie RH, action irreversible avec double
+confirmation cote interface.

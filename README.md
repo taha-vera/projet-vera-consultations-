@@ -72,6 +72,17 @@ Ce seuil n'est pas choisi arbitrairement, il est **mesuré**. À ε=0.5, avec pr
 
 **Sur ε=0.5** : c'est un régime de confidentialité plus strict que les déploiements DP industriels connus (Apple : ε=2–16 ; Google RAPPOR : ε=2–9 ; US Census 2020 : ε≈19,6). L'imprécision sur les petites cohortes n'est pas un défaut d'implémentation — c'est la garantie qui s'exerce.
 
+## Effacement actif et vérifiable (clôture de consultation)
+
+VERA ne se contente pas de ne rien conserver *après coup* : il permet à l'organisateur d'**effacer activement** toutes les données du serveur, et de le prouver.
+
+L'endpoint `POST /api/rh/cloturer` (bouton « Clôturer » dans l'interface) :
+1. renvoie les résultats finaux une dernière fois (l'organisateur doit les sauvegarder),
+2. efface définitivement **tout l'état brut** : compteurs, effectifs, codes de participation, tokens consommés, budget ε, résultats publiés, et la clé de signature,
+3. rouvre une consultation neuve (nouvelle clé) pour un usage ultérieur.
+
+Après clôture, un accès au serveur ne révèle **plus rien** de la consultation passée. C'est la garantie de minimisation des données (RGPD art. 5) rendue opérationnelle et démontrable — pas une promesse, une action testable. Vérifié en conditions réelles : un état de 10 départements est ramené à 0 après clôture.
+
 ## Limites assumées
 
 L1 observateur réseau · L2 coercition · L3 petits effectifs (refus de publier
