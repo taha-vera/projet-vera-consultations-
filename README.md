@@ -8,7 +8,7 @@ sans jamais rendre lisible la contribution d'un individu — et le prouve.
 - *Modèle de menace complet (17 portes)* : [VERA_THREAT_MODEL_COMPLETE.md](VERA_THREAT_MODEL_COMPLETE.md)
 - *Mécanisme de bruit en production* : [vera_dp_noise.py](vera_dp_noise.py) (OpenDP, Δ=2, scale=4, ε=0.5, bounds=(0,10000))
 - *Persistance chiffrée de l'état (Portes 11, 14)* : [vera_persistance.py](vera_persistance.py) (SQLite WAL, Fernet/AES-128)
-- *Porte 7 (signature aveugle RSABSSA, production)* : [vera_signature_manager.py](vera_signature_manager.py) — tests : [test_porte7.py](test_porte7.py)
+- *Porte 7 (signature aveugle, production)* : [vera_signature_manager.py](vera_signature_manager.py) — primitive RSABSSA RFC 9474 (standard audite). La *logique* de partition (un token par individu/epoque, anti-rejeu, blocage 49/1) est validee sur un prototype dans [archive/test_porte7.py](archive/test_porte7.py) ; ce prototype (archive/vera_token.py) n'est PAS la primitive de production et n'est pas utilise par le serveur.
 
 ## Antériorité (DOI Zenodo)
 

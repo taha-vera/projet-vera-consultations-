@@ -29,7 +29,7 @@ Dans le perimetre :
 - vera_epsilon_budget.py -- composition sequentielle, budget par population
 - vera_signature_manager.py -- signature aveugle RSABSSA (RFC 9474)
 - vera_persistance.py -- persistance SQLite chiffree (Fernet/AES-128)
-- vera_token.py -- gestion des tokens
+- vera_signature_manager.py -- gestion des tokens de production (signature aveugle RSABSSA RFC 9474). NB : archive/vera_token.py est un ancien prototype (logique de partition uniquement, primitive forgeable, non utilise en production).
 
 Hors perimetre :
 - Code archive dans archive/vera_radio_era/ (ere VERA Radio/ANCRE, non maintenu)
