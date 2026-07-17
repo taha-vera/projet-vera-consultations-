@@ -44,7 +44,7 @@ class BudgetEpsilonParDepartement:
     degradation silencieuse.
     """
 
-    def __init__(self, epsilon_total_autorise: float = 1.5):
+    def __init__(self, epsilon_total_autorise: float = 0.5):
         self._verrou = threading.Lock()
         self._epsilon_total_autorise = epsilon_total_autorise
         self._epsilon_consomme: dict[str, float] = {}
