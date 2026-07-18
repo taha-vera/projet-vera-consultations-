@@ -364,7 +364,7 @@ def generer_tokens(payload: GenererTokensRequete, session_vera: Optional[str] = 
         if len(registre_codes_courts) + payload.quantite > SEUIL_SATURATION_CODES:
             raise HTTPException(
                 status_code=503,
-                detail="Espace des codes insuffisant pour cette demande. Redemarrez le service pour repartir d'un espace vide.",
+                detail="Espace des codes temporairement sature. L'espace se libere au fur et a mesure que les participants votent. Pour tout reinitialiser immediatement, cloturez la consultation.",
             )
         for _ in range(payload.quantite):
             # Token SIGNE (RSABSSA, Porte 7). La signature aveugle est
@@ -723,6 +723,21 @@ def repondre(payload: ReponseEntrante, x_vera_token: Optional[str] = Header(None
 
         with verrou:
             _incrementer_compteur(departement, payload.reponse)
+            # Le token vient d'etre consomme (anti-rejeu). Le code court qui y
+            # menait n'a plus aucune utilite : on le libere de la memoire ET de
+            # la base. Cela evite la saturation de l'espace des codes au fil des
+            # votes (le plafond compte les codes ACTIFS, pas le cumul emis).
+            code_a_liberer = None
+            for _code, _tok in registre_codes_courts.items():
+                if _tok == token:
+                    code_a_liberer = _code
+                    break
+            if code_a_liberer is not None:
+                registre_codes_courts.pop(code_a_liberer, None)
+                try:
+                    persistance.supprimer_code_court(code_a_liberer)
+                except Exception:
+                    pass  # la suppression memoire suffit a liberer l'espace
 
         return {"statut": "enregistré"}
 
