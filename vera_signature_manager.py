@@ -140,7 +140,11 @@ class GestionnaireSignature:
             message = bytes.fromhex(token_complet["message"])
             signature = bytes.fromhex(token_complet["signature"])
             randomizer = bytes.fromhex(token_complet["randomizer"])
-        except (KeyError, ValueError) as e:
+        except (KeyError, ValueError, TypeError) as e:
+            # TypeError : un token forge peut contenir des valeurs de mauvais
+            # type (ex. message=5 au lieu d'une chaine hex) -> bytes.fromhex
+            # leve TypeError. On le traite comme un token malforme (rejet 404),
+            # jamais comme un crash 500.
             raise SignatureInvalideError("Token malforme: " + str(e))
         empreinte = hashlib.sha256(message + signature).hexdigest()
         with self._verrou:
