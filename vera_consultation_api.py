@@ -418,7 +418,6 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
                     continue
                 budget_epsilon.consommer(departement, EPSILON_PAR_PUBLICATION)
                 etat_apres = budget_epsilon.etat(departement)
-                persistance.persister_budget_epsilon(departement, etat_apres["epsilon_consomme"], etat_apres["nombre_publications"])
 
                 # Le bruit DP est tire UNE SEULE FOIS, a la premiere publication,
                 # puis fige. Republier ne re-tire pas de bruit -- sinon un appelant
@@ -434,7 +433,16 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
                 # elle reduit l'erreur de ~25% et garantit que les comptages
                 # publies somment exactement a l'effectif reel.
                 comptes_bruites = publier_histogramme_dp(comptes_ordonnes, effectif)
-                persistance.persister_resultat_publie(departement, comptes_bruites)
+
+                # ATOMICITE : budget + resultat committes ensemble. Sans cela,
+                # un crash entre les deux ecritures laissait "budget consomme
+                # mais resultat absent" -> departement verrouille a jamais.
+                persistance.persister_publication_atomique(
+                    departement,
+                    etat_apres["epsilon_consomme"],
+                    etat_apres["nombre_publications"],
+                    comptes_bruites,
+                )
             else:
                 # Deja publie : on renvoie le resultat bruite fige, jamais un nouveau tirage.
                 comptes_bruites = persistance.charger_resultat_publie(departement)

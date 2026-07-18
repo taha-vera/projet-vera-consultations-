@@ -226,6 +226,21 @@ def persister_resultat_publie(departement, resultat_dict):
         _conn.commit()
 
 
+def persister_publication_atomique(departement, epsilon_consomme, nb_publications, resultat_dict):
+    """Persiste le budget epsilon ET le resultat fige dans UNE SEULE
+    transaction. Empeche l'etat incoherent "budget consomme mais resultat
+    absent" qui, apres un crash entre deux commits separes, verrouillait
+    definitivement un departement (deja_publie=True mais resultat introuvable).
+    Un crash laisse desormais soit les deux ecritures, soit aucune."""
+    import json
+    with _verrou_db:
+        sql_budget = "INSERT INTO budget_epsilon (departement, epsilon_consomme, nb_publications) VALUES (?, ?, ?) ON CONFLICT(departement) DO UPDATE SET epsilon_consomme = excluded.epsilon_consomme, nb_publications = excluded.nb_publications"
+        _conn.execute(sql_budget, (departement, epsilon_consomme, nb_publications))
+        sql_resultat = "INSERT INTO resultats_publies (departement, resultat_json) VALUES (?, ?) ON CONFLICT(departement) DO UPDATE SET resultat_json = excluded.resultat_json"
+        _conn.execute(sql_resultat, (departement, json.dumps(resultat_dict)))
+        _conn.commit()  # un seul commit -> atomicite
+
+
 def charger_resultat_publie(departement):
     """Recupere le resultat bruite fige d'un departement, ou None s'il n'existe pas."""
     import json
