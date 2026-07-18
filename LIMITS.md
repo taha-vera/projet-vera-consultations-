@@ -73,3 +73,25 @@ le seuil K_MIN, l'effectif exact n'est de toute façon pas exposé (voir §1).
 Pour un contexte où le timing de participation serait lui-même sensible, il
 faudrait un rafraîchissement différé ou un arrondi du compteur — non
 implémenté à ce jour, documenté ici comme limite assumée.
+
+## 9. Ce que révèle le fichier de base de données au repos
+
+La clé RSA privée est chiffrée au repos (Fernet/AES-128, Porte 11) : voler le
+fichier `.db` sans la clé `VERA_DB_KEY` ne donne pas accès à la clé de
+signature. En revanche, les données **agrégées** sont stockées en clair : noms
+des départements, libellés des réponses, et compteurs cumulés par option.
+
+Ce qui reste protégé, et c'est l'essentiel : **aucun vote individuel n'existe
+en base.** Les votes sont agrégés à l'écriture (compteur `département → réponse
+→ total`), jamais stockés ligne par ligne. Un accès au fichier révélerait donc
+« le département X a 45 oui / 30 non », mais jamais qui a voté quoi. L'anonymat
+des participants — l'invariant central de VERA — n'est pas affecté.
+
+Cette exposition des agrégats en clair est acceptable dans le modèle de menace
+retenu : le fichier est déjà protégé par le système d'exploitation et l'accès
+SSH, et les compteurs agrégés sont de toute façon destinés à être publiés
+(sous forme bruitée). Une organisation dont la simple structure de consultation
+serait elle-même sensible devrait chiffrer le volume au niveau système
+(LUKS/dm-crypt), ce qui sort du périmètre de VERA.
+
+Vérifié par test_chiffrement_repos.py.
