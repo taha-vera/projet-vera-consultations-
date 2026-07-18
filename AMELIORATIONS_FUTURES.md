@@ -102,3 +102,16 @@ Etapes du chantier :
 
 Ampleur : plusieurs jours de travail concentre. Le plus gros morceau de VERA.
 A traiter comme un projet dedie, pas entre deux taches.
+### Obstacle sjcl : LEVE (verifie le 18/07 soir)
+Enquete sur node_modules/@cloudflare/blindrsa-ts : sjcl n'est utilise QUE pour
+l'arithmetique grands nombres (sjcl.bn, sjcl.codec, sjcl.random, i2osp/os2ip,
+inversion modulaire, generation de premiers). AUCUN appel a sjcl.ecc /
+basicKey / courbe elliptique sur le chemin RSABSSA (grep .ecc/elliptic/
+basicKey/curve dans util.js et blindrsa.js = vide). Or la faille
+GHSA-2w8x-224x-785m est dans sjcl.ecc.basicKey.publicKey (validation point sur
+courbe). => Faille HORS PERIMETRE pour notre usage RSA. Le pont crypto peut
+etre bati sur blindrsa-ts sans exposition a cette CVE.
+PROCHAINE ETAPE (tete reposee) : etape 1 du chantier = test d'interoperabilite
+reel. Message aveugle par blindrsa-ts (JS) -> signe par vera_blind_sig (Rust)
+-> finalise en JS -> verifie. Attention encodage DER des cles + format des
+octets a aligner entre les deux libs.
