@@ -30,11 +30,12 @@ dp.enable_features("contrib")
 # ---------------------------------------------------------------------
 # Parametres du mecanisme (snapping sur grille AVANT bruit)
 # ---------------------------------------------------------------------
-R = 20                                  # resolution de la grille
-DS = 0.45                               # sensibilite continue (a calibrer/usage)
-DELTA_INT = math.floor(R * DS) + 1      # sensibilite entiere apres snapping = 10
+# Parametres ALIGNES SUR LA PRODUCTION (vera_dp_noise.py), recalibration du
+# 04/07/2026. Avant cette date : Delta=10, scale=20, bounds=(0,100). Cette
+# preuve certifie desormais EXACTEMENT le mecanisme execute par le serveur.
 EPS_CIBLE = 0.5                         # budget epsilon vise
-SCALE = DELTA_INT / EPS_CIBLE           # echelle Laplace = 20.0
+DELTA_INT = 2                           # sensibilite L1 de production (Delta_1)
+SCALE = DELTA_INT / EPS_CIBLE           # echelle Laplace = 4.0 (= prod)
 
 # Bornes du domaine : la moyenne snappee ne peut pas sortir de cette plage.
 # Necesssaires pour que OpenDP utilise un echantillonnage en temps quasi-constant
@@ -42,8 +43,8 @@ SCALE = DELTA_INT / EPS_CIBLE           # echelle Laplace = 20.0
 # recommandations de la documentation OpenDP et au papier Jin et al. 2021
 # (IEEE S&P) qui montre que l'echantillonnage geometrique sans bounds fuite
 # l'amplitude du bruit via son temps d'execution -- Porte 3 du modele de menace.
-BORNE_INF = 0      # valeur minimale possible de la moyenne snappee
-BORNE_SUP = 100    # valeur maximale possible de la moyenne snappee
+BORNE_INF = 0      # borne inf du domaine (= prod, BOUNDS[0])
+BORNE_SUP = 10000  # borne sup du domaine (= prod, BOUNDS[1])
 
 # ---------------------------------------------------------------------
 # 1. GARANTIE epsilon-DP EXACTE (certifiee par OpenDP)
