@@ -25,7 +25,7 @@ sans jamais rendre lisible la contribution d'un individu — et le prouve.
 | 4. Composition séquentielle | Fermée — budget par population, vérifié empiriquement |
 | 5. Observateur réseau | Hors-périmètre, assumé (VPN/Tor au choix utilisateur) |
 | 6. Coercition | Hors-périmètre, limite partagée par tout système de vote |
-| 7. Différenciation « 49/1 » | Fermée — signature aveugle RSABSSA RFC 9474, testée dans les deux sens |
+| 7. Différenciation « 49/1 » | Partielle — la primitive RSABSSA RFC 9474 est correcte (empêche la forge de tokens). MAIS l'unlinkability du votant n'est PAS effective : le serveur génère le token complet (aveuglement + finalisation côté serveur), il pourrait donc relier identité et acte de voter. Contenu des votes protégé ; non-liaison identité↔vote à corriger par un refactor (crypto côté client). Voir AMELIORATIONS_FUTURES. |
 | 8. Inférence outlier | Fermée — AUC=0.6209, IC95% [0.6185, 0.6232] (même mesure que Porte 2) |
 | 9. Collusion émetteur/agrégateur | Fermée — secret admin distinct, comptes séparés |
 | 10. Sondage binaire K_MIN | Fermée — effectif/fiable retirés de l'API |

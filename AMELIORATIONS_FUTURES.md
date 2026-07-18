@@ -62,3 +62,43 @@ environnement de test, pas en direct sur la production.
 10. Après _detruire_cle_privee() (expiration 48h), la clé publique reste :
     verifier_et_consommer peut-il encore accepter des tokens ? Comportement à
     spécifier explicitement, puis tester.
+
+
+## CHANTIER MAJEUR -- Unlinkability du votant (crypto cote client)
+
+**Gravite : haute. Touche la promesse centrale "anonymat prouve".**
+
+Probleme identifie le 18/07/2026 (audit Fable 5, lecture bout-en-bout) :
+la signature aveugle ne produit AUCUNE unlinkability dans l'architecture
+actuelle. generer_token_signe() execute les 3 etapes (aveugler + signer +
+finaliser) cote serveur ; le client (static/*.html) ne fait aucune crypto.
+Le serveur produit donc le token complet et connait l'empreinte
+SHA256(message+signature) qui sera consommee -> il peut relier identite et
+acte de vote. Le CONTENU des votes reste protege (agregats bruites), mais la
+non-liaison identite<->participation, elle, n'est pas prouvee.
+
+Correctif (architectural, PAS un patch) : deplacer aveuglement +
+finalisation dans le navigateur du votant.
+
+Faisabilite etablie :
+- Serveur : blind-rsa-signatures 0.17 (Rust), variante SHA384-PSS-Randomized (RFC 9474)
+- Client : blindrsa-ts (Cloudflare) supporte la MEME variante -> interoperable
+- Seule signer_aveugle doit rester cote serveur
+
+Etapes du chantier :
+1. Pont crypto : prouver qu'un message aveugle en JS (blindrsa-ts) est signe
+   par la lib Rust et valide. Test de faisabilite AVANT tout le reste.
+2. Endpoints serveur : /api/cle_publique + /api/signer_aveugle (recoit un
+   message DEJA aveugle, ne voit jamais le message final).
+3. Client JS (vote.html) : aveugle, envoie l'aveugle, recoit la sig aveugle,
+   definalise, obtient le token -- le serveur ne l'a jamais vu.
+4. POINT DUR (conception) : autorisation du votant. Aujourd'hui le RH genere
+   et distribue les tokens. Dans le nouveau modele, le votant fabrique son
+   token -> comment prouver qu'il a le droit de voter (une fois) SANS que le
+   serveur puisse lier autorisation et token final ? Probleme classique du
+   vote anonyme, solutions connues (jeton d'autorisation a usage unique,
+   separation emetteur/signataire) mais c'est la vraie complexite.
+5. Tests bout-en-bout sur environnement isole, puis bascule.
+
+Ampleur : plusieurs jours de travail concentre. Le plus gros morceau de VERA.
+A traiter comme un projet dedie, pas entre deux taches.

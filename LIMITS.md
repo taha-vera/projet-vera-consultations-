@@ -48,7 +48,22 @@ directe. Limite partagee par l'ensemble des systemes de ce type.
 ## 6. Confiance dans l'organisateur au moment de l'emission
 
 L'organisateur (RH) connait, au moment d'emettre les jetons, la correspondance
-identite/departement. VERA empeche que cette information se propage dans le
+LIMITE ARCHITECTURALE IMPORTANTE (identifiee 18/07/2026) : la signature
+aveugle est censee garantir que le serveur ne peut PAS relier un votant a son
+acte de vote (unlinkability). Dans l'architecture actuelle, cette garantie
+n'est PAS effective : le serveur execute l'integralite du protocole RSABSSA
+(aveuglement ET finalisation) et produit le token complet, qu'il transmet au
+RH. Le serveur (ou le RH) peut donc construire la correspondance identite ->
+empreinte du token, puis, apres le vote, lire la table des tokens consommes
+pour savoir qui a vote. Le CONTENU du vote reste protege (agregats bruites,
+aucun vote individuel en base), mais la NON-LIAISON identite<->participation
+n'est pas prouvee cryptographiquement. Le correctif est architectural
+(deplacer aveuglement + finalisation dans le navigateur du votant) et fait
+l'objet d'un chantier dedie (voir AMELIORATIONS_FUTURES). En attendant, la
+non-liaison repose sur la confiance envers l'operateur, au meme titre que
+l'association identite/departement.
+
+VERA empeche que cette information se propage dans le
 traitement des reponses, mais ne l'efface pas cote organisateur. La cryptographie
 ne peut pas retirer cette connaissance initiale.
 
