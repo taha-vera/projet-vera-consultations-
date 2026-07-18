@@ -56,11 +56,20 @@ class BudgetEpsilonParDepartement:
             return self._epsilon_total_autorise - consomme
 
     def peut_publier(self, departement: str, epsilon_requete: float) -> bool:
+        # Un cout <= 0 n'a pas de sens (un cout nul autoriserait une infinite
+        # de publications, un cout negatif "rembourserait" du budget).
+        if epsilon_requete <= 0:
+            return False
         with self._verrou:
             consomme = self._epsilon_consomme.get(departement, 0.0)
             return (consomme + epsilon_requete) <= self._epsilon_total_autorise
 
     def consommer(self, departement: str, epsilon_requete: float) -> None:
+        # Refus dur d'un cout <= 0 : un cout negatif rembourserait du budget
+        # (permettant des publications supplementaires), un cout nul en
+        # autoriserait une infinite. Les deux casseraient la garantie DP.
+        if epsilon_requete <= 0:
+            raise ValueError(f"Cout epsilon invalide (doit etre > 0) : {epsilon_requete}")
         with self._verrou:
             consomme = self._epsilon_consomme.get(departement, 0.0)
             restant = self._epsilon_total_autorise - consomme
