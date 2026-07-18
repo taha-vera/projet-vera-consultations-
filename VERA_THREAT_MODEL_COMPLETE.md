@@ -10,7 +10,7 @@ Chaque statut n'est marqué "vérifié" que s'il a été testé directement sur 
 
 | # | Porte | Statut | Preuve (a jour 16/07/2026) |
 |---|---|---|---|
-| 1 | Mécanisme de bruit | Fermée | Laplace vectoriel OpenDP (Laplace discret), Delta_1=2, scale=4, eps=0.5, bounds=(0,10000). Projection sur le simplexe (Hay et al. 2010). Verifie par test_precision_kmin.py |
+| 1 | Mécanisme de bruit | Fermée | Laplace vectoriel OpenDP (Laplace discret), Delta_1=2, scale=4, eps=0.5, bounds=(0,10000). Projection sur le simplexe par clip-and-shift iteratif (post-traitement inspire de Hay et al. 2010 ; heuristique de coherence, pas la projection L2 exacte de Duchi ; gain ~25% mesure empiriquement). Verifie par test_precision_kmin.py |
 | 2 | MIA générale | Fermée | AUC=0.6209, IC95% [0.6185, 0.6232], borne theorique 0.6225 incluse (N=100000, bootstrap) |
 | 3 | Canal temporel | Fermée | Fuite sub-microseconde. Test etendu 7 valeurs N=10000 : Spearman rho=-0.14 p=0.76, pas de correlation valeur/temps. Inexploitable via reseau (latence 50-100ms) |
 | 4 | Composition séquentielle | Fermée | Budget eps=0.5 par population = UNE publication (resultat fige a la premiere, republier renvoie le meme resultat -> pas de moyennage) |

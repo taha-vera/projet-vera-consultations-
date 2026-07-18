@@ -430,7 +430,7 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
                 # Laplace vectoriel (Delta_1 = 2, scale = 4, eps = 0.5) PUIS
                 # projection sur le simplexe {x >= 0, somme = effectif}.
                 # La projection est du post-traitement : gratuite en epsilon,
-                # elle reduit l'erreur de ~25% et garantit que les comptages
+                # elle reduit l'erreur (~25%, mesure empiriquement) et garantit que les comptages
                 # publies somment exactement a l'effectif reel.
                 comptes_bruites = publier_histogramme_dp(comptes_ordonnes, effectif)
 

@@ -50,9 +50,13 @@ def appliquer_bruit_dp(valeur_brute: int) -> int:
 # hierarchiques). Notre cas est l'instance la plus simple : une seule contrainte,
 # la somme exacte = N.
 #
-# ALGORITHME : projection euclidienne sur le simplexe {x >= 0, somme = N}
-# (probleme d'optimisation convexe classique, cf. Duchi et al. 2008). Le total N
-# est publie exact car invariant sous substitution (sensibilite 0).
+# ALGORITHME : projection alternee par clip-and-shift iteratif (POCS -
+# Projections Onto Convex Sets) sur le simplexe {x >= 0, somme = N} : on
+# annule les negatifs puis on redistribue l'ecart uniformement, en iterant
+# jusqu'a convergence. NB : ce n'est PAS la projection L2 euclidienne exacte
+# de Duchi et al. 2008 (tri decroissant + seuil) ; c'est une heuristique de
+# coherence qui converge vers un point du simplexe. Le total N est publie
+# exact car invariant sous substitution (sensibilite 0).
 #
 # PREUVE DE SENSIBILITE (corrigee le 14/07/2026) :
 # Adjacence par SUBSTITUTION : un individu qui change d'avis retire son vote
@@ -66,9 +70,10 @@ def appliquer_bruit_dp(valeur_brute: int) -> int:
 # PROJECTION : l'effectif total N est invariant sous substitution
 # (sensibilite 0), donc publiable exactement sans consommer de budget.
 # On projette le vecteur bruite sur {x >= 0, somme(x) = N}. C'est du
-# POST-TRAITEMENT : gratuit en epsilon (theoreme de post-traitement DP),
-# et cela reduit l'erreur d'environ 25% tout en garantissant que les
-# comptages publies somment exactement a N.
+# POST-TRAITEMENT : gratuit en epsilon (theoreme de post-traitement DP,
+# valable quelle que soit la projection utilisee). Le gain de precision
+# (environ 25%) est MESURE EMPIRIQUEMENT sur notre cas a 3 cases (voir
+# test_precision_kmin.py), pas derive analytiquement de la projection L2.
 # --------------------------------------------------------------------------
 
 def _projeter_sur_simplexe(valeurs_bruitees: list[float], total: int) -> list[int]:
