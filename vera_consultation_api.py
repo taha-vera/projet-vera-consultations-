@@ -427,6 +427,29 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     return {"signature_aveugle_hex": sig_aveugle.hex(), "departement": departement}
 
 
+# ============================================================================
+# REFACTOR CRYPTO -- Exposition de la cle publique + son empreinte (Exigence 1)
+# La cle publique est PUBLIQUE par nature : l'exposer n'est pas un risque. Le
+# risque serait qu'un serveur malveillant en donne une DIFFERENTE par votant
+# (attaque par substitution de cle -> desanonymisation). La PARADE (cote client)
+# est de comparer l'empreinte de la cle recue a une empreinte ENGAGEE hors du
+# serveur (dans le lien SMS, fragment #k=). Cet endpoint fournit la cle et son
+# empreinte SHA-256 ; c'est le client qui doit verifier l'empreinte contre celle
+# du lien, JAMAIS se fier aveuglement a ce que renvoie le serveur.
+# ============================================================================
+@app.get("/api/cle_publique")
+def cle_publique_endpoint():
+    import hashlib
+    try:
+        pk_der = gestionnaire_signature.cle_publique()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Aucune consultation active.")
+    return {
+        "cle_publique_hex": pk_der.hex(),
+        "empreinte_sha256": hashlib.sha256(pk_der).hexdigest(),
+    }
+
+
 @app.get("/api/rh/resultats")
 def resultats(session_vera: Optional[str] = Cookie(None)):
     exiger_session(session_vera)
