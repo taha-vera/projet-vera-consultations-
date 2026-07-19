@@ -143,3 +143,45 @@ Points REELS a garder :
 
 Priorite quand on y viendra : concurrence verifier_et_consommer, puis test
 d'integration signature+persistance. Le reste est du durcissement progressif.
+
+## Chantier crypto -- 3 exigences de conception (audit Fable 5, 19/07)
+Le modele en deux temps (jeton d'autorisation identifiant + signature aveugle
+anonyme) est correct (Chaum 1982, Privacy Pass, RSA-BSSA) MAIS n'est validable
+qu'avec ces trois parades. A integrer DES la conception de l'endpoint, pas apres.
+
+### EXIGENCE 1 (CRITIQUE) -- Engagement de cle publique
+Sans elle, tout le refactor est decoratif. Attaque : un serveur malveillant
+signe chaque votant avec une cle RSA DIFFERENTE. Au depouillement, il teste
+quelle cle valide chaque token -> desanonymisation totale, sans casser la
+crypto. NB : notre test de faisabilite actuel a DEJA cette faille (le client
+lit une cle que le serveur fournit).
+PARADE OBLIGATOIRE : la cle publique de l'epoque est PUBLIEE et ENGAGEE AVANT
+la distribution des jetons (dans le depot, sur la page de consultation, hash
+dans le QR code -- publique et unique). Le client verifie sa signature
+finalisee contre CETTE cle engagee, jamais contre une cle que le serveur
+renvoie a la volee. => CHANGE LE CONTRAT DE L'API : le client doit connaitre
+la cle AVANT de contacter le serveur.
+
+### EXIGENCE 2 -- Ensemble d'anonymat = jetons echanges, pas population
+L'unlinkability ne vaut que parmi les gens qui ont EFFECTIVEMENT echange leur
+jeton dans l'epoque. 6 demandes sur 300 -> anonymat 1-parmi-6, pas 1-parmi-300.
+Meme logique que K_MIN. PARADE : depouiller seulement apres cloture (deja fait
+via K_MIN) ; DOCUMENTER honnetement que l'ensemble d'anonymat = nombre de
+jetons echanges. A resoudre par la doc, pas par la crypto.
+
+### EXIGENCE 3 -- Corrélation par metadonnees reseau (IP)
+Demande de signature et vote de la meme IP -> un serveur qui logge les IP
+relie les deux, aveuglement ou pas. Meme classe que la limite "observateur
+reseau" actuelle. L'unlinkability crypto protege contre ce qui est PERSISTE
+(enregistrements), pas contre un serveur qui observe le trafic en direct.
+PARADE : Tor, HORS PERIMETRE. A DOCUMENTER dans le threat model, pas a resoudre.
+
+### Deux details d'implementation a ne pas perdre
+1. DEUX REGISTRES SEPARES, JAMAIS JOINTS : jeton d'autorisation (Temps 1) et
+   hash du token de vote depense (Temps 2) sont deux tables distinctes. Les
+   joindre recreerait la liaison.
+2. one-token-per-epoch (parade differenciation, porte 7 historique) doit
+   SURVIVRE au refactor : un jeton d'autorisation = une epoque = une signature.
+
+Ces trois exigences seront les futures Portes 18 (engagement cle), 19 (ensemble
+anonymat), 20 (correlation reseau) une fois le refactor fait et teste.
