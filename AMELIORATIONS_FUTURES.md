@@ -115,3 +115,31 @@ PROCHAINE ETAPE (tete reposee) : etape 1 du chantier = test d'interoperabilite
 reel. Message aveugle par blindrsa-ts (JS) -> signe par vera_blind_sig (Rust)
 -> finalise en JS -> verifie. Attention encodage DER des cles + format des
 octets a aligner entre les deux libs.
+
+## Audit couverture de tests (19/07) -- a traiter APRES le refactor crypto
+Un audit qualite des tests a identifie des trous. NB : une partie deviendra
+caduque avec le refactor crypto (verifier_et_consommer, flux de tokens vont
+changer) -- ne pas ecrire ces tests avant le refactor.
+
+Points REELS a garder :
+- CONCURRENCE verifier_et_consommer : deux threads consommant le meme token
+  -> double vote possible EN THEORIE. Fortement attenue par worker unique
+  (impose exprès, GIL + etat memoire), mais a verifier/tester.
+- test_signature_production isole la primitive en memoire pure (monkey-patch
+  builtins.__import__). Legitime pour la primitive, MAIS manque un test
+  d'integration AVEC persistance (round-trip persister->recharge->verifier),
+  et le rechargement de cle RSA chiffree + timer de destruction 48h ne sont
+  pas testes.
+- test_admin_auth : pas de test d'expiration de session (mock time.time()),
+  pas de test de timing (compte existant vs inexistant), pas de concurrence.
+- test_persistance : pas de test de corruption SQLite, pas de test WAL, pas de
+  test d'atomicite de persister_publication_atomique (interruption entre
+  ecritures).
+- test_precision_kmin : tolerances larges (deja note #8), N_SIM=3000 -> monter
+  a 10000, ajouter test de biais (moyenne erreurs ~0) et de forme (KS/chi2).
+- Point mineur : test 7 admin_auth (sel) trivialement vrai par construction ;
+  test 3 signature ne verifie pas que le rejet est pour la BONNE raison
+  (verifier type SignatureInvalideError + message).
+
+Priorite quand on y viendra : concurrence verifier_et_consommer, puis test
+d'integration signature+persistance. Le reste est du durcissement progressif.
