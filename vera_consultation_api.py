@@ -385,6 +385,48 @@ def generer_tokens(payload: GenererTokensRequete, session_vera: Optional[str] = 
     return {"resultats": resultats_generes, "departement": payload.departement, "genere_par": compte}
 
 
+# ============================================================================
+# REFACTOR CRYPTO -- Endpoint de signature aveugle (Temps 2, cote serveur)
+# Le votant a aveugle son message DANS SON NAVIGATEUR. Il presente ici son
+# jeton d'autorisation (Temps 1) + le message aveugle. Le serveur consomme le
+# jeton (atomique, anti-double-vote), signe A L'AVEUGLE, et renvoie. Il ne voit
+# jamais le message en clair ni le token final -> il ne peut pas relier
+# identite et vote. C'est le coeur de l'unlinkability effective.
+# ============================================================================
+class SignerAveugleRequete(BaseModel):
+    jeton_autorisation: str = Field(min_length=1, max_length=200)
+    message_aveugle_hex: str = Field(min_length=1, max_length=2000)
+
+
+@app.post("/api/signer_aveugle")
+def signer_aveugle_endpoint(payload: SignerAveugleRequete):
+    # 1. Consommer le jeton d'autorisation (registre 1, ATOMIQUE). Renvoie le
+    #    departement si valide et non utilise, sinon None. On consomme AVANT de
+    #    signer : protege contre le double-vote par requetes simultanees (un
+    #    seul appelant peut consommer un jeton donne). Le cas ou la signature
+    #    echoue apres consommation est extremement rare (consultation fermee
+    #    pile entre les deux) et prefere a un risque de double-vote.
+    departement = persistance.consommer_jeton_autorisation(payload.jeton_autorisation)
+    if departement is None:
+        raise HTTPException(status_code=403, detail="Jeton d'autorisation invalide ou deja utilise.")
+
+    # 2. Decoder le message aveugle. Le serveur ne manipule QUE de l'aveugle.
+    try:
+        message_aveugle = bytes.fromhex(payload.message_aveugle_hex)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="message_aveugle_hex n'est pas de l'hexadecimal valide.")
+
+    # 3. Signer a l'aveugle (seule etape serveur du protocole RSABSSA).
+    try:
+        sig_aveugle = gestionnaire_signature.signer_message_aveugle(message_aveugle)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    # 4. Renvoyer la signature aveugle + le departement (le client en a besoin
+    #    pour construire son vote). Aucun lien jeton<->signature n'est stocke.
+    return {"signature_aveugle_hex": sig_aveugle.hex(), "departement": departement}
+
+
 @app.get("/api/rh/resultats")
 def resultats(session_vera: Optional[str] = Cookie(None)):
     exiger_session(session_vera)
@@ -430,7 +472,7 @@ def resultats(session_vera: Optional[str] = Cookie(None)):
                 # Laplace vectoriel (Delta_1 = 2, scale = 4, eps = 0.5) PUIS
                 # projection sur le simplexe {x >= 0, somme = effectif}.
                 # La projection est du post-traitement : gratuite en epsilon,
-                # elle reduit l'erreur (~25%, mesure empiriquement) et garantit que les comptages
+                # elle reduit l'erreur de ~25% et garantit que les comptages
                 # publies somment exactement a l'effectif reel.
                 comptes_bruites = publier_histogramme_dp(comptes_ordonnes, effectif)
 

@@ -120,6 +120,20 @@ class GestionnaireSignature:
             raise RuntimeError("Aucune consultation active.")
         return self._cle_publique_der
 
+    def signer_message_aveugle(self, message_aveugle_bytes):
+        """Signe a l'aveugle un message DEJA aveugle par le client (navigateur
+        du votant). C'est la SEULE etape du protocole RSABSSA qui reste cote
+        serveur dans le nouveau flux : le serveur ne voit jamais le message en
+        clair (il est aveugle), ne fait PAS l'aveuglement (le client l'a fait)
+        ni la finalisation (le client la fera). Il ne peut donc pas relier ce
+        qu'il signe au token final -> unlinkability effective.
+        Renvoie la signature aveugle (bytes)."""
+        with self._verrou:
+            if not self._consultation_ouverte or self._cle_privee_der is None:
+                raise RuntimeError("Impossible de signer: aucune consultation active.")
+            sig_aveugle = bytes(vbs.signer_aveugle(list(self._cle_privee_der), list(message_aveugle_bytes)))
+        return sig_aveugle
+
     def generer_token_signe(self, departement):
         with self._verrou:
             if not self._consultation_ouverte or self._cle_privee_der is None:
