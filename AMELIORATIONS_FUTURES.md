@@ -185,3 +185,48 @@ PARADE : Tor, HORS PERIMETRE. A DOCUMENTER dans le threat model, pas a resoudre.
 
 Ces trois exigences seront les futures Portes 18 (engagement cle), 19 (ensemble
 anonymat), 20 (correlation reseau) une fois le refactor fait et teste.
+
+## Chantier crypto -- DECISION distribution : Option B (19/07)
+Question tranchee : comment le votant recoit son acces (lien + jeton d'autorisation).
+Trois analyses convergentes (assistant + 2 IA) -> OPTION B.
+
+OPTION B RETENUE : le RH envoie les SMS lui-meme, avec des liens fournis par
+VERA. Le serveur ne voit JAMAIS les numeros de telephone.
+
+Pourquoi (raisonnement de fond) : l'autorite d'eligibilite (RH) connait DEJA
+l'electorat -- c'est irreductible. L'option A (VERA envoie via passerelle type
+Twilio) ne ferait que DUPLIQUER cette connaissance sur le serveur (numeros +
+liste + horodatage), elargissant la surface de confiance sans rien apporter.
+Donner les numeros au serveur contredit "prouve, pas promis" (on retomberait
+sur "le serveur promet de ne pas correler"). B ne donne au RH aucune info
+qu'il n'a pas deja.
+
+Risques de A qu'on EVITE en choisissant B :
+- Attaque par cle choisie facilitee : un serveur qui controle la distribution
+  cible trivialement un individu avec une cle differente -> desanonymisation.
+- Correlation temporelle SMS envoye a t / connexion a t+d.
+- Twilio = sous-traitant US, PII, RGPD (VERA deviendrait responsable de
+  traitement) -- contresens pour un outil dont l'argument est l'anonymat.
+- Inference de non-participation : le serveur apprend qui n'a PAS clique.
+
+DEUX CONDITIONS NON NEGOCIABLES pour que B tienne :
+1. LE LIEN = CREDENTIAL D'EMISSION UNIQUEMENT. Le lien autorise l'appareil du
+   votant a DEMANDER une signature aveugle. Il ne doit JAMAIS contenir le token
+   de vote lui-meme. Sinon le RH pourrait relier les votes ou voter a la place
+   des abstentionnistes -- FATAL. L'aveuglement se fait cote client, le token
+   devoile au vote n'a aucun rapport observable avec le lien.
+2. CLE DE SIGNATURE UNIQUE PUBLIEE + verification d'empreinte cote client
+   (= Exigence 1 / engagement de cle). Sans elle, l'attaque par cle choisie
+   annule tout le benefice de BSSA. Via SMS : hash de la cle dans le fragment
+   du lien (#k=HASH), jamais envoye au serveur -> il ne peut pas s'adapter.
+
+RISQUES RESIDUELS DE B a ASSUMER honnetement dans le threat model :
+- Bourrage par RH : le serveur ne peut pas verifier que le RH a distribue aux
+  vraies personnes. Mitigation : publier le nombre de credentials emis vs
+  effectif annonce (les votants constatent). Residu = confiance procedurale.
+- Fichier de liaison nom<->lien cote RH (Excel qui traine) : base de liaison
+  persistante. Consigne de suppression apres distribution = "promis pas prouve".
+- Collusion RH+serveur : ensemble ils savent "P a demande un token a t"
+  (participation phase emission), PAS le contenu du vote.
+- Coercition douce (RH demande "tu as utilise ton lien ?") : inherent au
+  contexte workplace, pas au canal.
