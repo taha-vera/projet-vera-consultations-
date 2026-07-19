@@ -18,6 +18,7 @@ _SQL_TABLES = [
     "CREATE TABLE IF NOT EXISTS effectifs (departement TEXT PRIMARY KEY, effectif INTEGER NOT NULL DEFAULT 0)",
     "CREATE TABLE IF NOT EXISTS resultats_publies (departement TEXT PRIMARY KEY, resultat_json TEXT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS codes_courts (code TEXT PRIMARY KEY, token TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS jetons_autorisation (jeton TEXT PRIMARY KEY, departement TEXT NOT NULL, utilise INTEGER NOT NULL DEFAULT 0)",
     "CREATE TABLE IF NOT EXISTS cle_rsa_active (id INTEGER PRIMARY KEY CHECK (id = 1), cle_privee_hex TEXT NOT NULL, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL, salt_hex TEXT)",
 ]
 
@@ -110,6 +111,56 @@ def supprimer_code_court(code):
     with _verrou_db:
         _conn.execute("DELETE FROM codes_courts WHERE code = ?", (code,))
         _conn.commit()
+
+
+# ============================================================================
+# REGISTRE 1 -- Jetons d'autorisation (credentials d'emission, refactor crypto)
+# Ces jetons prouvent le DROIT de demander une signature aveugle (Temps 1).
+# Ils sont distribues par le RH (SMS). Usage unique. Ce registre est SEPARE du
+# registre des tokens de vote consommes (tokens_consommes / Temps 2) et ne doit
+# JAMAIS etre joint a lui -- c'est ce qui garantit la non-liaison identite<->vote.
+# ============================================================================
+
+def persister_jeton_autorisation(jeton, departement):
+    """Enregistre un jeton d'autorisation a sa generation par le RH."""
+    with _verrou_db:
+        _conn.execute(
+            "INSERT INTO jetons_autorisation (jeton, departement, utilise) VALUES (?, ?, 0) "
+            "ON CONFLICT(jeton) DO NOTHING",
+            (jeton, departement),
+        )
+        _conn.commit()
+
+
+def consommer_jeton_autorisation(jeton):
+    """Consomme un jeton d'autorisation de facon ATOMIQUE. Renvoie le
+    departement si le jeton existait et n'etait pas encore utilise, sinon None.
+    L'atomicite (UPDATE ... WHERE utilise=0 en une seule transaction) empeche
+    qu'un meme jeton soit consomme deux fois par deux requetes simultanees
+    (protection anti-double-vote a la source)."""
+    with _verrou_db:
+        cur = _conn.execute(
+            "UPDATE jetons_autorisation SET utilise = 1 WHERE jeton = ? AND utilise = 0",
+            (jeton,),
+        )
+        if cur.rowcount != 1:
+            _conn.commit()
+            return None  # jeton inconnu OU deja utilise
+        row = _conn.execute(
+            "SELECT departement FROM jetons_autorisation WHERE jeton = ?",
+            (jeton,),
+        ).fetchone()
+        _conn.commit()
+        return row[0] if row else None
+
+
+def charger_jetons_autorisation():
+    """Recharge l'etat des jetons d'autorisation au demarrage {jeton: (departement, utilise)}."""
+    with _verrou_db:
+        rows = _conn.execute(
+            "SELECT jeton, departement, utilise FROM jetons_autorisation"
+        ).fetchall()
+    return {row[0]: (row[1], bool(row[2])) for row in rows}
 
 
 def charger_cle_rsa():
