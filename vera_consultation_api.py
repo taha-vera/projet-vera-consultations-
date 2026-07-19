@@ -450,6 +450,57 @@ def cle_publique_endpoint():
     }
 
 
+# ============================================================================
+# REFACTOR CRYPTO -- Generation des jetons d'autorisation par le RH (Temps 1)
+# NOUVEAU flux : le RH ne genere plus de tokens de vote complets (ancien
+# generer_tokens, conserve pour la transition). Il genere des JETONS
+# D'AUTORISATION (identifiants aleatoires a usage unique, registre 1) qui
+# prouvent le droit de demander une signature aveugle. Chaque jeton est
+# integre dans un lien SMS avec l'empreinte de la cle publique (fragment #k=,
+# jamais envoye au serveur) -> engagement de cle cote client (Exigence 1).
+# Le RH envoie lui-meme les SMS (Option B) : le serveur ne voit jamais les
+# numeros de telephone.
+# ============================================================================
+class GenererAutorisationsRequete(BaseModel):
+    departement: str = Field(min_length=1, max_length=100)
+    quantite: int = Field(ge=1, le=1000)
+
+
+@app.post("/api/rh/generer_autorisations")
+def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Optional[str] = Cookie(None)):
+    import hashlib
+    compte = exiger_session(session_vera)
+
+    # Empreinte de la cle publique de l'epoque (engagement de cle). Le RH la
+    # met dans chaque lien SMS ; le client verifiera la cle recue contre elle.
+    try:
+        pk_der = gestionnaire_signature.cle_publique()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Aucune consultation active.")
+    empreinte_cle = hashlib.sha256(pk_der).hexdigest()
+
+    base_url = "https://vera-consultation.duckdns.org/vote"
+    autorisations = []
+    with verrou:
+        for _ in range(payload.quantite):
+            # Jeton d'autorisation aleatoire, imprevisible, a usage unique.
+            jeton = secrets.token_urlsafe(24)
+            persistance.persister_jeton_autorisation(jeton, payload.departement)
+            # Lien SMS complet : jeton en query, empreinte de cle en FRAGMENT
+            # (#k=). Le fragment n'est jamais transmis au serveur -> il ne peut
+            # pas savoir quelle empreinte le client verifie, ni s'y adapter.
+            lien = f"{base_url}?a={jeton}#k={empreinte_cle}"
+            autorisations.append({"jeton": jeton, "lien_sms": lien})
+
+    return {
+        "departement": payload.departement,
+        "quantite": len(autorisations),
+        "empreinte_cle": empreinte_cle,
+        "autorisations": autorisations,
+        "genere_par": compte,
+    }
+
+
 @app.get("/api/rh/resultats")
 def resultats(session_vera: Optional[str] = Cookie(None)):
     exiger_session(session_vera)

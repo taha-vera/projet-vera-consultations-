@@ -230,3 +230,9 @@ RISQUES RESIDUELS DE B a ASSUMER honnetement dans le threat model :
   (participation phase emission), PAS le contenu du vote.
 - Coercition douce (RH demande "tu as utilise ton lien ?") : inherent au
   contexte workplace, pas au canal.
+
+## Robustesse : code HTTP sur message aveugle invalide (brique 2)
+L'endpoint /api/signer_aveugle renvoie 500 (erreur serveur) quand message_aveugle_hex
+n'est pas un message RSABSSA valide (ex: 'deadbeef'). Devrait renvoyer 400/422 (erreur
+client). Le jeton est bien consomme (fail-closed correct), seul le code HTTP est faux.
+Pas une faille de securite, defaut de robustesse. A corriger apres le refactor crypto.
