@@ -3,11 +3,12 @@
 """vera_persistance.py - Persistance SQLite Porte 14."""
 
 import sqlite3
+import os
 import threading
 import time
 from pathlib import Path
 
-DB_PATH = Path("/root/vera_state.db")
+DB_PATH = Path(os.environ.get("VERA_DB_PATH", "/root/vera_state.db"))
 _verrou_db = threading.Lock()
 _conn = None
 
@@ -19,7 +20,7 @@ _SQL_TABLES = [
     "CREATE TABLE IF NOT EXISTS resultats_publies (departement TEXT PRIMARY KEY, resultat_json TEXT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS codes_courts (code TEXT PRIMARY KEY, token TEXT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS jetons_autorisation (jeton TEXT PRIMARY KEY, departement TEXT NOT NULL, utilise INTEGER NOT NULL DEFAULT 0)",
-    "CREATE TABLE IF NOT EXISTS cle_rsa_active (id INTEGER PRIMARY KEY CHECK (id = 1), cle_privee_hex TEXT NOT NULL, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL, salt_hex TEXT)",
+    "CREATE TABLE IF NOT EXISTS cle_rsa_active (departement TEXT PRIMARY KEY, cle_privee_hex TEXT NOT NULL, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL, salt_hex TEXT)",
 ]
 
 
@@ -31,10 +32,27 @@ def _connexion():
     return conn
 
 
+def _migrer_schema_cles(conn):
+    """Migration idempotente : cle_rsa_active mono-cle (id=1) -> multi-cles
+    (departement PRIMARY KEY). Detecte l'ancien schema par la presence de la
+    colonne 'id' et, le cas echeant, DROP + recree. SUR : les cles RSA sont
+    ephemeres (regenerees a l'ouverture de consultation), aucune donnee
+    precieuse perdue. Ne fait rien si la table est absente ou deja migree."""
+    tables = [r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='cle_rsa_active'"
+    ).fetchall()]
+    if not tables:
+        return  # table absente : sera creee au bon schema par _SQL_TABLES
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(cle_rsa_active)").fetchall()]
+    if 'id' in cols:
+        conn.execute("DROP TABLE cle_rsa_active")
+
+
 def initialiser():
     global _conn
     with _verrou_db:
         _conn = _connexion()
+        _migrer_schema_cles(_conn)
         for sql in _SQL_TABLES:
             _conn.execute(sql)
         _conn.commit()
@@ -196,9 +214,34 @@ def effacer_etat_consultation():
 
 
 def effacer_cle_rsa():
+    """Efface TOUTES les cles RSA (destruction groupee : toutes les cles de
+    departement d'une consultation meurent ensemble a la cloture)."""
     with _verrou_db:
-        _conn.execute("DELETE FROM cle_rsa_active WHERE id = 1")
+        _conn.execute("DELETE FROM cle_rsa_active")
         _conn.commit()
+
+
+def charger_toutes_cles_chiffrees() -> dict:
+    """Charge et dechiffre TOUTES les cles de departement (rechargement au boot).
+    Renvoie {departement: (cle_privee_der, cle_publique_der, ouverture_unix)}.
+    Une cle sans salt (ancien format) est ignoree avec avertissement plutot que
+    de bloquer tout le rechargement."""
+    with _verrou_db:
+        rows = _conn.execute(
+            "SELECT departement, cle_privee_hex, cle_publique_hex, ouverture_unix, salt_hex FROM cle_rsa_active"
+        ).fetchall()
+    resultat = {}
+    for dep, priv_hex, pub_hex, ouverture, salt_hex in rows:
+        if salt_hex is None:
+            continue  # ancien format sans salt : ignore
+        salt = bytes.fromhex(salt_hex)
+        f = _get_fernet(salt)
+        try:
+            cle_privee = f.decrypt(bytes.fromhex(priv_hex))
+        except Exception:
+            continue  # dechiffrement impossible (VERA_DB_KEY changee) : ignore
+        resultat[dep] = (cle_privee, bytes.fromhex(pub_hex), ouverture)
+    return resultat
 
 
 # --------------------------------------------------------------------------
@@ -231,22 +274,24 @@ def _get_fernet(salt: bytes) -> Fernet:
     return Fernet(cle_derivee)
 
 
-def persister_cle_rsa_chiffree(cle_privee_der: bytes, cle_publique_der: bytes, ouverture_unix: float) -> None:
-    """Ecrit la cle RSA chiffree avec VERA_DB_KEY, salt aleatoire par enregistrement."""
+def persister_cle_rsa_chiffree(departement: str, cle_privee_der: bytes, cle_publique_der: bytes, ouverture_unix: float) -> None:
+    """Ecrit la cle RSA d'UN departement, chiffree avec VERA_DB_KEY, salt aleatoire
+    par enregistrement. Une ligne par departement (PRIMARY KEY departement)."""
     salt = os.urandom(16)
     f = _get_fernet(salt)
     cle_privee_chiffree = f.encrypt(cle_privee_der).hex()
     with _verrou_db:
-        sql = "INSERT INTO cle_rsa_active (id, cle_privee_hex, cle_publique_hex, ouverture_unix, salt_hex) VALUES (1, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET cle_privee_hex = excluded.cle_privee_hex, cle_publique_hex = excluded.cle_publique_hex, ouverture_unix = excluded.ouverture_unix, salt_hex = excluded.salt_hex"
-        _conn.execute(sql, (cle_privee_chiffree, cle_publique_der.hex(), ouverture_unix, salt.hex()))
+        sql = "INSERT INTO cle_rsa_active (departement, cle_privee_hex, cle_publique_hex, ouverture_unix, salt_hex) VALUES (?, ?, ?, ?, ?) ON CONFLICT(departement) DO UPDATE SET cle_privee_hex = excluded.cle_privee_hex, cle_publique_hex = excluded.cle_publique_hex, ouverture_unix = excluded.ouverture_unix, salt_hex = excluded.salt_hex"
+        _conn.execute(sql, (departement, cle_privee_chiffree, cle_publique_der.hex(), ouverture_unix, salt.hex()))
         _conn.commit()
 
 
-def charger_cle_rsa_chiffree() -> tuple[bytes, bytes, float] | None:
-    """Charge et dechiffre la cle RSA depuis SQLite en utilisant le salt stocke."""
+def charger_cle_rsa_chiffree(departement: str) -> tuple[bytes, bytes, float] | None:
+    """Charge et dechiffre la cle RSA d'UN departement en utilisant le salt stocke."""
     with _verrou_db:
         row = _conn.execute(
-            "SELECT cle_privee_hex, cle_publique_hex, ouverture_unix, salt_hex FROM cle_rsa_active WHERE id = 1"
+            "SELECT cle_privee_hex, cle_publique_hex, ouverture_unix, salt_hex FROM cle_rsa_active WHERE departement = ?",
+            (departement,)
         ).fetchone()
     if row is None:
         return None
