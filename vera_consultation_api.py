@@ -350,11 +350,15 @@ class GenererTokensRequete(BaseModel):
 
 @app.post("/api/rh/generer_tokens")
 def generer_tokens(payload: GenererTokensRequete, session_vera: Optional[str] = Cookie(None)):
-    compte = exiger_session(session_vera)
-
-    if payload.quantite < 1 or payload.quantite > 1000:
-        raise HTTPException(status_code=422, detail="Quantité doit être entre 1 et 1000")
-
+    # ENDPOINT OBSOLETE (ancien Modele A). Le flux Modele B remplace la
+    # generation de tokens complets cote serveur par la generation de JETONS
+    # D'AUTORISATION (voir /api/rh/generer_autorisations). Conserve pour
+    # renvoyer un message clair plutot qu'un 500 aux anciens appelants.
+    exiger_session(session_vera)
+    raise HTTPException(
+        status_code=410,
+        detail="Endpoint obsolete. Utilisez /api/rh/generer_autorisations (flux Modele B).",
+    )
     resultats_generes = []
     with verrou:
         # Verification de saturation AVANT la boucle : on refuse d'emblee si la
@@ -418,7 +422,7 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
 
     # 3. Signer a l'aveugle (seule etape serveur du protocole RSABSSA).
     try:
-        sig_aveugle = gestionnaire_signature.signer_message_aveugle(message_aveugle)
+        sig_aveugle = gestionnaire_signature.signer_message_aveugle(departement, message_aveugle)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
@@ -438,10 +442,10 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
 # du lien, JAMAIS se fier aveuglement a ce que renvoie le serveur.
 # ============================================================================
 @app.get("/api/cle_publique")
-def cle_publique_endpoint():
+def cle_publique_endpoint(departement: str):
     import hashlib
     try:
-        pk_der = gestionnaire_signature.cle_publique()
+        pk_der = gestionnaire_signature.cle_publique(departement)
     except RuntimeError:
         raise HTTPException(status_code=503, detail="Aucune consultation active.")
     return {
@@ -474,7 +478,7 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
     # Empreinte de la cle publique de l'epoque (engagement de cle). Le RH la
     # met dans chaque lien SMS ; le client verifiera la cle recue contre elle.
     try:
-        pk_der = gestionnaire_signature.cle_publique()
+        pk_der = gestionnaire_signature.cle_publique(payload.departement)
     except RuntimeError:
         raise HTTPException(status_code=503, detail="Aucune consultation active.")
     empreinte_cle = hashlib.sha256(pk_der).hexdigest()
@@ -811,6 +815,15 @@ def obtenir_question(token: str):
 
 @app.post("/api/repondre")
 def repondre(payload: ReponseEntrante, x_vera_token: Optional[str] = Header(None)):
+    # ENDPOINT EN COURS DE REECRITURE (Modele B, brique 7). L'ancien flux
+    # (verifier_et_consommer sur un token complet cote serveur) est obsolete.
+    # Le nouveau flux recevra (K, signature(K), reponse) et verifiera la
+    # signature sous la cle publique du departement, en UNE transaction.
+    # Neutralise temporairement pour ne pas exposer un chemin casse.
+    raise HTTPException(
+        status_code=410,
+        detail="Endpoint en cours de migration vers le flux Modele B. Indisponible temporairement.",
+    )
     token = x_vera_token
     if not token:
         raise HTTPException(status_code=400, detail="Token manquant")
