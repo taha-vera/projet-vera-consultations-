@@ -49,8 +49,7 @@ class SignatureInvalideError(Exception):
 class GestionnaireSignature:
     def __init__(self):
         self._verrou = threading.Lock()
-        self._cle_privee_der = None
-        self._cle_publique_der = None
+        self._cles = {}
         self._consultation_ouverte = False
         self._ouverture_ts = None
         self._timer_destruction = None
@@ -63,26 +62,21 @@ class GestionnaireSignature:
         with self._verrou:
             if self._consultation_ouverte:
                 raise RuntimeError("Une consultation est deja active.")
-            cle_rechargee = False
+            self._cles = {}
+            ts_recharge = None
             if _PERSISTANCE_DISPONIBLE:
-                etat_persiste = _persistance.charger_cle_rsa_chiffree()
-                if etat_persiste is not None:
-                    cle_privee, cle_publique, ouverture_unix = etat_persiste
-                    age = time.time() - ouverture_unix
-                    if age < DUREE_VIE_CLE_SECONDES:
-                        self._cle_privee_der = cle_privee
-                        self._cle_publique_der = cle_publique
-                        self._ouverture_ts = ouverture_unix
-                        cle_rechargee = True
+                toutes = _persistance.charger_toutes_cles_chiffrees()
+                for dep, (priv, pub, ouv) in toutes.items():
+                    if time.time() - ouv < DUREE_VIE_CLE_SECONDES:
+                        self._cles[dep] = (priv, pub)
+                        if ts_recharge is None or ouv < ts_recharge:
+                            ts_recharge = ouv
                     else:
                         _persistance.effacer_cle_rsa()
-            if not cle_rechargee:
-                self._cle_privee_der, self._cle_publique_der = vbs.generer_cles()
-                self._cle_privee_der = bytes(self._cle_privee_der)
-                self._cle_publique_der = bytes(self._cle_publique_der)
-                self._ouverture_ts = time.time()
-                if _PERSISTANCE_DISPONIBLE:
-                    _persistance.persister_cle_rsa_chiffree(self._cle_privee_der, self._cle_publique_der, self._ouverture_ts)
+                        self._cles = {}
+                        ts_recharge = None
+                        break
+            self._ouverture_ts = ts_recharge if ts_recharge is not None else time.time()
             self._consultation_ouverte = True
         temps_ecoule = time.time() - self._ouverture_ts
         temps_restant = max(0.0, DUREE_VIE_CLE_SECONDES - temps_ecoule)
@@ -101,9 +95,10 @@ class GestionnaireSignature:
 
     def _detruire_cle_privee(self):
         with self._verrou:
-            if self._cle_privee_der is not None:
-                self._cle_privee_der = b"\x00" * len(self._cle_privee_der)
-                self._cle_privee_der = None
+            for dep, (priv, pub) in list(self._cles.items()):
+                if priv is not None:
+                    self._cles[dep] = (b"\x00" * len(priv), pub)
+            self._cles = {}
             self._consultation_ouverte = False
 
     def consultation_active(self):
@@ -115,12 +110,27 @@ class GestionnaireSignature:
         ecoule = time.time() - self._ouverture_ts
         return max(0.0, DUREE_VIE_CLE_SECONDES - ecoule)
 
-    def cle_publique(self):
-        if self._cle_publique_der is None:
-            raise RuntimeError("Aucune consultation active.")
-        return self._cle_publique_der
+    def _obtenir_ou_creer_cle(self, departement):
+        """Renvoie (priv, pub) du departement, generee a la volee si absente.
+        DOIT etre appelee sous self._verrou."""
+        if departement in self._cles:
+            return self._cles[departement]
+        priv, pub = vbs.generer_cles()
+        priv = bytes(priv)
+        pub = bytes(pub)
+        self._cles[departement] = (priv, pub)
+        if _PERSISTANCE_DISPONIBLE:
+            _persistance.persister_cle_rsa_chiffree(departement, priv, pub, self._ouverture_ts)
+        return priv, pub
 
-    def signer_message_aveugle(self, message_aveugle_bytes):
+    def cle_publique(self, departement):
+        with self._verrou:
+            if not self._consultation_ouverte:
+                raise RuntimeError("Aucune consultation active.")
+            _priv, pub = self._obtenir_ou_creer_cle(departement)
+        return pub
+
+    def signer_message_aveugle(self, departement, message_aveugle_bytes):
         """Signe a l'aveugle un message DEJA aveugle par le client (navigateur
         du votant). C'est la SEULE etape du protocole RSABSSA qui reste cote
         serveur dans le nouveau flux : le serveur ne voit jamais le message en
@@ -129,51 +139,20 @@ class GestionnaireSignature:
         qu'il signe au token final -> unlinkability effective.
         Renvoie la signature aveugle (bytes)."""
         with self._verrou:
-            if not self._consultation_ouverte or self._cle_privee_der is None:
+            if not self._consultation_ouverte:
                 raise RuntimeError("Impossible de signer: aucune consultation active.")
-            sig_aveugle = bytes(vbs.signer_aveugle(list(self._cle_privee_der), list(message_aveugle_bytes)))
+            priv, _pub = self._obtenir_ou_creer_cle(departement)
+            sig_aveugle = bytes(vbs.signer_aveugle(list(priv), list(message_aveugle_bytes)))
         return sig_aveugle
 
     def generer_token_signe(self, departement):
-        with self._verrou:
-            if not self._consultation_ouverte or self._cle_privee_der is None:
-                raise RuntimeError("Impossible de generer un token: aucune consultation active.")
-            identifiant_unique = secrets.token_urlsafe(16)
-            message_dict = {"departement": departement, "alea": identifiant_unique}
-            message = json.dumps(message_dict, sort_keys=True).encode("utf-8")
-            blind_msg, secret_aveuglement, randomizer = vbs.aveugler_message(self._cle_publique_der, message)
-            blind_msg = bytes(blind_msg)
-            secret_aveuglement = bytes(secret_aveuglement)
-            randomizer = bytes(randomizer)
-            sig_aveugle = bytes(vbs.signer_aveugle(self._cle_privee_der, blind_msg))
-            signature = bytes(vbs.finaliser_signature(self._cle_publique_der, message, blind_msg, secret_aveuglement, sig_aveugle, randomizer))
-        return {"message": message.hex(), "signature": signature.hex(), "randomizer": randomizer.hex()}
+        raise RuntimeError(
+            "generer_token_signe est obsolete (ancien Modele A). Flux Modele B : "
+            "aveuglement cote client, voir signer_message_aveugle(departement, msg)."
+        )
 
     def verifier_et_consommer(self, token_complet):
-        try:
-            message = bytes.fromhex(token_complet["message"])
-            signature = bytes.fromhex(token_complet["signature"])
-            randomizer = bytes.fromhex(token_complet["randomizer"])
-        except (KeyError, ValueError, TypeError) as e:
-            # TypeError : un token forge peut contenir des valeurs de mauvais
-            # type (ex. message=5 au lieu d'une chaine hex) -> bytes.fromhex
-            # leve TypeError. On le traite comme un token malforme (rejet 404),
-            # jamais comme un crash 500.
-            raise SignatureInvalideError("Token malforme: " + str(e))
-        empreinte = hashlib.sha256(message + signature).hexdigest()
-        with self._verrou:
-            if self._tokens_consommes.get(empreinte):
-                raise TokenDejaUtiliseError("Ce token a deja ete utilise")
-            if self._cle_publique_der is None:
-                raise SignatureInvalideError("Cle publique non disponible.")
-            valide = vbs.verifier_signature(self._cle_publique_der, message, signature, randomizer)
-            if not valide:
-                raise SignatureInvalideError("Signature invalide")
-            self._tokens_consommes[empreinte] = True
-            if _PERSISTANCE_DISPONIBLE:
-                _persistance.persister_token_consomme(empreinte)
-        try:
-            message_dict = json.loads(message.decode("utf-8"))
-            return message_dict["departement"]
-        except (json.JSONDecodeError, KeyError) as e:
-            raise SignatureInvalideError("Contenu du message invalide: " + str(e))
+        raise RuntimeError(
+            "verifier_et_consommer est obsolete (ancien Modele A). Flux Modele B : "
+            "verification dans /api/repondre sous la cle publique du departement."
+        )
