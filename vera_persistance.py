@@ -181,21 +181,6 @@ def charger_jetons_autorisation():
     return {row[0]: (row[1], bool(row[2])) for row in rows}
 
 
-def charger_cle_rsa():
-    with _verrou_db:
-        row = _conn.execute("SELECT cle_privee_hex, cle_publique_hex, ouverture_unix FROM cle_rsa_active WHERE id = 1").fetchone()
-    if row is None:
-        return None
-    return bytes.fromhex(row[0]), bytes.fromhex(row[1]), row[2]
-
-
-def persister_cle_rsa(cle_privee_der, cle_publique_der, ouverture_unix):
-    with _verrou_db:
-        sql = "INSERT INTO cle_rsa_active (id, cle_privee_hex, cle_publique_hex, ouverture_unix) VALUES (1, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET cle_privee_hex = excluded.cle_privee_hex, cle_publique_hex = excluded.cle_publique_hex, ouverture_unix = excluded.ouverture_unix"
-        _conn.execute(sql, (cle_privee_der.hex(), cle_publique_der.hex(), ouverture_unix))
-        _conn.commit()
-
-
 def effacer_etat_consultation():
     """Efface TOUT l'etat brut d'une consultation : compteurs, effectifs,
     codes courts, tokens consommes, budget epsilon, resultats publies.
