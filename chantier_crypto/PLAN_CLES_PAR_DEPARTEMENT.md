@@ -1,6 +1,48 @@
 # Plan : refactor Modele B + cles par departement
 
-## ETAT AU 20/07 (soir) -- REPRENDRE ICI
+## ETAT AU 20/07 (matinee) -- 4 COUCHES SERVEUR FINIES, REPRENDRE AUX BRIQUES CLIENT
+
+Les 4 couches SERVEUR du Modele B multi-departement sont faites, testees sur
+base/instance isolee, commitees (jusqu-a 6803087). NON deployees (prod sur
+ancien Modele A stable).
+- Couche 1 schema + migration auto (ab4788e/b550fb5)
+- Couche 2 persistance chiffree par departement (b550fb5)
+- Couche 3 gestionnaire dict de cles, generation a la volee, destruction
+  groupee (54e2c45), test_couche3.py OK
+- Couche 4 API 3 endpoints routent par departement, ancien monde en 410
+  (6803087), test_api_c4.py OK
+
+MARCHE cote serveur : cle par departement a la volee ; empreinte de la BONNE
+cle dans le lien SMS ; signer_aveugle signe avec la cle du departement issu du
+JETON (porte "departement auto-declare" de Fable 5 FERMEE) ;
+/api/cle_publique?departement=X ; ancien Modele A (generer_tokens, repondre) en 410.
+
+DECISION CHEMIN 2 : Modele B pur, plus de vote fonctionnel jusqu-a la fin,
+portage prod en UNE fois a la toute fin.
+
+RESTE A FAIRE (briques CLIENT) :
+- Brique 5b : crypto client dans static/vote.html. Lire ?a=JETON#k=EMPREINTE,
+  generer K (128 bits), aveugler K, POST signer_aveugle, finaliser -> (K, sig(K)).
+  Reference qui marche : chantier_crypto/brique5_test_client.mjs (adapter :
+  signer K opaque ; cle via /api/cle_publique?departement=X ; le departement
+  vient de la reponse de signer_aveugle).
+- Brique 6 : verif empreinte cle client. Comparer empreinte cle recue au #k= du
+  lien (fragment jamais envoye au serveur). Different -> refuser.
+- Brique 7 : reecrire /api/repondre Modele B. Recoit (K, sig(K), reponse). UNE
+  SEULE TRANSACTION SQLite (bug double-commit a NE PAS recreer) : verifier
+  sig(K) sous cle publique du departement -> H(K) absent registre 2 (dedup
+  SHA-384(K)) -> reponse valide -> _incrementer_compteur + inserer H(K).
+  Invalide -> 400, jeton survit. + cache idempotence sur signer_aveugle.
+- Brique 8 : test bout-en-bout client<->serveur + BASCULE prod.
+
+NETTOYAGE en attente (cosmetique) : code mort apres raise 410 dans
+generer_tokens et repondre. Fichiers test_*.py du bac a sable a ranger.
+
+RAPPELS : bac a sable /root/vera_test, base isolee VERA_DB_PATH ; lancer avec
+VERA_DB_KEY + venv /root/vera_blind_sig/.venv/bin/python3 ; node dans
+/root/crypto_test ; mobile = petits blocs avec LIGNE REPERE, git SANS apostrophes.
+
+## (archive) ETAT AU 20/07 (soir) -- REPRENDRE ICI
 Couches 1-2 FAITES, testees sur base isolee, commitees (b550fb5) mais PAS
 portees en prod (incompatibles avec gestionnaire encore mono-cle).
 - Couche 1 : schema cle_rsa_active departement PRIMARY KEY + migration auto
