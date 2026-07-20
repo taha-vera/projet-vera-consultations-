@@ -1,5 +1,26 @@
 # Plan : refactor Modele B + cles par departement
 
+## ETAT AU 20/07 (soir) -- REPRENDRE ICI
+Couches 1-2 FAITES, testees sur base isolee, commitees (b550fb5) mais PAS
+portees en prod (incompatibles avec gestionnaire encore mono-cle).
+- Couche 1 : schema cle_rsa_active departement PRIMARY KEY + migration auto
+  idempotente (_migrer_schema_cles dans initialiser()). VALIDE bout-en-bout.
+- Couche 2 : persistance chiffree par departement (persister/charger_cle_rsa_
+  chiffree(departement,...), charger_toutes_cles_chiffrees(), effacer_cle_rsa
+  efface tout). Vestiges morts supprimes. Test test_couche2.py OK.
+- DB_PATH configurable via VERA_DB_PATH (isolation bac a sable posee, ne PAS
+  perdre : sans ca un DROP de test toucherait la base de prod).
+PROCHAINE ETAPE = COUCHE 3 : le gestionnaire (vera_signature_manager.py).
+  self._cle_privee_der scalaire -> dict {departement: (priv,pub)}. Generation
+  a la volee (1ere demande d'un departement). UN timer de destruction groupee
+  a ouverture+DUREE_VIE (decision actee). Rechargement au boot via
+  charger_toutes_cles_chiffrees(). ATTENTION : etat memoire + threads + timer,
+  concentration requise, faire en session fraiche.
+Rappel test : lancer avec VERA_DB_KEY (depuis systemd) + VERA_DB_PATH isole +
+  /root/vera_blind_sig/.venv/bin/python3. Bac a sable = /root/vera_test.
+Rappel mobile : heredocs cassent, PREFERER fichiers .py + python3 fichier.py.
+
+
 ## Contexte
 Suite du refactor crypto d'unlinkability. Le tour multi-IA (Copilot, ChatGPT,
 Gemini, Mistral, Fable 5) a tranche DEUX decisions structurantes qui rendent
