@@ -31,7 +31,7 @@ console.log('1. Message aveugle:', blindedMsg.length, 'octets');
 // --- 2a. Login RH ---
 const rLogin = await fetch(`${BASE}/api/rh/connexion`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ identifiant: 'asso_acer', mot_de_passe: '***REMOVED***' })
+    body: JSON.stringify({ identifiant: process.env.VERA_ADMIN_USER || 'asso_acer', mot_de_passe: process.env.VERA_ADMIN_PASS })
 });
 const cookie = rLogin.headers.get('set-cookie');
 console.log('2a. Login RH:', (await rLogin.json()).statut);
