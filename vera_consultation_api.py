@@ -499,7 +499,7 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
             # Lien SMS complet : jeton en query, empreinte de cle en FRAGMENT
             # (#k=). Le fragment n'est jamais transmis au serveur -> il ne peut
             # pas savoir quelle empreinte le client verifie, ni s'y adapter.
-            lien = f"{base_url}?a={jeton}#k={empreinte_cle}"
+            lien = f"{base_url}?a={jeton}&d={payload.departement}#k={empreinte_cle}"
             autorisations.append({"jeton": jeton, "lien_sms": lien})
 
     return {

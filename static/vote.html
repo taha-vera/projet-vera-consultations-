@@ -198,6 +198,7 @@
   // fragment #k= (le fragment n'est JAMAIS envoye au serveur -> engagement de cle
   // cote client, brique 6). window.location.hash inclut le # initial.
   const jetonAutorisation = params.get('a');
+  const departementVote = params.get('d');
   const empreinteCleAttendue = window.location.hash.replace(/^#k=/, '');
 
   const form = document.getElementById('vote-form');
@@ -267,58 +268,57 @@
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!selectedValue) return;
+    if (!departementVote) { showError('Lien invalide : departement manquant.'); return; }
     submitBtn.disabled = true;
     submitBtn.textContent = 'Preparation…';
     try {
-      // 1. Suite RSABSSA (lib auto-hebergee)
       const suite = window.RSABSSA.SHA384.PSS.Randomized();
 
-      // 2. Generer le secret K (opaque, ne dit rien du vote) - 32 octets
-      const K = crypto.getRandomValues(new Uint8Array(32));
-
-      // 3. Recuperer la cle publique du serveur (le departement viendra de la
-      //    reponse de signer_aveugle ; ici on demande la cle sans departement,
-      //    le serveur route par le jeton). Brique 6 (verif empreinte) a ajouter.
-      const rPk = await fetch(`${API_BASE}/cle_publique`);
+      const rPk = await fetch(`${API_BASE}/cle_publique?departement=${encodeURIComponent(departementVote)}`);
+      if (rPk.status === 404) { showError('Consultation introuvable pour ce departement.'); return; }
       if (!rPk.ok) throw new Error('cle publique indisponible');
-      const { cle_publique_hex } = await rPk.json();
-      const pkDer = fromHex(cle_publique_hex);
-      const publicKey = await crypto.subtle.importKey(
-        'spki', pkDer, { name: 'RSA-PSS', hash: 'SHA-384' }, true, ['verify']);
+      const { cle_publique_hex, empreinte_sha256 } = await rPk.json();
 
-      // 4. Aveugler K
+      if (empreinteCleAttendue && empreinte_sha256 !== empreinteCleAttendue) {
+        showError('Cle du serveur non conforme au lien. Vote refuse par securite.');
+        return;
+      }
+
+      const publicKey = await crypto.subtle.importKey(
+        'spki', fromHex(cle_publique_hex), { name: 'RSA-PSS', hash: 'SHA-384' }, true, ['verify']);
+
+      const K = crypto.getRandomValues(new Uint8Array(32));
       const prepared = suite.prepare(K);
       const { blindedMsg, inv } = await suite.blind(publicKey, prepared);
 
-      // 5. Demander la signature aveugle en presentant le jeton d'autorisation
       const rSig = await fetch(`${API_BASE}/signer_aveugle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jeton_autorisation: jetonAutorisation,
-          message_aveugle_hex: toHex(blindedMsg)
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jeton_autorisation: jetonAutorisation, message_aveugle_hex: toHex(blindedMsg) })
       });
       if (rSig.status === 403) { showError('Jeton invalide ou deja utilise.'); return; }
       if (!rSig.ok) throw new Error('signature refusee');
       const { signature_aveugle_hex, departement } = await rSig.json();
 
-      // 6. Finaliser -> signature valide sur K, non liee au jeton
-      const signature = await suite.finalize(
-        publicKey, prepared, inv, fromHex(signature_aveugle_hex));
+      const signature = await suite.finalize(publicKey, prepared, inv, fromHex(signature_aveugle_hex));
 
-      // BRIQUE 5b: on a (K, signature). Le vote (brique 7) enverra
-      // (K, signature, reponse) a /api/repondre en Modele B.
-      // Pour l'instant on PROUVE que le flux marche en affichant le resultat.
-      submitBtn.textContent = 'Token anonyme obtenu !';
-      alert('BRIQUE 5b OK\ndepartement: ' + departement +
-            '\nK: ' + toHex(K).slice(0,16) + '...' +
-            '\nsignature: ' + toHex(signature).slice(0,16) + '... (' + signature.length + ' octets)');
+      const randomizer = prepared.slice(0, 32);
+      const Kmsg = prepared.slice(prepared.length - 32);
+
+      submitBtn.textContent = 'Envoi du vote…';
+      const rVote = await fetch(`${API_BASE}/repondre`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          K_hex: toHex(Kmsg), randomizer_hex: toHex(randomizer),
+          signature_hex: toHex(signature), reponse: selectedValue, departement: departement
+        })
+      });
+      if (rVote.status === 409) { showError('Vous avez deja vote.'); return; }
+      if (!rVote.ok) throw new Error('vote refuse (' + rVote.status + ')');
       showSuccess();
     } catch (err) {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Envoyer ma réponse';
-      alert('Erreur brique 5b: ' + err.message);
+      alert('Erreur : ' + err.message);
     }
   });
 
