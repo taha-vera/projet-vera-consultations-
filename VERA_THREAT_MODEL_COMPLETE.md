@@ -427,3 +427,79 @@ Fonction de persistance : effacer_etat_consultation() dans vera_persistance.py
 (ne touche PAS a la cle RSA d'infrastructure -- seulement l'etat de la
 consultation). Endpoint authentifie RH, action irreversible avec double
 confirmation cote interface.
+### Porte 18 -- Generation de cles RSA a la volee via endpoints non authentifies (DoS keygen)
+
+Identifiee le 22/07/2026 par lecture de code (audit externe Fable 5), PAS par
+les prompts du Tour 1. Fermee le meme jour (commit 0a246a8), deployee en
+production et verifiee (404 sur departement arbitraire).
+
+Vecteur : /api/cle_publique (GET) et /api/repondre (POST), tous deux publics,
+appelaient gestionnaire_signature.cle_publique() qui delegue a
+_obtenir_ou_creer_cle : pour tout nom de departement inconnu, une paire RSA
+etait generee, chiffree (PBKDF2 100k iterations + Fernet) et persistee dans
+cle_rsa_active. Cout par requete : un keygen RSA + un PBKDF2 + une ecriture
+disque, declenchable en boucle par un anonyme avec des noms aleatoires.
+
+Impact : (1) DoS CPU -- le keygen RSA et le PBKDF2 sont volontairement
+couteux ; quelques requetes par seconde saturent le vCPU du CPX22, mesure
+coherent avec la limite GIL observee au load test. (2) Croissance illimitee
+de la table cle_rsa_active (une ligne persistee par nom soumis), jamais
+purgee avant cloture. (3) Pollution du cycle de vie des cles : des
+departements fantomes coexistent avec les legitimes.
+
+Correction (fermee) : nouvelle methode cle_publique_si_existe (lecture
+seule, KeyError -> 404) utilisee par les deux endpoints publics. La creation
+de cle est reservee au flux RH authentifie (/api/rh/generer_autorisations),
+qui cree toujours la cle avant toute distribution de lien -- aucun cas
+legitime ne passait par la creation a la volee cote public.
+
+Trade-off assume : le 404 confirme l'existence ou non d'un nom de
+departement (enumeration). Information deja publique via les liens de vote
+distribues et l'empreinte #k= ; moindre mal net face au DoS.
+
+Test : test_brique7_v2.mjs T7 -- departement inconnu -> 404 sur les deux
+endpoints, second appel toujours 404 (preuve qu'aucune cle n'a ete creee).
+
+**Porte 18 : identifiee et fermee (0a246a8), verifiee en production.**
+
+
+### Porte 19 -- Uvicorn expose directement sur Internet (0.0.0.0:8001, hors TLS et hors proxy)
+
+Identifiee le 22/07/2026 par test d'infrastructure reel (curl direct sur
+l'IP publique depuis l'exterieur), PAS par les prompts du Tour 1. Fermee le
+meme jour (unit systemd : --host 0.0.0.0 -> --host 127.0.0.1), verifiee
+(connexion refusee sur 8001 depuis l'exterieur, service intact via Nginx).
+
+Vecteur : le unit vera-consultation.service lancait uvicorn sur 0.0.0.0:8001
+sans firewall bloquant le port. Toute l'API etait joignable en HTTP clair,
+en contournant Nginx et Let's Encrypt. Les logs de production montraient
+deja des scanners automatises frappant directement le port (GET /.env,
+/login) avant la fermeture.
+
+Impact direct : trafic API en clair possible (mots de passe RH, jetons
+d'autorisation, payloads de vote interceptables sur le chemin reseau),
+aneantissant la garantie TLS affichee.
+
+Impact en chaine -- CRITIQUE pour la coherence du threat model : la
+fermeture de la porte historique sur la confiance aux headers IP reposait
+sur l'hypothese "X-Real-IP est fiable car pose par un reverse proxy
+correctement configure, seul chemin d'acces". Tant que 8001 etait ouvert,
+cette hypothese etait FAUSSE : un client direct forgeait X-Real-IP
+librement (contournement du rate-limiting IP, pollution du registre
+d'echecs). Une porte fermee peut etre rouverte par une porte
+d'infrastructure ulterieure : les hypotheses d'environnement des portes
+fermees doivent etre re-verifiees a chaque changement de deploiement.
+
+Correction (fermee) : --host 127.0.0.1 ; Nginx (proxy local) redevient
+l'unique chemin, TLS obligatoire de fait. Verification : timeout/refus sur
+http://IP:8001 depuis l'exterieur, health OK via https.
+
+Lecon de methode : les portes 18 et 19 ont ete trouvees par lecture de code
+et test d'infrastructure reels, zero par les quatre IA du Tour 1 sur
+prompts. Le protocole multi-IA Tour 2 integre desormais une passe
+obligatoire de lecture de code et de verification d'infrastructure par
+tour, faute de quoi le critere d'arret mesure la couverture des prompts,
+pas celle du systeme.
+
+**Porte 19 : identifiee et fermee (unit systemd), verifiee en production.
+Compteur de tours remis a zero (deux portes trouvees en cours de tour).**
