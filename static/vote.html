@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Consultation — Réponse confidentielle</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --ink: #1B3A2F;
+    --ink-light: #2D5240;
+    --gold: #C9A227;
+    --paper: #FAF8F3;
+    --paper-dim: #F0EDE4;
+    --line: #DCD6C5;
+    --error: #8B3A3A;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px 48px;
+    line-height: 1.5;
+  }
+
+  .seal { width: 56px; height: 56px; margin-bottom: 20px; }
+
+  .container { width: 100%; max-width: 420px; }
+
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    text-align: center;
+    margin-bottom: 8px;
+    opacity: 0.75;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 12px;
+    line-height: 1.25;
+  }
+
+  .guarantee {
+    background: var(--paper-dim);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 20px 0 28px;
+    font-size: 14px;
+    color: var(--ink-light);
+  }
+
+  .guarantee strong { color: var(--ink); font-weight: 600; }
+
+  .question-block { margin-bottom: 28px; }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+
+  .option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  .option.selected { border-color: var(--ink); background: var(--paper-dim); }
+
+  .option input[type="radio"] {
+    width: 20px; height: 20px; accent-color: var(--ink); flex-shrink: 0;
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 17px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .submit-btn:disabled { background: var(--line); color: #9A9484; cursor: not-allowed; }
+
+  .footnote {
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-light);
+    opacity: 0.65;
+    margin-top: 24px;
+    line-height: 1.5;
+  }
+
+  .state-screen { display: none; text-align: center; padding-top: 40px; }
+  .state-screen.active { display: block; }
+  #form-screen.hidden { display: none; }
+
+  .state-icon { width: 64px; height: 64px; margin: 0 auto 24px; }
+
+  .state-title {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .state-text {
+    font-size: 15px;
+    color: var(--ink-light);
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  #error-screen .state-title { color: var(--error); }
+</style>
+</head>
+<body>
+
+  <svg class="seal" viewBox="0 0 56 56" fill="none">
+    <circle cx="28" cy="28" r="27" stroke="#1B3A2F" stroke-width="1.5"/>
+    <path d="M14 22 L28 32 L42 22" stroke="#1B3A2F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="14" y="18" width="28" height="20" rx="2" stroke="#1B3A2F" stroke-width="1.5"/>
+    <circle cx="28" cy="28" r="3" fill="#C9A227"/>
+  </svg>
+
+  <div class="container">
+
+    <div id="form-screen">
+      <p class="eyebrow">Consultation anonyme</p>
+      <h1 id="question-title">Chargement de la question…</h1>
+
+      <div class="guarantee">
+        Votre réponse est agrégée avec celles des autres participants. <strong>Personne — y compris l'organisateur — ne peut savoir ce que vous avez répondu individuellement.</strong>
+      </div>
+
+      <form id="vote-form">
+        <div class="question-block">
+          <div class="options" id="options-container"></div>
+        </div>
+        <button type="submit" class="submit-btn" id="submit-btn" disabled>
+          Envoyer ma réponse
+        </button>
+      </form>
+
+      <p class="footnote">
+        Ce lien est à usage unique. Une fois votre réponse envoyée, elle ne peut plus être modifiée ni retracée jusqu'à vous.
+      </p>
+    </div>
+
+    <div id="success-screen" class="state-screen">
+      <svg class="state-icon" viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="30" stroke="#1B3A2F" stroke-width="2"/>
+        <path d="M20 33 L28 41 L44 24" stroke="#C9A227" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p class="state-title">Réponse enregistrée</p>
+      <p class="state-text">Merci d'avoir participé. Votre contribution a été intégrée au résultat collectif, sans pouvoir être reliée à votre identité.</p>
+    </div>
+
+    <div id="error-screen" class="state-screen">
+      <svg class="state-icon" viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="30" stroke="#8B3A3A" stroke-width="2"/>
+        <path d="M32 20 L32 38" stroke="#8B3A3A" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="32" cy="46" r="2" fill="#8B3A3A"/>
+      </svg>
+      <p class="state-title">Ce lien a déjà été utilisé</p>
+      <p class="state-text">Chaque lien de participation ne peut servir qu'une seule fois. Si vous pensez qu'il s'agit d'une erreur, contactez l'organisateur.</p>
+    </div>
+
+  </div>
+
+<script src="/static/blindrsa-bundle.js"></script>
+<script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  // Modele B: le jeton d'autorisation est dans ?a=, l'empreinte de cle dans le
+  // fragment #k= (le fragment n'est JAMAIS envoye au serveur -> engagement de cle
+  // cote client, brique 6). window.location.hash inclut le # initial.
+  const jetonAutorisation = params.get('a');
+  const empreinteCleAttendue = window.location.hash.replace(/^#k=/, '');
+
+  const form = document.getElementById('vote-form');
+  const formScreen = document.getElementById('form-screen');
+  const successScreen = document.getElementById('success-screen');
+  const errorScreen = document.getElementById('error-screen');
+  const optionsContainer = document.getElementById('options-container');
+  const submitBtn = document.getElementById('submit-btn');
+  const questionTitle = document.getElementById('question-title');
+
+  const API_BASE = '/api';
+
+  let selectedValue = null;
+
+  function showError(message) {
+    formScreen.classList.add('hidden');
+    errorScreen.classList.add('active');
+    if (message) errorScreen.querySelector('.state-text').textContent = message;
+  }
+
+  function showSuccess() {
+    formScreen.classList.add('hidden');
+    successScreen.classList.add('active');
+  }
+
+  function renderOptions(options) {
+    optionsContainer.innerHTML = '';
+    options.forEach((opt) => {
+      const label = document.createElement('label');
+      label.className = 'option';
+      label.innerHTML = `<input type="radio" name="reponse" value="${opt.valeur}"><span>${opt.texte}</span>`;
+      optionsContainer.appendChild(label);
+    });
+
+    optionsContainer.querySelectorAll('input[type="radio"]').forEach(input => {
+      input.addEventListener('change', (e) => {
+        selectedValue = e.target.value;
+        submitBtn.disabled = false;
+        optionsContainer.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+        e.target.closest('.option').classList.add('selected');
+      });
+    });
+  }
+
+  async function chargerQuestion() {
+    if (!jetonAutorisation) {
+      showError("Lien invalide — aucun jeton de participation détecté.");
+      return;
+    }
+    try {
+      const resp = await fetch(`${API_BASE}/question`);
+      if (resp.status === 410 || resp.status === 409) { showError(); return; }
+      if (!resp.ok) throw new Error('Réponse serveur inattendue');
+      const data = await resp.json();
+      questionTitle.textContent = data.question;
+      renderOptions(data.options);
+    } catch (err) {
+      questionTitle.textContent = 'Impossible de charger la consultation';
+      optionsContainer.innerHTML = `<p style="font-size:14px;color:#8B3A3A;">Vérifiez votre connexion et réessayez.</p>`;
+    }
+  }
+
+  // --- Helpers hex (navigateur, pas de Buffer Node) ---
+  const toHex = (u8) => Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
+  const fromHex = (h) => new Uint8Array(h.match(/.{2}/g).map(b => parseInt(b,16)));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!selectedValue) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Preparation…';
+    try {
+      // 1. Suite RSABSSA (lib auto-hebergee)
+      const suite = window.RSABSSA.SHA384.PSS.Randomized();
+
+      // 2. Generer le secret K (opaque, ne dit rien du vote) - 32 octets
+      const K = crypto.getRandomValues(new Uint8Array(32));
+
+      // 3. Recuperer la cle publique du serveur (le departement viendra de la
+      //    reponse de signer_aveugle ; ici on demande la cle sans departement,
+      //    le serveur route par le jeton). Brique 6 (verif empreinte) a ajouter.
+      const rPk = await fetch(`${API_BASE}/cle_publique`);
+      if (!rPk.ok) throw new Error('cle publique indisponible');
+      const { cle_publique_hex } = await rPk.json();
+      const pkDer = fromHex(cle_publique_hex);
+      const publicKey = await crypto.subtle.importKey(
+        'spki', pkDer, { name: 'RSA-PSS', hash: 'SHA-384' }, true, ['verify']);
+
+      // 4. Aveugler K
+      const prepared = suite.prepare(K);
+      const { blindedMsg, inv } = await suite.blind(publicKey, prepared);
+
+      // 5. Demander la signature aveugle en presentant le jeton d'autorisation
+      const rSig = await fetch(`${API_BASE}/signer_aveugle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jeton_autorisation: jetonAutorisation,
+          message_aveugle_hex: toHex(blindedMsg)
+        })
+      });
+      if (rSig.status === 403) { showError('Jeton invalide ou deja utilise.'); return; }
+      if (!rSig.ok) throw new Error('signature refusee');
+      const { signature_aveugle_hex, departement } = await rSig.json();
+
+      // 6. Finaliser -> signature valide sur K, non liee au jeton
+      const signature = await suite.finalize(
+        publicKey, prepared, inv, fromHex(signature_aveugle_hex));
+
+      // BRIQUE 5b: on a (K, signature). Le vote (brique 7) enverra
+      // (K, signature, reponse) a /api/repondre en Modele B.
+      // Pour l'instant on PROUVE que le flux marche en affichant le resultat.
+      submitBtn.textContent = 'Token anonyme obtenu !';
+      alert('BRIQUE 5b OK\ndepartement: ' + departement +
+            '\nK: ' + toHex(K).slice(0,16) + '...' +
+            '\nsignature: ' + toHex(signature).slice(0,16) + '... (' + signature.length + ' octets)');
+      showSuccess();
+    } catch (err) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Envoyer ma réponse';
+      alert('Erreur brique 5b: ' + err.message);
+    }
+  });
+
+  chargerQuestion();
+})();
+</script>
+
+</body>
+</html>
