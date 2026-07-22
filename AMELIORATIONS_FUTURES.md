@@ -263,3 +263,24 @@ incluses). Formulation juste: "en cours de fermeture, cote serveur fait, client 
 Le remote origin utilise https://taha-vera:TOKEN@github.com/... Ce format a expose
 le token le 21/07 (affiche par git filter-repo). Migrer vers SSH (cle deja utilisee
 pour se connecter au serveur) pour ne plus jamais avoir le token dans une URL.
+
+## Dechiffrement des cles RSA : echec silencieux sur passphrase erronee
+
+Constat (session 2026-07-22) : dans `charger_cles_rsa` (vera_persistance.py),
+un echec de dechiffrement Fernet est traite par `continue` silencieux. Si
+VERA_DB_KEY est erronee au redemarrage (typo dans le unit systemd, restauration
+sur une autre machine), les cles existantes sont ignorees sans erreur et de
+nouvelles cles sont generees : tous les liens deja distribues (empreinte #k=
+dans les SMS) deviennent invalides en pleine consultation, sans aucun signal
+cote operateur. C'est la variante silencieuse du probleme historique de cycle
+de vie RSA.
+
+Correction envisagee : si la table cle_rsa_active contient des lignes mais
+qu'AUCUNE ne se dechiffre, refuser de demarrer (fail-closed, coherent avec le
+comportement VERA_DB_KEY absente) plutot que de regenerer. A minima, log
+CRITICAL par cle ignoree. Le cas legitime de rotation volontaire passe par la
+cloture de consultation, qui purge ces lignes.
+
+Non bloquant : en production la passphrase est fixe dans le unit file, et le
+crash test (chantier_crypto/test_crash.mjs) prouve le rechargement correct a
+passphrase identique. Le risque ne se materialise que sur erreur operateur.
