@@ -103,30 +103,50 @@ def persister_vote(departement, reponse, nouveau_compte, nouvel_effectif):
         _conn.commit()
 
 
+class DoubleVoteErreur(Exception):
+    """Leve quand l'empreinte K est deja dans tokens_consommes. La DB est
+    l'AUTORITE anti-rejeu : meme si le cache memoire est incoherent (clear
+    partiel, futur multi-worker, restauration de DB), la contrainte PRIMARY
+    KEY refuse le doublon. L'endpoint doit convertir en HTTP 409."""
+
+
 def enregistrer_vote_atomique(departement, reponse, nouveau_compte, nouvel_effectif, empreinte_k):
     """Modele B : enregistre un vote ET marque le secret K comme consomme dans
-    UNE SEULE transaction SQLite. Invariant critique : le compteur et le registre
-    anti-rejeu (tokens_consommes) sont ecrits ensemble ou pas du tout. Un seul
-    commit() a la fin. Si le processus meurt avant le commit, ni le vote ni la
-    consommation ne sont persistes -> pas de double-vote possible, pas de vote
-    fantome. Ne PAS remplacer par des appels separes a persister_vote +
-    persister_token_consomme (deux commits = bug historique double-commit)."""
+    UNE SEULE transaction SQLite. Invariants critiques :
+    1. Le compteur et le registre anti-rejeu (tokens_consommes) sont ecrits
+       ensemble ou pas du tout. Un seul commit() a la fin. Si le processus
+       meurt avant le commit, ni le vote ni la consommation ne sont persistes
+       -> pas de double-vote possible, pas de vote fantome.
+    2. L'INSERT dans tokens_consommes est STRICT (pas de OR IGNORE) et vient
+       EN PREMIER : si l'empreinte existe deja, IntegrityError est levee
+       AVANT toute autre ecriture, rollback, et DoubleVoteErreur remonte.
+       La DB est l'autorite anti-rejeu, pas le dict memoire.
+    Ne PAS remplacer par des appels separes a persister_vote +
+    persister_token_consomme (deux commits = bug historique double-commit).
+    Ne PAS remettre OR IGNORE (doublon silencieusement compte = bug)."""
     with _verrou_db:
-        _conn.execute(
-            "INSERT INTO compteurs_votes (departement, reponse, compte) VALUES (?, ?, ?) "
-            "ON CONFLICT(departement, reponse) DO UPDATE SET compte = excluded.compte",
-            (departement, reponse, nouveau_compte),
-        )
-        _conn.execute(
-            "INSERT INTO effectifs (departement, effectif) VALUES (?, ?) "
-            "ON CONFLICT(departement) DO UPDATE SET effectif = excluded.effectif",
-            (departement, nouvel_effectif),
-        )
-        _conn.execute(
-            "INSERT OR IGNORE INTO tokens_consommes (empreinte, horodatage_unix) VALUES (?, ?)",
-            (empreinte_k, time.time()),
-        )
-        _conn.commit()
+        try:
+            _conn.execute(
+                "INSERT INTO tokens_consommes (empreinte, horodatage_unix) VALUES (?, ?)",
+                (empreinte_k, time.time()),
+            )
+            _conn.execute(
+                "INSERT INTO compteurs_votes (departement, reponse, compte) VALUES (?, ?, ?) "
+                "ON CONFLICT(departement, reponse) DO UPDATE SET compte = excluded.compte",
+                (departement, reponse, nouveau_compte),
+            )
+            _conn.execute(
+                "INSERT INTO effectifs (departement, effectif) VALUES (?, ?) "
+                "ON CONFLICT(departement) DO UPDATE SET effectif = excluded.effectif",
+                (departement, nouvel_effectif),
+            )
+            _conn.commit()
+        except sqlite3.IntegrityError:
+            _conn.rollback()
+            raise DoubleVoteErreur(empreinte_k)
+        except Exception:
+            _conn.rollback()
+            raise
 
 
 def charger_codes_courts():

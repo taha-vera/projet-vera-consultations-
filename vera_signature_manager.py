@@ -124,10 +124,30 @@ class GestionnaireSignature:
         return priv, pub
 
     def cle_publique(self, departement):
+        """CREATRICE si absente. A reserver aux flux AUTHENTIFIES (RH,
+        /api/rh/generer_autorisations). Ne JAMAIS appeler depuis un endpoint
+        public : voir cle_publique_si_existe."""
         with self._verrou:
             if not self._consultation_ouverte:
                 raise RuntimeError("Aucune consultation active.")
             _priv, pub = self._obtenir_ou_creer_cle(departement)
+        return pub
+
+    def cle_publique_si_existe(self, departement):
+        """Lecture SEULE : renvoie la cle publique du departement si elle
+        existe deja, leve KeyError sinon. Obligatoire sur les endpoints NON
+        authentifies (/api/cle_publique, /api/repondre). Sans cela, tout
+        anonyme force une generation RSA + une ecriture persistee dans
+        cle_rsa_active par requete avec un nom de departement arbitraire :
+        DoS CPU (keygen) + croissance illimitee de la DB. La cle d'un
+        departement legitime existe toujours a ce stade, creee par le RH
+        lors de generer_autorisations."""
+        with self._verrou:
+            if not self._consultation_ouverte:
+                raise RuntimeError("Aucune consultation active.")
+            if departement not in self._cles:
+                raise KeyError(departement)
+            _priv, pub = self._cles[departement]
         return pub
 
     def signer_message_aveugle(self, departement, message_aveugle_bytes):

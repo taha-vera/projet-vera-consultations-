@@ -445,10 +445,15 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
 @app.get("/api/cle_publique")
 def cle_publique_endpoint(departement: str):
     import hashlib
+    # LECTURE SEULE (voir cle_publique_si_existe) : endpoint public, ne doit
+    # jamais declencher de generation de cle. La cle est creee par le flux RH
+    # authentifie (generer_autorisations) avant toute distribution de lien.
     try:
-        pk_der = gestionnaire_signature.cle_publique(departement)
+        pk_der = gestionnaire_signature.cle_publique_si_existe(departement)
     except RuntimeError:
         raise HTTPException(status_code=503, detail="Aucune consultation active.")
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Departement inconnu.")
     return {
         "cle_publique_hex": pk_der.hex(),
         "empreinte_sha256": hashlib.sha256(pk_der).hexdigest(),
@@ -842,10 +847,17 @@ def repondre(payload: ReponseModeleB):
     if payload.reponse not in valeurs_valides:
         raise HTTPException(status_code=422, detail="Reponse invalide")
 
+    # LECTURE SEULE de la cle : un departement inconnu -> 404, JAMAIS de
+    # generation a la volee ici (endpoint non authentifie -> sinon DoS keygen
+    # + croissance illimitee de cle_rsa_active). Note assumee : le 404 revele
+    # l'existence d'un nom de departement, information deja publique via les
+    # liens de vote distribues ; c'est le moindre mal face au DoS.
     try:
-        cle_pub_der = gestionnaire_signature.cle_publique(payload.departement)
+        cle_pub_der = gestionnaire_signature.cle_publique_si_existe(payload.departement)
     except RuntimeError:
         raise HTTPException(status_code=503, detail="Aucune consultation active.")
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Departement inconnu.")
 
     valide = vbs.verifier_signature(
         list(cle_pub_der), list(K), list(signature), list(randomizer))
@@ -855,19 +867,40 @@ def repondre(payload: ReponseModeleB):
     empreinte_k = hashlib.sha384(K).hexdigest()
 
     with verrou:
+        # Fast-path memoire (evite un aller SQLite sur rejeu evident), mais
+        # l'AUTORITE anti-rejeu est la contrainte PRIMARY KEY de la DB dans
+        # enregistrer_vote_atomique. Ordre critique : on PERSISTE D'ABORD,
+        # on ne mute la memoire QU'APRES le commit reussi. Si la persistance
+        # leve (disque plein, corruption), memoire et DB restent coherentes
+        # (aucune des deux n'a compte le vote) et le votant peut re-essayer
+        # avec le meme K.
         if empreinte_k in gestionnaire_signature._tokens_consommes:
             raise HTTPException(status_code=409, detail="Deja vote (K consomme).")
-        compteurs_par_departement.setdefault(payload.departement, {})
-        compteurs_par_departement[payload.departement][payload.reponse] = (
-            compteurs_par_departement[payload.departement].get(payload.reponse, 0) + 1)
-        effectif_par_departement[payload.departement] = (
-            effectif_par_departement.get(payload.departement, 0) + 1)
+
+        nouveaux_compteurs = dict(compteurs_par_departement.get(payload.departement, {}))
+        nouveaux_compteurs[payload.reponse] = nouveaux_compteurs.get(payload.reponse, 0) + 1
+        nouvel_effectif = effectif_par_departement.get(payload.departement, 0) + 1
+
+        try:
+            persistance.enregistrer_vote_atomique(
+                payload.departement, payload.reponse,
+                nouveaux_compteurs[payload.reponse],
+                nouvel_effectif,
+                empreinte_k)
+        except persistance.DoubleVoteErreur:
+            # La DB connaissait deja ce K (cache memoire incoherent ou
+            # restauration de DB) : on resynchronise le cache et on refuse.
+            gestionnaire_signature._tokens_consommes[empreinte_k] = True
+            raise HTTPException(status_code=409, detail="Deja vote (K consomme).")
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(status_code=500, detail="Erreur de persistance, vote NON enregistre. Reessayez.")
+
+        # Commit DB reussi : la memoire peut suivre.
+        compteurs_par_departement[payload.departement] = nouveaux_compteurs
+        effectif_par_departement[payload.departement] = nouvel_effectif
         gestionnaire_signature._tokens_consommes[empreinte_k] = True
-        persistance.enregistrer_vote_atomique(
-            payload.departement, payload.reponse,
-            compteurs_par_departement[payload.departement][payload.reponse],
-            effectif_par_departement[payload.departement],
-            empreinte_k)
 
     return {"statut": "enregistre"}
 
