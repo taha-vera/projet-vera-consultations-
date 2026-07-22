@@ -236,3 +236,30 @@ L'endpoint /api/signer_aveugle renvoie 500 (erreur serveur) quand message_aveugl
 n'est pas un message RSABSSA valide (ex: 'deadbeef'). Devrait renvoyer 400/422 (erreur
 client). Le jeton est bien consomme (fail-closed correct), seul le code HTTP est faux.
 Pas une faille de securite, defaut de robustesse. A corriger apres le refactor crypto.
+
+## Session 21/07 -- points en suspens
+
+### Fix effacement jetons_autorisation (EN COURS, a committer)
+effacer_etat_consultation() ne vidait pas la table jetons_autorisation (registre
+1). Trace residuelle apres cloture + rejeu inter-consultation possible. FIX FAIT
+dans vera_persistance.py (table ajoutee a la boucle + docstring alignee). Reste:
+lancer test_effacement_jetons.py (ecrit, pas encore lance) sur base isolee, puis
+committer. Porte trouvee par un regard Fable 5 / Opus 4.8, verifiee sur le vrai code.
+
+### Fil securite: anti-rejeu jetons depend de la cloture
+La protection anti-rejeu des jetons d'autorisation repose entierement sur le fait
+que la cloture (effacer_etat_consultation) a lieu. Un jeton NON consomme, entre
+deux consultations sans cloture explicite (redemarrage, reouverture via
+ouvrir_consultation), resterait valide. A reprendre dans la brique 7 (Modele B),
+quand /api/repondre sera reecrit.
+
+### README Porte 7 perime
+Le README decrit Porte 7 comme "partielle, unlinkability pas effective" alors que
+le refactor serveur Modele B (couches 1-4) l'a resolue cote serveur. Mettre a jour
+Porte 7 + threat model quand le Modele B sera boucle (briques client 5b/6/7
+incluses). Formulation juste: "en cours de fermeture, cote serveur fait, client a finir".
+
+### Remote git en token-dans-URL
+Le remote origin utilise https://taha-vera:TOKEN@github.com/... Ce format a expose
+le token le 21/07 (affiche par git filter-repo). Migrer vers SSH (cle deja utilisee
+pour se connecter au serveur) pour ne plus jamais avoir le token dans une URL.

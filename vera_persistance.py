@@ -183,7 +183,8 @@ def charger_jetons_autorisation():
 
 def effacer_etat_consultation():
     """Efface TOUT l'etat brut d'une consultation : compteurs, effectifs,
-    codes courts, tokens consommes, budget epsilon, resultats publies.
+    codes courts, tokens consommes, budget epsilon, resultats publies,
+    jetons d'autorisation.
     NE touche PAS a la cle RSA (infrastructure, pas donnee de consultation).
 
     Apres cet appel, le serveur ne conserve plus AUCUNE donnee de la
@@ -193,7 +194,8 @@ def effacer_etat_consultation():
     Operation atomique (une seule transaction)."""
     with _verrou_db:
         for table in ("compteurs_votes", "effectifs", "codes_courts",
-                      "tokens_consommes", "budget_epsilon", "resultats_publies"):
+                      "tokens_consommes", "budget_epsilon", "resultats_publies",
+                      "jetons_autorisation"):
             _conn.execute(f"DELETE FROM {table}")
         _conn.commit()
 
