@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import vera_admin_auth as auth
+import vera_blind_sig as vbs
 from vera_epsilon_budget import BudgetEpsilonParDepartement
 from vera_dp_noise import appliquer_bruit_dp, publier_histogramme_dp
 
@@ -813,67 +814,62 @@ def obtenir_question(token: str):
     raise HTTPException(status_code=404, detail="Token invalide ou non signe.")
 
 
+class ReponseModeleB(BaseModel):
+    K_hex: str = Field(min_length=1, max_length=200)
+    randomizer_hex: str = Field(min_length=1, max_length=200)
+    signature_hex: str = Field(min_length=1, max_length=2000)
+    reponse: str = Field(min_length=1, max_length=200)
+    departement: str = Field(min_length=1, max_length=100)
+
+
 @app.post("/api/repondre")
-def repondre(payload: ReponseEntrante, x_vera_token: Optional[str] = Header(None)):
-    # ENDPOINT EN COURS DE REECRITURE (Modele B, brique 7). L'ancien flux
-    # (verifier_et_consommer sur un token complet cote serveur) est obsolete.
-    # Le nouveau flux recevra (K, signature(K), reponse) et verifiera la
-    # signature sous la cle publique du departement, en UNE transaction.
-    # Neutralise temporairement pour ne pas exposer un chemin casse.
-    raise HTTPException(
-        status_code=410,
-        detail="Endpoint en cours de migration vers le flux Modele B. Indisponible temporairement.",
-    )
-    token = x_vera_token
-    if not token:
-        raise HTTPException(status_code=400, detail="Token manquant")
+def repondre(payload: ReponseModeleB):
+    import hashlib
+    # Flux Modele B (brique 7). Le votant a obtenu (K, signature) via le flux
+    # aveugle cote client. Il presente ici K + randomizer + signature + reponse.
+    # Le serveur verifie la signature sous la cle publique du departement, puis
+    # marque K comme consomme (anti-rejeu) et compte le vote, EN UNE transaction
+    # atomique. Aucun lien entre K et le jeton d'autorisation : unlinkability.
+
+    try:
+        K = bytes.fromhex(payload.K_hex)
+        randomizer = bytes.fromhex(payload.randomizer_hex)
+        signature = bytes.fromhex(payload.signature_hex)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Champs hex invalides.")
 
     valeurs_valides = {opt["valeur"] for opt in QUESTION_ACTIVE["options"]}
     if payload.reponse not in valeurs_valides:
-        raise HTTPException(status_code=422, detail="Réponse invalide")
+        raise HTTPException(status_code=422, detail="Reponse invalide")
 
-    if SIGNATURE_AVEUGLE_DISPONIBLE and _token_est_signe(token):
-        # Nouveau format (Porte 7 durcie) : verification cryptographique
-        # reelle de la signature, pas juste une recherche dans un registre.
-        # C'est ICI que la verification + consommation anti-rejeu a lieu --
-        # gestionnaire_signature.verifier_et_consommer() leve une exception
-        # si le token est invalide ou deja utilise.
-        try:
-            token_complet = decoder_token_depuis_url(token)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Token malforme: {e}")
+    try:
+        cle_pub_der = gestionnaire_signature.cle_publique(payload.departement)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Aucune consultation active.")
 
-        try:
-            departement = gestionnaire_signature.verifier_et_consommer(token_complet)
-        except TokenDejaUtiliseError:
-            raise HTTPException(status_code=410, detail="Token déjà consommé")
-        except SignatureInvalideError as e:
-            raise HTTPException(status_code=404, detail=f"Token invalide: {e}")
+    valide = vbs.verifier_signature(
+        list(cle_pub_der), list(K), list(signature), list(randomizer))
+    if not valide:
+        raise HTTPException(status_code=403, detail="Signature invalide.")
 
-        with verrou:
-            _incrementer_compteur(departement, payload.reponse)
-            # Le token vient d'etre consomme (anti-rejeu). Le code court qui y
-            # menait n'a plus aucune utilite : on le libere de la memoire ET de
-            # la base. Cela evite la saturation de l'espace des codes au fil des
-            # votes (le plafond compte les codes ACTIFS, pas le cumul emis).
-            code_a_liberer = None
-            for _code, _tok in registre_codes_courts.items():
-                if _tok == token:
-                    code_a_liberer = _code
-                    break
-            if code_a_liberer is not None:
-                registre_codes_courts.pop(code_a_liberer, None)
-                try:
-                    persistance.supprimer_code_court(code_a_liberer)
-                except Exception:
-                    pass  # la suppression memoire suffit a liberer l'espace
+    empreinte_k = hashlib.sha384(K).hexdigest()
 
-        return {"statut": "enregistré"}
+    with verrou:
+        if empreinte_k in gestionnaire_signature._tokens_consommes:
+            raise HTTPException(status_code=409, detail="Deja vote (K consomme).")
+        compteurs_par_departement.setdefault(payload.departement, {})
+        compteurs_par_departement[payload.departement][payload.reponse] = (
+            compteurs_par_departement[payload.departement].get(payload.reponse, 0) + 1)
+        effectif_par_departement[payload.departement] = (
+            effectif_par_departement.get(payload.departement, 0) + 1)
+        gestionnaire_signature._tokens_consommes[empreinte_k] = True
+        persistance.enregistrer_vote_atomique(
+            payload.departement, payload.reponse,
+            compteurs_par_departement[payload.departement][payload.reponse],
+            effectif_par_departement[payload.departement],
+            empreinte_k)
 
-    # Signature aveugle obligatoire : un token non signe ne peut pas exister
-    # en fonctionnement normal (fail-closed au demarrage). On refuse
-    # explicitement plutot que de retomber sur un chemin legacy.
-    raise HTTPException(status_code=404, detail="Token invalide ou non signe.")
+    return {"statut": "enregistre"}
 
 
 @app.get("/api/health")
