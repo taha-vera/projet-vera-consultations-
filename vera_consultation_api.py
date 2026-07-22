@@ -800,23 +800,12 @@ def _token_est_signe(token: str) -> bool:
 
 
 @app.get("/api/question")
-def obtenir_question(token: str):
-    if SIGNATURE_AVEUGLE_DISPONIBLE and _token_est_signe(token):
-        # Nouveau format (Porte 7 durcie) : on ne fait QUE decoder pour
-        # verifier la forme ici, sans consommer -- la vraie verification
-        # cryptographique (et donc la consommation anti-rejeu) n'a lieu
-        # qu'au moment du vote reel dans /api/repondre, pas a la simple
-        # consultation de la question.
-        try:
-            decoder_token_depuis_url(token)
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=f"Token invalide: {e}")
-        return QUESTION_ACTIVE
-
-    # Signature aveugle obligatoire : un token non signe ne peut pas exister
-    # en fonctionnement normal (le service refuse de demarrer sans signature).
-    # On refuse explicitement plutot que de retomber sur un chemin legacy.
-    raise HTTPException(status_code=404, detail="Token invalide ou non signe.")
+def obtenir_question():
+    # Modele B : la question est PUBLIQUE. Ce qui est protege, c'est le lien
+    # identite<->vote (unlinkability), pas le contenu de la question elle-meme.
+    # Aucun token requis ici : le droit de voter est prouve au moment du vote
+    # (signature sur K dans /api/repondre), pas a la consultation de la question.
+    return QUESTION_ACTIVE
 
 
 class ReponseModeleB(BaseModel):
