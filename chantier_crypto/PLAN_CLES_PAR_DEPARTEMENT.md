@@ -158,3 +158,27 @@ le bulletin), 6 (verif empreinte cle), 7 (/api/repondre transactionnel),
 - Un timer global ou N timers ? (probable: un balayage groupe)
 - La brique 5 preuve (brique5_test_client.mjs) doit etre refaite version B :
   faire signer K opaque, recuperer cle du departement via /api/cle_publique?departement=X.
+
+## Session 22/07 -- socle crypto client VALIDE
+- Fix jetons_autorisation: teste (test_effacement_jetons.py OK) et committe.
+- Migration git vers SSH faite (plus de token dans URL). Token GitHub supprime.
+- Brique 5b SOCLE: lib @cloudflare/blindrsa-ts bundlee via esbuild ->
+  static/blindrsa-bundle.js (86ko, auto-hebergee, zero dependance externe).
+  PROUVEE dans navigateur HTTPS (test_bundle.html autonome): window.RSABSSA
+  charge, aveuglement 256 octets OK. Bundle dans /root/static/ (prod) mais PAS
+  encore dans git ni versionne -> a committer avec la brique 5b complete.
+  Le bundle a ete genere depuis /root/crypto_test (esbuild + entree_bundle.js).
+
+## RESTE brique 5b (le vrai flux dans vote.html)
+Ecrire dans static/vote.html: charger blindrsa-bundle.js, lire ?a=JETON et
+#k=EMPREINTE, generer K, aveugler K, POST /api/signer_aveugle, finaliser.
+Reference: chantier_crypto/brique5_test_client.mjs (attention: Buffer=Node,
+remplacer par toHex/fromHex navigateur comme dans test_bundle.html).
+
+## POINT DE SEQUENCEMENT A TRANCHER (important)
+Pour TESTER le flux vote.html complet, il faut un serveur avec la COUCHE 4
+(endpoints Modele B: /api/cle_publique?departement=X, /api/signer_aveugle qui
+route par jeton). Or la PROD tourne encore l'ANCIENNE version (refactor pas
+deploye, chemin 2 acte). Donc: soit lancer une instance de test avec couche 4
+(mais WebCrypto exige HTTPS, pas trivial sur instance http), soit basculer la
+couche 4 en prod. A trancher a froid avant d'ecrire vote.html.
