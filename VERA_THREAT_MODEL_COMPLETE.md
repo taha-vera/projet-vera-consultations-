@@ -6,6 +6,50 @@
 
 Chaque statut n'est marqué "vérifié" que s'il a été testé directement sur le serveur de production, avec preuve reproductible datée. Les statuts hérités et non re-testés sont marqués comme tels. Cette version remplace la version du 14 juin, restée figée sur le dépôt distant pendant que le travail de vérification se poursuivait.
 
+## Modèle d'adversaire
+
+Toutes les garanties de ce document se lisent relativement a un adversaire.
+VERA distingue deux niveaux et ne pretend au niveau fort que contre le premier.
+
+**Niveau 1 — Tiers et operateur honnete-mais-curieux (garantie forte, prouvee).**
+Contre un tiers (lecteur des resultats publies, observateur reseau, attaquant
+externe) ET contre un operateur qui administre le serveur sans chercher
+activement a falsifier le logiciel : VERA garantit qu'aucune reponse ne peut
+etre reliee a une personne. Cette garantie est structurelle : le serveur ne
+stocke jamais le lien identite<->vote. Le registre 1 (jetons d'autorisation)
+et le registre 2 (SHA-384(K) des votes consommes) sont disjoints, et la reponse
+n'est jamais stockee a cote de SHA-384(K) -- elle n'existe que dans un compteur
+agrege par (departement, reponse). Meme un administrateur legitime lisant toute
+la base ne peut pas desanonymiser un vote : il ne *peut pas* savoir, meme s'il
+le voulait passivement.
+
+**Niveau 2 — Operateur activement malveillant (hors garantie sans hebergement tiers).**
+Un operateur qui controle toute la chaine (sert le JS client, termine le TLS
+dans Nginx, detient les cles privees, lit les access logs) peut contourner la
+cryptographie sans la casser :
+- servir un client JS pige qui exfiltre K avant l'aveuglement (lien identite<->vote a la source) ;
+- correler les deux requetes signature/vote via les access logs Nginx (IP + horodatage) ;
+- signer de faux votes avec la cle privee du departement qu'il detient (bourrage) ;
+- reecrire le champ reponse cote serveur (le blind sig couvre K, pas la reponse).
+Aucune cryptographie ne protege contre l'entite qui controle le code execute et
+l'infrastructure. VERA ne pretend PAS etre anonyme contre un operateur
+activement malveillant qui s'heberge lui-meme.
+
+**Condition pour un anonymat contre l'organisation consultante.**
+Pour que l'anonymat tienne face a une organisation qui aurait interet a
+desanonymiser, VERA doit etre heberge par un tiers de confiance distinct du
+consultant (association neutre, prestataire independant), et/ou le client doit
+etre verifiable independamment (build reproductible, empreinte publiee). Sans
+cela, la garantie est "anonyme contre un tiers et contre un operateur curieux",
+pas "anonyme contre l'hebergeur".
+
+**Consequence de deploiement (pilote Orly).**
+Si la mairie heberge le serveur, la mairie est dans la base de confiance de
+niveau 2. Un anonymat reel face a la mairie exige un hebergeur neutre. Ce point
+doit etre explicite aupres de toute organisation consultante : VERA rend la
+desanonymisation passive impossible, mais ne remplace pas la confiance dans
+l'hebergeur pour un adversaire actif.
+
 ## État des portes — 2 juillet 2026
 
 | # | Porte | Statut | Preuve (a jour 16/07/2026) |
@@ -16,7 +60,7 @@ Chaque statut n'est marqué "vérifié" que s'il a été testé directement sur 
 | 4 | Composition séquentielle | Fermée | Budget eps=0.5 par population = UNE publication (resultat fige a la premiere, republier renvoie le meme resultat -> pas de moyennage) |
 | 5 | Observateur réseau (L1) | Limite assumée | Hors-perimetre (VPN/Tor au choix de l'utilisateur) |
 | 6 | Coercition (L2) | Limite assumée | Hors-perimetre, partagee par tout systeme de vote |
-| 7 | Différenciation 49/1 (crypto) | Fermée | Primitive de production : signature aveugle RSABSSA RFC 9474 (vera_signature_manager.py, standard audite). La LOGIQUE de partition (nominal, double-depense, 49/1 bloquee, rejeu cross-epoque) est validee 9/9 sur un prototype (archive/test_porte7.py) ; ce prototype n est PAS la primitive de production. Primitive de prod testee par test_signature_production.py (6/6, memoire pure isolee) : flux nominal, anti-rejeu, token force rejete, malforme sans crash, round-trip URL, et token d une AUTRE cle rejete (preuve que la signature est verifiee, pas juste decodee). | | NOTE 18/07 : unlinkability du votant NON effective -- le serveur genere le token complet (aveuglement+finalisation cote serveur). Contenu protege, mais non-liaison identite<->vote a corriger (crypto cote client, chantier dedie).
+| 7 | Différenciation 49/1 (crypto) | Fermée | Primitive de production : signature aveugle RSABSSA RFC 9474 (vera_signature_manager.py, standard audite). La LOGIQUE de partition (nominal, double-depense, 49/1 bloquee, rejeu cross-epoque) est validee 9/9 sur un prototype (archive/test_porte7.py) ; ce prototype n est PAS la primitive de production. Primitive de prod testee par test_signature_production.py (6/6, memoire pure isolee) : flux nominal, anti-rejeu, token force rejete, malforme sans crash, round-trip URL, et token d une AUTRE cle rejete (preuve que la signature est verifiee, pas juste decodee). | | NOTE 20/07 : unlinkability du votant EFFECTIVE (refactor Modele B termine). L aveuglement et la finalisation sont faits cote client (navigateur) ; le serveur ne voit jamais K ni la signature finale. Le votant obtient (K, signature) non lie au jeton d autorisation. Verifie bout-en-bout (chantier_crypto/test_vote_complet.mjs, test_brique7.mjs). LIMITE : cette garantie tient contre un tiers et un operateur curieux (cf. Modele d adversaire, Niveau 1). Contre un operateur activement malveillant qui sert le JS et detient les cles (Niveau 2), l unlinkability n est pas garantie sans hebergement tiers.
 | 8 | Inférence outlier | Fermée | AUC=0.6209 (meme mesure que Porte 2). Composition : fuite k=1 garantie par la partition (Porte 7), TPR@1%FPR=1.6% |
 | 9 | Collusion émetteur/agrégateur | Fermée | Secret admin distinct, comptes separes, isolation testee avec secret aleatoire |
 | 10 | Sondage binaire (K_MIN) | Fermée | REFUS de publier sous K_MIN=240 (aucun resultat, pas de version degradee). Champs effectif/fiable retires. Effectif exact des petites cohortes non expose |
