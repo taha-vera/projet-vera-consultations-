@@ -87,6 +87,34 @@ l'effectif attendu est proche ou inferieur a K_MIN est a proscrire -- non
 seulement le resultat ne sera pas publiable, mais les comptes bruts existent
 en base pendant toute la consultation.
 
+### Oracle 403 / 409 sur /api/repondre -- analyse, pas de correctif
+
+Constat (audit externe, 23/07/2026) : l'endpoint distingue "signature invalide"
+(403) de "K deja consomme" (409). Un attaquant pourrait, en theorie, sonder si
+un secret K donne a deja servi a voter.
+
+Pourquoi ce n'est pas exploitable, et pourquoi on ne l'uniformise pas :
+- L'ordre du code impose la verification de signature AVANT le test du registre
+  anti-rejeu. Pour obtenir un 409, il faut donc presenter un K accompagne d'une
+  signature VALIDE sur ce K. Sans signature valide, on obtient 403 et on
+  n'atteint jamais le test du registre.
+- K est un secret de 32 octets tire par crypto.getRandomValues dans le
+  navigateur du votant. Il n'est ni devinable (2^256) ni derivable du jeton
+  d'autorisation (c'est tout l'objet de la signature aveugle).
+- Posseder (K, signature) signifie donc etre le votant lui-meme, ou lui avoir
+  vole son token. Dans les deux cas, apprendre "ce K a vote" n'apprend rien :
+  le votant sait s'il a vote, et un voleur de token le decouvrirait de toute
+  facon en essayant de s'en servir.
+- Uniformiser 403 et 409 aurait un cout reel : le votant legitime qui rejoue
+  apres un timeout reseau ne saurait plus si son vote est passe. On perdrait
+  une information utile pour fermer un canal que personne ne peut emprunter.
+
+Le meme raisonnement vaut pour l'ecart de TIMING entre les deux chemins (rejet
+de longueur en Python, rapide, vs verification RSA, quelques millisecondes) :
+l'ecart existe, mais il est noye dans la variance reseau (50-100 ms) et
+n'apprend a l'attaquant que ce qu'il sait deja, puisque c'est lui qui a forge
+la requete malformee. Meme conclusion que la Porte 3 (canal temporel).
+
 ## État des portes — 2 juillet 2026
 
 | # | Porte | Statut | Preuve (a jour 16/07/2026) |
