@@ -82,6 +82,29 @@ Options evaluees :
   un anonymat face a l'organisation elle-meme, de recourir a un hebergement
   tiers (cf. section Modele d'adversaire, Niveau 2).
 
+VERSION FORTE (precisee le 23/07 apres audit avec lecture du code) : la
+formulation ci-dessus sous-estimait la portee. Le risque n'est pas seulement
+"un petit departement vote a l'unanimite" ni "une sauvegarde fuite". Un
+operateur qui SONDE les compteurs pendant la consultation lit chaque reponse
+individuelle au fil de l'eau, a TOUTE taille de cohorte : il releve
+compteurs_votes avant et apres chaque vote, la difference donne la reponse.
+K_MIN=240 et le bruit Laplace s'appliquent a la PUBLICATION
+(/api/rh/resultats) ; ils ne s'appliquent pas a la lecture directe des tables.
+Un lecteur de base est sous cette couche.
+
+Ce que cette lecture donne et ne donne pas : elle donne le QUOI et l'ORDRE
+(via le rowid, cf. section dediee), pas le QUI. Aucune identite n'existe en
+base. Pour desanonymiser, il faut une source externe placant une personne dans
+la sequence -- les canaux qui la fournissaient (access logs des routes de vote,
+jeton en query string, horodatage en base) ont ete fermes le 23/07. La
+protection contre cette lecture ne vient donc pas de la DP mais du fait que
+l'operateur ne dispose plus d'ancre temporelle exterieure.
+
+Consequence pour le positionnement : ne pas ecrire que "K_MIN protege
+l'anonymat". K_MIN protege le RESULTAT PUBLIE. L'anonymat face a un lecteur de
+base repose sur l'absence d'identite en base et sur la fermeture des canaux
+temporels, pas sur le seuil ni sur epsilon.
+
 Regle de deploiement qui en decoule : un decoupage en departements dont
 l'effectif attendu est proche ou inferieur a K_MIN est a proscrire -- non
 seulement le resultat ne sera pas publiable, mais les comptes bruts existent
