@@ -115,6 +115,48 @@ l'ecart existe, mais il est noye dans la variance reseau (50-100 ms) et
 n'apprend a l'attaquant que ce qu'il sait deja, puisque c'est lui qui a forge
 la requete malformee. Meme conclusion que la Porte 3 (canal temporel).
 
+### Rowid implicite : l'ORDRE des votes survit au retrait des horodatages
+
+Constat (audit externe avec lecture du code, 23/07/2026) : SQLite attribue un
+rowid implicite a toute table qui n'est pas declaree WITHOUT ROWID. Le retrait
+de horodatage_unix de tokens_consommes (correctif P-B) supprime donc les
+INSTANTS de vote, mais pas leur ORDRE : un SELECT rowid, empreinte FROM
+tokens_consommes ORDER BY rowid restitue la sequence exacte des votes.
+Verifie sur la base de production : rowid 1, 2, 3, 4 strictement croissants.
+
+Formulation corrigee : la base ne permet plus de DATER un vote, elle permet
+encore de les ORDONNER entre eux.
+
+Ce que l'ordre seul ne donne pas : ni le QUI (aucune identite en base), ni le
+QUAND (plus aucun horodatage), ni le QUOI par vote (la reponse n'existe que
+dans un compteur agrege, jamais a cote de l'empreinte).
+
+Ce qui le rendrait exploitable : une source temporelle EXTERNE permettant de
+placer une personne dans la sequence. Les canaux qui la fournissaient ont ete
+fermes le 23/07 :
+- access_log Nginx sur les routes de vote -> desactive ;
+- jeton et departement en query string du lien SMS (donc dans l'access log au
+  chargement de page) -> deplaces dans le FRAGMENT, jamais transmis au serveur ;
+- horodatage explicite en base -> retire, pages liberees purgees par VACUUM.
+
+Contre-point favorable, verifie : jetons_autorisation ne fuit PAS l'ordre de
+consommation. Son rowid reflete l'ordre de GENERATION par le RH, et le passage
+a utilise=1 ne reordonne rien (verifie en base : rowid 1 utilise, rowids 2 a 5
+non utilises). Impossible donc d'apparier "n-ieme jeton consomme" et "n-ieme
+vote insere" par les seuls rowid.
+
+Options evaluees pour supprimer aussi l'ordre :
+- WITHOUT ROWID sur tokens_consommes : la table serait ordonnee par empreinte
+  (SHA-384, donc pseudo-aleatoire) au lieu de l'insertion. Supprime le canal a
+  la racine. Cout : migration supplementaire d'une table critique pour
+  l'anti-rejeu, sur un canal qui n'est exploitable qu'avec une source temporelle
+  externe desormais fermee.
+- Inserer dans un ordre aleatoire (lots melanges) : casse l'atomicite
+  vote-plus-anti-rejeu, protection bien plus precieuse.
+- Limite documentee (choix retenu) : l'ordre subsiste, il est inoffensif isole,
+  et les canaux qui le rendraient exploitable sont fermes. A reconsiderer si un
+  jour un horodatage devait etre reintroduit quelque part.
+
 ## État des portes — 2 juillet 2026
 
 | # | Porte | Statut | Preuve (a jour 16/07/2026) |
