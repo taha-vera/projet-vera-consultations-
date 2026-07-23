@@ -50,6 +50,43 @@ doit etre explicite aupres de toute organisation consultante : VERA rend la
 desanonymisation passive impossible, mais ne remplace pas la confiance dans
 l'hebergeur pour un adversaire actif.
 
+### P-C — Compteurs bruts lisibles en base (limite de Niveau 1, documentee)
+
+Constat (audit externe, 23/07/2026) : les tables `compteurs_votes
+(departement, reponse, compte)` et `effectifs (departement, effectif)` sont
+persistees EN CLAIR. Seule la cle RSA beneficie du chiffrement Fernet.
+
+Ce que K_MIN protege, et ce qu'il ne protege pas :
+- K_MIN=240 est applique PAR DEPARTEMENT a la PUBLICATION (boucle sur
+  effectif_par_departement, refus individuel avec `continue`, verifie avant
+  toute consommation de budget epsilon). Un departement de 6 personnes ne voit
+  jamais son resultat publie, meme si le total de la consultation depasse 240.
+  La desanonymisation par unanimite via le resultat publie est donc fermee.
+- MAIS K_MIN ne protege pas la LECTURE DIRECTE de la base. Un operateur qui
+  ouvre le fichier SQLite voit les comptes exacts, sans bruit et sans seuil :
+  un departement de 6 personnes votant a l'unanimite revele les 6 positions.
+
+Adversaire concerne : operateur lisant la base (Niveau 1 du modele
+d'adversaire). C'est donc une limite DANS le perimetre ou VERA revendique une
+garantie forte -- elle doit etre nommee, pas masquee.
+
+Options evaluees :
+- Chiffrer compteurs_votes et effectifs (Fernet, comme la cle RSA) : gain reel
+  contre un vol de disque ou une sauvegarde qui fuite, mais NUL contre
+  l'operateur lui-meme, qui detient VERA_DB_KEY (elle est dans son unit
+  systemd). Meme raisonnement que celui deja retenu pour tokens_consommes.
+- Ne pas persister les compteurs sous K_MIN : casse la reprise apres
+  redemarrage (Porte 14) pour un gain nul contre l'operateur.
+- Limite assumee (choix retenu) : documenter. La parade operationnelle est de
+  ne pas decouper la consultation en departements de petite taille, et, pour
+  un anonymat face a l'organisation elle-meme, de recourir a un hebergement
+  tiers (cf. section Modele d'adversaire, Niveau 2).
+
+Regle de deploiement qui en decoule : un decoupage en departements dont
+l'effectif attendu est proche ou inferieur a K_MIN est a proscrire -- non
+seulement le resultat ne sera pas publiable, mais les comptes bruts existent
+en base pendant toute la consultation.
+
 ## État des portes — 2 juillet 2026
 
 | # | Porte | Statut | Preuve (a jour 16/07/2026) |
