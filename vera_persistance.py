@@ -94,6 +94,12 @@ def _migrer_schema_tokens(conn):
     # recuperables forensiquement. Le DROP nettoie la vue logique, pas les
     # octets. VACUUM reecrit le fichier sans les pages mortes. Hors
     # transaction (SQLite l'exige).
+    # wal_checkpoint(TRUNCATE) AVANT le VACUUM : le VACUUM reecrit le fichier
+    # .db mais ne touche PAS au journal -wal, qui peut conserver les anciennes
+    # valeurs en clair (verifie le 23/07 : un jeton pre-migration subsistait
+    # dans les octets apres VACUUM seul). Le checkpoint integre puis tronque le
+    # journal ; le VACUUM nettoie ensuite les pages liberees du fichier.
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.execute("VACUUM")
 
 
@@ -130,6 +136,12 @@ def _migrer_jetons_vers_empreintes(conn):
             (hashlib.sha256(j.encode("utf-8")).hexdigest(), j),
         )
     conn.commit()
+    # wal_checkpoint(TRUNCATE) AVANT le VACUUM : le VACUUM reecrit le fichier
+    # .db mais ne touche PAS au journal -wal, qui peut conserver les anciennes
+    # valeurs en clair (verifie le 23/07 : un jeton pre-migration subsistait
+    # dans les octets apres VACUUM seul). Le checkpoint integre puis tronque le
+    # journal ; le VACUUM nettoie ensuite les pages liberees du fichier.
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.execute("VACUUM")
 
 
