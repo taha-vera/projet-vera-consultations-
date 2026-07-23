@@ -35,6 +35,13 @@ def _connexion():
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=FULL")
     conn.execute("PRAGMA foreign_keys=ON")
+    # secure_delete : ecrase les octets des lignes supprimees au lieu de les
+    # marquer libres. Sans lui, un DELETE (effacement de cloture, purge des
+    # jetons) laisse les donnees lisibles dans les pages du fichier .db,
+    # recuperables forensiquement. La promesse "apres cloture le serveur ne
+    # revele plus rien" ne tient au niveau des OCTETS que si ce PRAGMA est
+    # actif. Cout : ecritures un peu plus lentes, negligeable a cette echelle.
+    conn.execute("PRAGMA secure_delete=ON")
     return conn
 
 
@@ -81,6 +88,12 @@ def _migrer_schema_tokens(conn):
     conn.execute("DROP TABLE tokens_consommes")
     conn.execute("ALTER TABLE tokens_consommes_v2 RENAME TO tokens_consommes")
     conn.commit()
+    # VACUUM apres le DROP : sans lui, les anciennes lignes -- horodatages
+    # compris -- restent dans les pages LIBEREES du fichier .db et sont
+    # recuperables forensiquement. Le DROP nettoie la vue logique, pas les
+    # octets. VACUUM reecrit le fichier sans les pages mortes. Hors
+    # transaction (SQLite l'exige).
+    conn.execute("VACUUM")
 
 
 def initialiser():
@@ -111,12 +124,6 @@ def charger_tokens_consommes():
     with _verrou_db:
         rows = _conn.execute("SELECT empreinte FROM tokens_consommes").fetchall()
     return {row[0] for row in rows}
-
-
-def persister_token_consomme(empreinte):
-    with _verrou_db:
-        _conn.execute("INSERT OR IGNORE INTO tokens_consommes (empreinte) VALUES (?)", (empreinte,))
-        _conn.commit()
 
 
 def charger_compteurs():
@@ -158,7 +165,11 @@ def enregistrer_vote_atomique(departement, reponse, empreinte_k):
        AVANT toute autre ecriture, rollback, et DoubleVoteErreur remonte.
        La DB est l'autorite anti-rejeu, pas le dict memoire.
     Ne PAS remplacer par des appels separes a persister_vote +
-    persister_token_consomme (deux commits = bug historique double-commit).
+    des ecritures separees du compteur et du registre (deux commits = bug
+    historique double-commit). Une ancienne fonction persister_token_consomme
+    faisait cet INSERT en OR IGNORE hors transaction : supprimee le 23/07 car
+    jamais appelee et contournant l'invariant ci-dessus (un doublon y passait
+    silencieusement au lieu de lever).
     Ne PAS remettre OR IGNORE (doublon silencieusement compte = bug)."""
     with _verrou_db:
         try:
