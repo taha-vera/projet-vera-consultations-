@@ -866,16 +866,14 @@ def repondre(payload: ReponseModeleB):
         if empreinte_k in gestionnaire_signature._tokens_consommes:
             raise HTTPException(status_code=409, detail="Deja vote (K consomme).")
 
-        nouveaux_compteurs = dict(compteurs_par_departement.get(payload.departement, {}))
-        nouveaux_compteurs[payload.reponse] = nouveaux_compteurs.get(payload.reponse, 0) + 1
-        nouvel_effectif = effectif_par_departement.get(payload.departement, 0) + 1
-
+        # Correctif P-D : plus aucun compteur calcule depuis la RAM n'est
+        # ecrit en base. enregistrer_vote_atomique incremente en SQL
+        # (compte = compte + 1) et RENVOIE les valeurs vraies relues apres
+        # commit. La memoire se resynchronise dessus : elle ne peut plus
+        # corrompre le total meme si elle etait en retard.
         try:
-            persistance.enregistrer_vote_atomique(
-                payload.departement, payload.reponse,
-                nouveaux_compteurs[payload.reponse],
-                nouvel_effectif,
-                empreinte_k)
+            compte_reel, effectif_reel = persistance.enregistrer_vote_atomique(
+                payload.departement, payload.reponse, empreinte_k)
         except persistance.DoubleVoteErreur:
             # La DB connaissait deja ce K (cache memoire incoherent ou
             # restauration de DB) : on resynchronise le cache et on refuse.
@@ -887,8 +885,9 @@ def repondre(payload: ReponseModeleB):
             raise HTTPException(status_code=500, detail="Erreur de persistance, vote NON enregistre. Reessayez.")
 
         # Commit DB reussi : la memoire peut suivre.
-        compteurs_par_departement[payload.departement] = nouveaux_compteurs
-        effectif_par_departement[payload.departement] = nouvel_effectif
+        compteurs_par_departement.setdefault(payload.departement, {})
+        compteurs_par_departement[payload.departement][payload.reponse] = compte_reel
+        effectif_par_departement[payload.departement] = effectif_reel
         gestionnaire_signature._tokens_consommes[empreinte_k] = True
 
     return {"statut": "enregistre"}

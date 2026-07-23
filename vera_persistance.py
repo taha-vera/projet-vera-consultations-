@@ -110,7 +110,7 @@ class DoubleVoteErreur(Exception):
     KEY refuse le doublon. L'endpoint doit convertir en HTTP 409."""
 
 
-def enregistrer_vote_atomique(departement, reponse, nouveau_compte, nouvel_effectif, empreinte_k):
+def enregistrer_vote_atomique(departement, reponse, empreinte_k):
     """Modele B : enregistre un vote ET marque le secret K comme consomme dans
     UNE SEULE transaction SQLite. Invariants critiques :
     1. Le compteur et le registre anti-rejeu (tokens_consommes) sont ecrits
@@ -130,17 +130,35 @@ def enregistrer_vote_atomique(departement, reponse, nouveau_compte, nouvel_effec
                 "INSERT INTO tokens_consommes (empreinte, horodatage_unix) VALUES (?, ?)",
                 (empreinte_k, time.time()),
             )
+            # INCREMENT RELATIF (pas de valeur absolue venue de la RAM).
+            # Correctif P-D : ecrire "compte = excluded.compte" depuis un
+            # compteur memoire permettait, si la RAM etait en retard d'un cran
+            # (commit reussi puis exception avant mise a jour memoire), qu'un
+            # vote suivant ecrase silencieusement le precedent. Avec
+            # "compte = compte + 1" la DB est seule autorite du compteur :
+            # l'etat memoire ne peut plus corrompre le total.
             _conn.execute(
-                "INSERT INTO compteurs_votes (departement, reponse, compte) VALUES (?, ?, ?) "
-                "ON CONFLICT(departement, reponse) DO UPDATE SET compte = excluded.compte",
-                (departement, reponse, nouveau_compte),
+                "INSERT INTO compteurs_votes (departement, reponse, compte) VALUES (?, ?, 1) "
+                "ON CONFLICT(departement, reponse) DO UPDATE SET compte = compte + 1",
+                (departement, reponse),
             )
             _conn.execute(
-                "INSERT INTO effectifs (departement, effectif) VALUES (?, ?) "
-                "ON CONFLICT(departement) DO UPDATE SET effectif = excluded.effectif",
-                (departement, nouvel_effectif),
+                "INSERT INTO effectifs (departement, effectif) VALUES (?, 1) "
+                "ON CONFLICT(departement) DO UPDATE SET effectif = effectif + 1",
+                (departement,),
             )
+            # Relire les valeurs VRAIES apres incrementation : l'appelant
+            # resynchronise sa memoire dessus au lieu de recalculer.
+            compte_reel = _conn.execute(
+                "SELECT compte FROM compteurs_votes WHERE departement = ? AND reponse = ?",
+                (departement, reponse),
+            ).fetchone()[0]
+            effectif_reel = _conn.execute(
+                "SELECT effectif FROM effectifs WHERE departement = ?",
+                (departement,),
+            ).fetchone()[0]
             _conn.commit()
+            return compte_reel, effectif_reel
         except sqlite3.IntegrityError:
             _conn.rollback()
             raise DoubleVoteErreur(empreinte_k)
