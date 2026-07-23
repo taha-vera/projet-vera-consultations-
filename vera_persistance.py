@@ -6,6 +6,7 @@ import sqlite3
 import os
 import threading
 import time
+import hashlib
 from pathlib import Path
 
 DB_PATH = Path(os.environ.get("VERA_DB_PATH", "/root/vera_state.db"))
@@ -96,12 +97,49 @@ def _migrer_schema_tokens(conn):
     conn.execute("VACUUM")
 
 
+def _migrer_jetons_vers_empreintes(conn):
+    """Migration idempotente : jetons_autorisation stockait le jeton EN CLAIR.
+    Un lecteur de base recuperait les jetons non consommes par un SELECT et les
+    rejouait contre /api/signer_aveugle (public) : bourrage et privation de vote
+    sans clé privée ni modification du logiciel. On remplace chaque jeton par
+    son SHA-256, comme le registre 2 le fait deja pour K.
+
+    Detection : un SHA-256 hexadecimal fait exactement 64 caracteres [0-9a-f].
+    Les jetons generes (token_urlsafe) ne respectent pas ce format. On ne
+    hache donc que les lignes qui n'y ressemblent pas -> rejouer la migration
+    ne re-hache pas les empreintes (idempotence).
+
+    Les liens SMS deja distribues continuent de fonctionner : le votant envoie
+    le jeton en clair, le serveur le hache et retrouve la ligne."""
+    tables = [r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='jetons_autorisation'"
+    ).fetchall()]
+    if not tables:
+        return
+    rows = conn.execute("SELECT jeton FROM jetons_autorisation").fetchall()
+    a_migrer = []
+    for (j,) in rows:
+        deja_hache = (len(j) == 64 and all(ch in "0123456789abcdef" for ch in j))
+        if not deja_hache:
+            a_migrer.append(j)
+    if not a_migrer:
+        return
+    for j in a_migrer:
+        conn.execute(
+            "UPDATE jetons_autorisation SET jeton = ? WHERE jeton = ?",
+            (hashlib.sha256(j.encode("utf-8")).hexdigest(), j),
+        )
+    conn.commit()
+    conn.execute("VACUUM")
+
+
 def initialiser():
     global _conn
     with _verrou_db:
         _conn = _connexion()
         _migrer_schema_cles(_conn)
         _migrer_schema_tokens(_conn)
+        _migrer_jetons_vers_empreintes(_conn)
         for sql in _SQL_TABLES:
             _conn.execute(sql)
         _conn.commit()
@@ -250,13 +288,25 @@ def supprimer_code_court(code):
 # JAMAIS etre joint a lui -- c'est ce qui garantit la non-liaison identite<->vote.
 # ============================================================================
 
+def _empreinte_jeton(jeton):
+    """SHA-256 du jeton d'autorisation. La base ne stocke JAMAIS le jeton en
+    clair : sinon un lecteur de base (Niveau 1) recupere les jetons non
+    consommes par un simple SELECT et les rejoue contre /api/signer_aveugle,
+    qui est public. Il obtient des signatures valides sans clé privée et sans
+    modifier le logiciel : bourrage, et privation de vote en consommant le
+    jeton d'une personne avant elle. Le registre 2 hachait deja K (SHA-384) ;
+    cette asymetrie etait la porte. Le jeton en clair n'existe plus que dans
+    le lien SMS (cote RH) et dans la requete du votant, jamais au repos."""
+    return hashlib.sha256(jeton.encode("utf-8")).hexdigest()
+
+
 def persister_jeton_autorisation(jeton, departement):
-    """Enregistre un jeton d'autorisation a sa generation par le RH."""
+    """Enregistre l'EMPREINTE d'un jeton d'autorisation a sa generation."""
     with _verrou_db:
         _conn.execute(
             "INSERT INTO jetons_autorisation (jeton, departement, utilise) VALUES (?, ?, 0) "
             "ON CONFLICT(jeton) DO NOTHING",
-            (jeton, departement),
+            (_empreinte_jeton(jeton), departement),
         )
         _conn.commit()
 
@@ -268,16 +318,17 @@ def consommer_jeton_autorisation(jeton):
     qu'un meme jeton soit consomme deux fois par deux requetes simultanees
     (protection anti-double-vote a la source)."""
     with _verrou_db:
+        emp = _empreinte_jeton(jeton)
         cur = _conn.execute(
             "UPDATE jetons_autorisation SET utilise = 1 WHERE jeton = ? AND utilise = 0",
-            (jeton,),
+            (emp,),
         )
         if cur.rowcount != 1:
             _conn.commit()
             return None  # jeton inconnu OU deja utilise
         row = _conn.execute(
             "SELECT departement FROM jetons_autorisation WHERE jeton = ?",
-            (jeton,),
+            (emp,),
         ).fetchone()
         _conn.commit()
         return row[0] if row else None
