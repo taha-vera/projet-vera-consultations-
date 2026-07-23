@@ -196,13 +196,18 @@
 <script src="/static/blindrsa-bundle.js"></script>
 <script>
 (function() {
-  const params = new URLSearchParams(window.location.search);
-  // Modele B: le jeton d'autorisation est dans ?a=, l'empreinte de cle dans le
-  // fragment #k= (le fragment n'est JAMAIS envoye au serveur -> engagement de cle
-  // cote client, brique 6). window.location.hash inclut le # initial.
-  const jetonAutorisation = params.get('a');
-  const departementVote = params.get('d');
-  const empreinteCleAttendue = window.location.hash.replace(/^#k=/, '');
+  // TOUT le credential de vote est dans le FRAGMENT (#), jamais dans la query.
+  // Le fragment n'est JAMAIS transmis au serveur par le navigateur : il
+  // n'apparait donc ni dans les access logs Nginx (avec IP + horodatage a la
+  // seconde), ni dans un proxy d'entreprise, ni dans le Referer. Avec le jeton
+  // en query string (?a=JETON), le chargement de la page suffisait a relier
+  // identite et instant de vote -- exactement le canal que la desactivation des
+  // logs sur les POST cherchait a fermer, laisse ouvert par le GET.
+  // Format du lien SMS : https://.../vote#a=JETON&d=DEPARTEMENT&k=EMPREINTE
+  const frag = new URLSearchParams(window.location.hash.slice(1));
+  const jetonAutorisation = frag.get('a');
+  const departementVote = frag.get('d');
+  const empreinteCleAttendue = frag.get('k') || '';
 
   const form = document.getElementById('vote-form');
   const formScreen = document.getElementById('form-screen');

@@ -510,7 +510,14 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
             # Lien SMS complet : jeton en query, empreinte de cle en FRAGMENT
             # (#k=). Le fragment n'est jamais transmis au serveur -> il ne peut
             # pas savoir quelle empreinte le client verifie, ni s'y adapter.
-            lien = f"{base_url}?a={jeton}&d={payload.departement}#k={empreinte_cle}"
+            # TOUT le credential passe par le FRAGMENT (#), rien en query string.
+            # Le navigateur ne transmet JAMAIS le fragment au serveur : le jeton
+            # n'apparait donc dans aucun access log (avec IP + horodatage), ni
+            # dans un proxy, ni dans le Referer. En query (?a=JETON), le simple
+            # chargement de la page suffisait a relier une identite a un instant
+            # de vote -- le canal que la coupure des logs sur les POST visait,
+            # laisse ouvert par le GET de la page.
+            lien = f"{base_url}#a={jeton}&d={payload.departement}&k={empreinte_cle}"
             autorisations.append({"jeton": jeton, "lien_sms": lien})
 
     return {
