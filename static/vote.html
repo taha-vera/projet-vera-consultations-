@@ -213,7 +213,13 @@
   // Longueur cible pour (reponse + pad), cf. P-A. Doit etre >= a la plus
   // longue valeur d'option possible ; 32 laisse de la marge pour de futures
   // questions sans re-fuiter par la taille.
-  const LONGUEUR_REPONSE_FIXE = 32;
+  // Longueur cible pour (reponse + departement + pad). Le pad compense les
+  // DEUX champs de longueur variable du corps : sans cela la taille du paquet
+  // chiffre trahissait le departement (TLS preserve la longueur du clair), ce
+  // qui permet de classer les requetes par cohorte et reduit l'ensemble
+  // d'anonymat dans les petits departements. 96 laisse de la marge pour des
+  // noms de departement longs et de futures options.
+  const LONGUEUR_CIBLE_FIXE = 96;
 
   let selectedValue = null;
 
@@ -316,8 +322,8 @@
           // clair : sans ce pad, "abstention" (10 octets) se distingue de
           // "oui"/"non" (3 octets) a la simple taille du paquet chiffre, et un
           // observateur passif lit les abstentions sans dechiffrer. On complete
-          // pour que (reponse + pad) fasse toujours LONGUEUR_REPONSE_FIXE.
-          pad: 'x'.repeat(Math.max(0, LONGUEUR_REPONSE_FIXE - selectedValue.length)),
+          // pour que (reponse + departement + pad) fasse toujours LONGUEUR_CIBLE_FIXE.
+          pad: 'x'.repeat(Math.max(0, LONGUEUR_CIBLE_FIXE - selectedValue.length - departement.length)),
           K_hex: toHex(Kmsg), randomizer_hex: toHex(randomizer),
           signature_hex: toHex(signature), reponse: selectedValue, departement: departement
         })
