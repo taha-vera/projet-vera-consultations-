@@ -21,6 +21,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Header, Cookie, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 import vera_admin_auth as auth
@@ -77,6 +78,16 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/vote")
+def page_vote():
+    """Page de vote du participant. Le lien SMS distribue par le RH pointe ici
+    (/vote?a=JETON&d=DEPARTEMENT#k=EMPREINTE). Sans cette route, le lien
+    renvoyait 404 alors que le fichier existait sous /static/vote.html : tout
+    votant recevant son SMS tombait sur une erreur. Le fragment #k= n'est pas
+    transmis au serveur (le navigateur le garde), il reste disponible au JS."""
+    return FileResponse("static/vote.html")
 
 verrou = threading.Lock()
 
