@@ -14,7 +14,13 @@ _conn = None
 
 _SQL_TABLES = [
     "CREATE TABLE IF NOT EXISTS budget_epsilon (departement TEXT PRIMARY KEY, epsilon_consomme REAL NOT NULL DEFAULT 0.0, nb_publications INTEGER NOT NULL DEFAULT 0)",
-    "CREATE TABLE IF NOT EXISTS tokens_consommes (empreinte TEXT PRIMARY KEY, horodatage_unix REAL NOT NULL)",
+    # P-B : PAS d'horodatage ici. Un instant de consommation stocke a cote de
+    # l'empreinte permettait, en lisant la base apres coup, de dater chaque vote
+    # et de le recouper avec toute autre source temporelle (logs, envoi des
+    # liens). Le champ n'etait jamais lu par le code : purement descriptif, mais
+    # exploitable par un adversaire. La table ne retient que ce qui est
+    # STRICTEMENT necessaire a l'anti-rejeu : l'empreinte.
+    "CREATE TABLE IF NOT EXISTS tokens_consommes (empreinte TEXT PRIMARY KEY)",
     "CREATE TABLE IF NOT EXISTS compteurs_votes (departement TEXT NOT NULL, reponse TEXT NOT NULL, compte INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (departement, reponse))",
     "CREATE TABLE IF NOT EXISTS effectifs (departement TEXT PRIMARY KEY, effectif INTEGER NOT NULL DEFAULT 0)",
     "CREATE TABLE IF NOT EXISTS resultats_publies (departement TEXT PRIMARY KEY, resultat_json TEXT NOT NULL)",
@@ -48,11 +54,41 @@ def _migrer_schema_cles(conn):
         conn.execute("DROP TABLE cle_rsa_active")
 
 
+def _migrer_schema_tokens(conn):
+    """Migration idempotente : tokens_consommes (empreinte, horodatage_unix)
+    -> (empreinte) seule. L'horodatage de consommation n'etait JAMAIS lu par le
+    code (purement descriptif) mais permettait, en lisant la base apres coup,
+    de dater chaque vote et de le recouper avec toute autre source temporelle.
+
+    DIFFERENCE CRITIQUE avec _migrer_schema_cles : ici on ne peut PAS faire un
+    DROP sec. Cette table EST l'anti-rejeu : la vider autoriserait a revoter
+    avec un K deja utilise. On COPIE donc les empreintes dans la nouvelle table
+    avant de supprimer l'ancienne, le tout dans une transaction (si le processus
+    meurt au milieu, on ne se retrouve jamais sans table anti-rejeu).
+
+    Idempotente : ne fait rien si la colonne horodatage_unix est deja absente.
+    Sans ce garde-fou, la table serait recreee a chaque demarrage."""
+    tables = [r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='tokens_consommes'"
+    ).fetchall()]
+    if not tables:
+        return  # absente : creee au bon schema par _SQL_TABLES
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(tokens_consommes)").fetchall()]
+    if 'horodatage_unix' not in cols:
+        return  # deja migree
+    conn.execute("CREATE TABLE tokens_consommes_v2 (empreinte TEXT PRIMARY KEY)")
+    conn.execute("INSERT INTO tokens_consommes_v2 (empreinte) SELECT empreinte FROM tokens_consommes")
+    conn.execute("DROP TABLE tokens_consommes")
+    conn.execute("ALTER TABLE tokens_consommes_v2 RENAME TO tokens_consommes")
+    conn.commit()
+
+
 def initialiser():
     global _conn
     with _verrou_db:
         _conn = _connexion()
         _migrer_schema_cles(_conn)
+        _migrer_schema_tokens(_conn)
         for sql in _SQL_TABLES:
             _conn.execute(sql)
         _conn.commit()
@@ -79,7 +115,7 @@ def charger_tokens_consommes():
 
 def persister_token_consomme(empreinte):
     with _verrou_db:
-        _conn.execute("INSERT OR IGNORE INTO tokens_consommes (empreinte, horodatage_unix) VALUES (?, ?)", (empreinte, time.time()))
+        _conn.execute("INSERT OR IGNORE INTO tokens_consommes (empreinte) VALUES (?)", (empreinte,))
         _conn.commit()
 
 
@@ -127,8 +163,8 @@ def enregistrer_vote_atomique(departement, reponse, empreinte_k):
     with _verrou_db:
         try:
             _conn.execute(
-                "INSERT INTO tokens_consommes (empreinte, horodatage_unix) VALUES (?, ?)",
-                (empreinte_k, time.time()),
+                "INSERT INTO tokens_consommes (empreinte) VALUES (?)",
+                (empreinte_k,),
             )
             # INCREMENT RELATIF (pas de valeur absolue venue de la RAM).
             # Correctif P-D : ecrire "compte = excluded.compte" depuis un
