@@ -809,6 +809,13 @@ def obtenir_question():
 
 
 class ReponseModeleB(BaseModel):
+    # Champ de bourrage (P-A) : le client complete le corps JSON pour que sa
+    # taille soit CONSTANTE quelle que soit la reponse choisie. Sans lui, la
+    # longueur du corps chiffre trahit "abstention" (10 octets) face a
+    # "oui"/"non" (3 octets) : TLS preserve la longueur du plaintext, donc un
+    # observateur passif distingue les abstentions sans dechiffrer. Le serveur
+    # ignore ce champ, il n'existe que pour uniformiser la taille sur le reseau.
+    pad: str = Field(default="", max_length=200)
     K_hex: str = Field(min_length=1, max_length=200)
     randomizer_hex: str = Field(min_length=1, max_length=200)
     signature_hex: str = Field(min_length=1, max_length=2000)
@@ -848,8 +855,18 @@ def repondre(payload: ReponseModeleB):
     except KeyError:
         raise HTTPException(status_code=404, detail="Departement inconnu.")
 
-    valide = vbs.verifier_signature(
-        list(cle_pub_der), list(K), list(signature), list(randomizer))
+    # Validation des longueurs AVANT d'appeler la primitive : sans elle, une
+    # entree malformee (mauvaise taille) fait lever ValueError dans la lib Rust
+    # -> 500 avec trace interne, et un oracle distinguant "malforme" de
+    # "signature invalide". On renvoie le MEME 403 dans les deux cas.
+    if len(K) != 32 or len(randomizer) != 32 or len(signature) != 256:
+        raise HTTPException(status_code=403, detail="Signature invalide.")
+
+    try:
+        valide = vbs.verifier_signature(
+            list(cle_pub_der), list(K), list(signature), list(randomizer))
+    except Exception:
+        raise HTTPException(status_code=403, detail="Signature invalide.")
     if not valide:
         raise HTTPException(status_code=403, detail="Signature invalide.")
 

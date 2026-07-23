@@ -210,6 +210,10 @@
   const questionTitle = document.getElementById('question-title');
 
   const API_BASE = '/api';
+  // Longueur cible pour (reponse + pad), cf. P-A. Doit etre >= a la plus
+  // longue valeur d'option possible ; 32 laisse de la marge pour de futures
+  // questions sans re-fuiter par la taille.
+  const LONGUEUR_REPONSE_FIXE = 32;
 
   let selectedValue = null;
 
@@ -308,6 +312,12 @@
       const rVote = await fetch(`${API_BASE}/repondre`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // P-A : bourrage a longueur constante. TLS preserve la longueur du
+          // clair : sans ce pad, "abstention" (10 octets) se distingue de
+          // "oui"/"non" (3 octets) a la simple taille du paquet chiffre, et un
+          // observateur passif lit les abstentions sans dechiffrer. On complete
+          // pour que (reponse + pad) fasse toujours LONGUEUR_REPONSE_FIXE.
+          pad: 'x'.repeat(Math.max(0, LONGUEUR_REPONSE_FIXE - selectedValue.length)),
           K_hex: toHex(Kmsg), randomizer_hex: toHex(randomizer),
           signature_hex: toHex(signature), reponse: selectedValue, departement: departement
         })
