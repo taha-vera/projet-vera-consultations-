@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Consultation — Réponse confidentielle</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap');
+  /* Aucune police distante : la page de vote ne doit dependre d'AUCUN tiers.
+     Charger des polices chez Google revenait a lui donner l'IP de chaque votant
+     a l'heure de sa consultation -- incoherent avec l'auto-hebergement de la lib
+     crypto. Polices systeme uniquement. */
 
   :root {
     --ink: #1B3A2F;
@@ -20,7 +23,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     background: var(--paper);
     color: var(--ink);
     min-height: 100vh;
@@ -47,7 +50,7 @@
   }
 
   h1 {
-    font-family: 'Fraunces', serif;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 28px;
     font-weight: 600;
     text-align: center;
@@ -120,7 +123,7 @@
   .state-icon { width: 64px; height: 64px; margin: 0 auto 24px; }
 
   .state-title {
-    font-family: 'Fraunces', serif;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 24px;
     font-weight: 600;
     margin-bottom: 12px;
