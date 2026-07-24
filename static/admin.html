@@ -608,6 +608,14 @@
             // projection sur le simplexe. Le serveur n expose jamais les
             // comptes bruts -- l ancien nom du champ, comptes_BRUTS_sans_DP,
             // etait un residu d une intention abandonnee.
+            // Cas REFUSE : sous le seuil K_MIN, l API ne renvoie pas de
+            // comptages mais {refuse, raison}. Sans ce test, on affichait
+            // "0 reponses" et un libelle vide -- le RH pouvait croire que
+            // personne n avait vote, alors que des reponses existent mais que
+            // le seuil de publication n est pas atteint.
+            if (r.refuse) {
+              return `<div class="dept-row"><span>${dep}</span><span class="dept-progress">${r.raison || 'Non publiable'}</span></div>`;
+            }
             const comptesTexte = Object.entries(r.resultats_bruits || {})
               .map(([k, v]) => `${k}: ${v}`).join(', ');
             // L API ne renvoie pas de champ effectif : elle expose
