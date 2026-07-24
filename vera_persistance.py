@@ -21,7 +21,15 @@ _SQL_TABLES = [
     # liens). Le champ n'etait jamais lu par le code : purement descriptif, mais
     # exploitable par un adversaire. La table ne retient que ce qui est
     # STRICTEMENT necessaire a l'anti-rejeu : l'empreinte.
-    "CREATE TABLE IF NOT EXISTS tokens_consommes (empreinte TEXT PRIMARY KEY)",
+    # WITHOUT ROWID : sans ce mot-cle, SQLite attribue un rowid implicite et la
+    # table conserve l'ORDRE D'INSERTION des votes, lisible par SELECT rowid.
+    # Retirer l'horodatage supprimait les instants, pas la sequence. En
+    # WITHOUT ROWID la table est un B-tree ordonne par l'empreinte (SHA-384,
+    # pseudo-aleatoire) : l'ordre des votes disparait a la racine au lieu de
+    # dependre du maintien d'une hypothese d'environnement (aucun log, aucun
+    # horodatage ailleurs). Lecon de la Porte 19 : une porte fermee peut etre
+    # rouverte par une porte d'infrastructure ulterieure.
+    "CREATE TABLE IF NOT EXISTS tokens_consommes (empreinte TEXT PRIMARY KEY) WITHOUT ROWID",
     "CREATE TABLE IF NOT EXISTS compteurs_votes (departement TEXT NOT NULL, reponse TEXT NOT NULL, compte INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (departement, reponse))",
     "CREATE TABLE IF NOT EXISTS effectifs (departement TEXT PRIMARY KEY, effectif INTEGER NOT NULL DEFAULT 0)",
     "CREATE TABLE IF NOT EXISTS resultats_publies (departement TEXT PRIMARY KEY, resultat_json TEXT NOT NULL)",
@@ -84,7 +92,7 @@ def _migrer_schema_tokens(conn):
     cols = [r[1] for r in conn.execute("PRAGMA table_info(tokens_consommes)").fetchall()]
     if 'horodatage_unix' not in cols:
         return  # deja migree
-    conn.execute("CREATE TABLE tokens_consommes_v2 (empreinte TEXT PRIMARY KEY)")
+    conn.execute("CREATE TABLE tokens_consommes_v2 (empreinte TEXT PRIMARY KEY) WITHOUT ROWID")
     conn.execute("INSERT INTO tokens_consommes_v2 (empreinte) SELECT empreinte FROM tokens_consommes")
     conn.execute("DROP TABLE tokens_consommes")
     conn.execute("ALTER TABLE tokens_consommes_v2 RENAME TO tokens_consommes")
@@ -94,12 +102,6 @@ def _migrer_schema_tokens(conn):
     # recuperables forensiquement. Le DROP nettoie la vue logique, pas les
     # octets. VACUUM reecrit le fichier sans les pages mortes. Hors
     # transaction (SQLite l'exige).
-    # wal_checkpoint(TRUNCATE) AVANT le VACUUM : le VACUUM reecrit le fichier
-    # .db mais ne touche PAS au journal -wal, qui peut conserver les anciennes
-    # valeurs en clair (verifie le 23/07 : un jeton pre-migration subsistait
-    # dans les octets apres VACUUM seul). Le checkpoint integre puis tronque le
-    # journal ; le VACUUM nettoie ensuite les pages liberees du fichier.
-    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.execute("VACUUM")
 
 
@@ -136,11 +138,31 @@ def _migrer_jetons_vers_empreintes(conn):
             (hashlib.sha256(j.encode("utf-8")).hexdigest(), j),
         )
     conn.commit()
-    # wal_checkpoint(TRUNCATE) AVANT le VACUUM : le VACUUM reecrit le fichier
-    # .db mais ne touche PAS au journal -wal, qui peut conserver les anciennes
-    # valeurs en clair (verifie le 23/07 : un jeton pre-migration subsistait
-    # dans les octets apres VACUUM seul). Le checkpoint integre puis tronque le
-    # journal ; le VACUUM nettoie ensuite les pages liberees du fichier.
+    conn.execute("VACUUM")
+
+
+def _migrer_tokens_sans_rowid(conn):
+    """Migration idempotente : tokens_consommes AVEC rowid -> WITHOUT ROWID.
+    Le rowid implicite restituait l'ordre d'insertion des votes (SELECT rowid
+    ... ORDER BY rowid). En WITHOUT ROWID la table est ordonnee par l'empreinte
+    SHA-384, donc pseudo-aleatoire : plus aucune sequence temporelle.
+
+    Detection : on lit le CREATE stocke dans sqlite_master et on cherche le
+    mot-cle. Comme pour les autres migrations de cette table, on COPIE les
+    empreintes avant de supprimer l'ancienne -- c'est l'anti-rejeu, la vider
+    autoriserait a revoter avec un K deja utilise."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='tokens_consommes'"
+    ).fetchone()
+    if not row:
+        return  # absente : creee au bon schema par _SQL_TABLES
+    if "WITHOUT ROWID" in row[0].upper():
+        return  # deja migree
+    conn.execute("CREATE TABLE tokens_consommes_v3 (empreinte TEXT PRIMARY KEY) WITHOUT ROWID")
+    conn.execute("INSERT INTO tokens_consommes_v3 (empreinte) SELECT empreinte FROM tokens_consommes")
+    conn.execute("DROP TABLE tokens_consommes")
+    conn.execute("ALTER TABLE tokens_consommes_v3 RENAME TO tokens_consommes")
+    conn.commit()
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.execute("VACUUM")
 
@@ -152,6 +174,7 @@ def initialiser():
         _migrer_schema_cles(_conn)
         _migrer_schema_tokens(_conn)
         _migrer_jetons_vers_empreintes(_conn)
+        _migrer_tokens_sans_rowid(_conn)
         for sql in _SQL_TABLES:
             _conn.execute(sql)
         _conn.commit()
