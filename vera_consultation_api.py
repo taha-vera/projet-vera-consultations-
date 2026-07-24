@@ -692,6 +692,11 @@ def cloturer_consultation(session_vera: Optional[str] = Cookie(None)):
     # 5. Vider le set des tokens consommes du gestionnaire.
     try:
         gestionnaire_signature._tokens_consommes.clear()
+        # Le budget epsilon en memoire doit etre purge comme les autres
+        # registres : la table est videe par effacer_etat_consultation, mais
+        # sans ce reset l'objet garderait nombre_publications > 0 et rendrait
+        # tout departement de meme nom non publiable a la consultation suivante.
+        budget_epsilon.reset()
     except Exception:
         pass
 

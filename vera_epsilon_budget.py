@@ -90,6 +90,25 @@ class BudgetEpsilonParDepartement:
                 "epsilon_total_autorise": self._epsilon_total_autorise,
                 "nombre_publications": self._nombre_publications.get(departement, 0),
             }
+    def reset(self) -> None:
+        """Remet le budget a zero pour TOUS les departements. Appelee a la
+        cloture de consultation, en meme temps que les autres registres
+        memoire.
+
+        Correctif du 24/07 : la cloture vidait la table budget_epsilon et les
+        registres memoire des compteurs, mais pas cet objet. Une nouvelle
+        consultation reutilisant un nom de departement deja publie voyait donc
+        nombre_publications > 0 -> deja_publie -> tentative de charger le
+        resultat fige -> introuvable (table videe) -> publication refusee par
+        securite. Le departement devenait definitivement non publiable jusqu'au
+        prochain redemarrage, ce qui contredit la garantie "rouvre une
+        consultation neuve pour un usage ulterieur". Scenario realiste : deux
+        consultations successives dans une meme organisation, memes noms de
+        departements, sans redemarrage entre les deux."""
+        with self._verrou:
+            self._epsilon_consomme.clear()
+            self._nombre_publications.clear()
+
     def injecter_etat(self, departement: str, epsilon_consomme: float, nombre_publications: int) -> None:
         """
         Reinjecte un etat deja connu (rechargement depuis persistance, Porte 14) --
