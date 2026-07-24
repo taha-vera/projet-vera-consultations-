@@ -80,7 +80,7 @@ class GestionnaireSignature:
             self._consultation_ouverte = True
         temps_ecoule = time.time() - self._ouverture_ts
         temps_restant = max(0.0, DUREE_VIE_CLE_SECONDES - temps_ecoule)
-        self._timer_destruction = threading.Timer(temps_restant, self._detruire_cle_privee)
+        self._timer_destruction = threading.Timer(temps_restant, self._expirer_cle)
         self._timer_destruction.daemon = True
         self._timer_destruction.start()
 
@@ -89,6 +89,26 @@ class GestionnaireSignature:
         if self._timer_destruction:
             self._timer_destruction.cancel()
             self._timer_destruction = None
+        self._detruire_cle_privee()
+        if _PERSISTANCE_DISPONIBLE:
+            _persistance.effacer_cle_rsa()
+
+    def _expirer_cle(self):
+        """Appelee par le TIMER a l'echeance des 48h. Detruit la cle en memoire
+        ET la purge de la base.
+
+        Correctif du 24/07 : le timer n'appelait que _detruire_cle_privee, qui
+        zeroise la RAM. La cle privee chiffree survivait donc dans
+        cle_rsa_active jusqu'au prochain ouvrir_consultation, c'est-a-dire
+        jusqu'a un redemarrage. La garantie affichee -- "a 48h la cle est
+        detruite" -- n'etait vraie qu'en memoire : un snapshot disque ou une
+        sauvegarde prise entre l'echeance et le reboot contenait encore la cle.
+        Meme motif que la Porte 19 : une garantie qui repose sur une hypothese
+        d'environnement ("il y aura un redemarrage").
+
+        Methode distincte de _detruire_cle_privee pour ne pas dupliquer
+        l'effacement : fermer_consultation appelle deja les deux etapes
+        separement."""
         self._detruire_cle_privee()
         if _PERSISTANCE_DISPONIBLE:
             _persistance.effacer_cle_rsa()
