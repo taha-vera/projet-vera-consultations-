@@ -181,6 +181,18 @@ SEUIL_ECHECS_AVANT_BLOCAGE = 5
 DUREE_BLOCAGE_SECONDES = 300  # 5 minutes
 
 
+def _ip_client(request) -> str:
+    """IP source robuste au deploiement. Si la connexion vient de localhost,
+    c'est Nginx qui relaie : on fait confiance a X-Real-IP qu'il pose lui-meme
+    (non falsifiable). Sinon l'app est exposee directement et X-Real-IP serait
+    pose par le client : on l'ignore. On ne lit jamais X-Forwarded-For, dont le
+    premier element est controle par le client."""
+    ip_directe = request.client.host if request.client else "inconnue"
+    if ip_directe in ("127.0.0.1", "::1"):
+        return request.headers.get("x-real-ip") or ip_directe
+    return ip_directe
+
+
 def _verifier_anti_bruteforce(ip: str) -> None:
     """Leve une exception si l'IP a depasse le seuil d'echecs recents."""
     with verrou:
@@ -286,15 +298,33 @@ def exiger_session(session_vera: Optional[str] = Cookie(None)) -> str:
 
 
 @app.post("/api/rh/connexion")
-def connexion_rh(payload: IdentifiantsRH, response: Response):
+def connexion_rh(payload: IdentifiantsRH, response: Response, request: Request):
+    # ANTI-BRUTEFORCE (ajoute le 24/07). Cet endpoint est public et declenche
+    # un PBKDF2 de 200000 iterations A CHAQUE appel, y compris pour un compte
+    # inexistant (calcul factice anti-timing). Sans limitation, deux attaques :
+    # (1) brute-force du mot de passe RH sans jamais etre bloque ;
+    # (2) plus grave, AMPLIFICATION -- le service tourne en worker unique
+    #     (garde deliberee, etat DP en memoire), donc quelques dizaines de POST
+    #     par seconde monopolisent le CPU et font tomber les votes legitimes en
+    #     timeout. C'est "detruire des votes" sans toucher au logiciel.
+    # Le mecanisme existait mais n'etait cable que sur le circuit code court,
+    # devenu du code mort : plus aucun endpoint n'etait protege.
+    ip_client = _ip_client(request)
+    _verifier_anti_bruteforce(ip_client)
+
     if not auth.verifier_identifiants(payload.identifiant, payload.mot_de_passe):
+        _enregistrer_echec(ip_client)
         raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
 
+    _reinitialiser_echecs(ip_client)
     jeton_session = auth.ouvrir_session(payload.identifiant)
     response.set_cookie(
         key="session_vera",
         value=jeton_session,
         httponly=True,
+        secure=True,   # cookie jamais transmis en clair (lecon Porte 19 : ne
+                       # pas dependre de l'hypothese "il y aura toujours une
+                       # redirection HTTPS")
         samesite="lax",
         max_age=auth.DUREE_SESSION_SECONDES,
     )
@@ -765,26 +795,6 @@ class CodeCourtEntrant(BaseModel):
 
 @app.post("/api/resoudre_code")
 def resoudre_code(payload: CodeCourtEntrant, request: Request):
-    """NEUTRALISE (Modele B, 24/07). Le code court a 4 chiffres appartenait au
-    flux Modele A : le RH pouvait dicter un code oralement, le votant le
-    saisissait pour recuperer son token. Dans le Modele B le lien SMS porte
-    TOUT (jeton, departement, empreinte de cle) dans son fragment -- un code a
-    4 chiffres ne peut structurellement pas transporter ces trois elements.
-    Le maintenir imposerait de stocker a nouveau une correspondance secrete en
-    base et d'exposer un endpoint brute-forcable sur 10000 combinaisons, pour
-    une commodite que le lien assure deja. Le circuit etait de toute facon
-    casse : il redirigeait vers vote.html?token=... , format que le client
-    Modele B ne lit plus.
-    Neutralise plutot que supprime : si un besoin reel d'acces sans lien
-    apparait (votant sans smartphone, code remis sur papier en reunion), la
-    fonctionnalite sera repensee avec un identifiant de longueur suffisante et
-    une duree de validite courte."""
-    raise HTTPException(
-        status_code=410,
-        detail="Acces par code court indisponible. Utilisez le lien recu.",
-    )
-
-def _resoudre_code_obsolete(payload, request):
     """
     Convertit un code court (4 chiffres) en token complet, pour rediriger
     le participant vers son lien de vote reel. Proteges contre le
