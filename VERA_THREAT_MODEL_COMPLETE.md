@@ -176,9 +176,19 @@ Options evaluees pour supprimer aussi l'ordre :
   externe desormais fermee.
 - Inserer dans un ordre aleatoire (lots melanges) : casse l'atomicite
   vote-plus-anti-rejeu, protection bien plus precieuse.
-- Limite documentee (choix retenu) : l'ordre subsiste, il est inoffensif isole,
-  et les canaux qui le rendraient exploitable sont fermes. A reconsiderer si un
-  jour un horodatage devait etre reintroduit quelque part.
+- FERME (choix retenu, applique le 23/07) : WITHOUT ROWID. L'argument initial
+  -- documenter la limite parce que les canaux temporels externes sont fermes --
+  revenait a parier que personne ne remettrait jamais un log ou un horodatage
+  quelque part. C'est exactement le scenario de la Porte 19 : une porte fermee
+  rouverte par une porte d'infrastructure ulterieure. Le cout estime etait de
+  plus surevalue : la migration de cette table existait deja (creer v2, copier,
+  drop, rename), ajouter le mot-cle coute un mot. Migration
+  _migrer_tokens_sans_rowid, idempotente, empreintes copiees avant recreation,
+  suivie de wal_checkpoint et VACUUM. Verifie en production : 4 empreintes
+  preservees, rowid devenu inaccessible (no such column: rowid), flux de vote
+  intact. La table est desormais un B-tree ordonne par empreinte SHA-384 :
+  l'ordre des votes n'existe plus, il ne depend plus d'une hypothese
+  d'environnement.
 
 ## État des portes — 2 juillet 2026
 
