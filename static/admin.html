@@ -337,7 +337,7 @@
             <input type="number" id="qty-input" min="1" max="1000" placeholder="10" required>
           </div>
         </div>
-        <button class="btn-primary" id="generate-btn">Générer les codes de participation</button>
+        <button class="btn-primary" id="generate-btn">Générer les liens de participation</button>
 
         <div class="sequential-output" id="sequential-output">
           <div class="seq-progress" id="seq-progress"></div>
@@ -374,7 +374,7 @@
       <div class="section" style="border:1px solid #d9534f; border-radius:8px; padding:16px;">
         <div class="section-title" style="color:#d9534f;">Clôturer la consultation</div>
         <p class="results-note">
-          La clôture affiche les résultats finaux une dernière fois, puis <strong>efface définitivement toutes les données du serveur</strong> : réponses, effectifs, codes, clés. Après clôture, le serveur ne conserve plus rien — c'est la garantie d'anonymat de VERA rendue vérifiable. <strong>Sauvegardez les résultats affichés : ils seront irrécupérables.</strong>
+          La clôture affiche les résultats finaux une dernière fois, puis <strong>efface définitivement toutes les données du serveur</strong> : réponses, effectifs, jetons, clés. Après clôture, le serveur ne conserve plus rien — c'est la garantie d'anonymat de VERA rendue vérifiable. <strong>Sauvegardez les résultats affichés : ils seront irrécupérables.</strong>
         </p>
         <button class="btn-secondary" id="cloturer-btn" style="background:#d9534f; color:#fff; border:none;">Clôturer et effacer les données</button>
         <div id="cloture-confirm" style="display:none; margin-top:12px;">
@@ -491,7 +491,7 @@
       alert('Impossible de contacter le serveur.');
     } finally {
       generateBtn.disabled = false;
-      generateBtn.textContent = 'Générer les codes de participation';
+      generateBtn.textContent = 'Générer les liens de participation';
     }
   });
 
