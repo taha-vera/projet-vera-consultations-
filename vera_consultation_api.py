@@ -765,6 +765,26 @@ class CodeCourtEntrant(BaseModel):
 
 @app.post("/api/resoudre_code")
 def resoudre_code(payload: CodeCourtEntrant, request: Request):
+    """NEUTRALISE (Modele B, 24/07). Le code court a 4 chiffres appartenait au
+    flux Modele A : le RH pouvait dicter un code oralement, le votant le
+    saisissait pour recuperer son token. Dans le Modele B le lien SMS porte
+    TOUT (jeton, departement, empreinte de cle) dans son fragment -- un code a
+    4 chiffres ne peut structurellement pas transporter ces trois elements.
+    Le maintenir imposerait de stocker a nouveau une correspondance secrete en
+    base et d'exposer un endpoint brute-forcable sur 10000 combinaisons, pour
+    une commodite que le lien assure deja. Le circuit etait de toute facon
+    casse : il redirigeait vers vote.html?token=... , format que le client
+    Modele B ne lit plus.
+    Neutralise plutot que supprime : si un besoin reel d'acces sans lien
+    apparait (votant sans smartphone, code remis sur papier en reunion), la
+    fonctionnalite sera repensee avec un identifiant de longueur suffisante et
+    une duree de validite courte."""
+    raise HTTPException(
+        status_code=410,
+        detail="Acces par code court indisponible. Utilisez le lien recu.",
+    )
+
+def _resoudre_code_obsolete(payload, request):
     """
     Convertit un code court (4 chiffres) en token complet, pour rediriger
     le participant vers son lien de vote reel. Proteges contre le
