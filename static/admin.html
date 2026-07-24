@@ -467,7 +467,7 @@
     generateBtn.textContent = 'Génération…';
 
     try {
-      const resp = await fetch(`${API_BASE}/rh/generer_tokens`, {
+      const resp = await fetch(`${API_BASE}/rh/generer_autorisations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -481,7 +481,7 @@
       }
 
       const data = await resp.json();
-      demarrerDistributionSequentielle(data.resultats);
+      demarrerDistributionSequentielle(data.autorisations);
 
       document.getElementById('dept-input').value = '';
       document.getElementById('qty-input').value = '';
@@ -529,8 +529,11 @@
 
     seqProgress.textContent = `Code ${indexDistributionActuel + 1} sur ${total}`;
 
-    const message = `Pour participer, allez sur :\n${base}/static/code.html\n\nEt entrez le code :\n${r.code_court}`;
-    seqCodeMessage.innerHTML = `Pour participer, allez sur :\n${base}/static/code.html\n\nEt entrez le code :\n<span class="code-highlight">${r.code_court}</span>`;
+    // Modele B : on distribue un LIEN personnel complet, plus un code court.
+    // Le lien porte le jeton, le departement et l'empreinte de cle dans son
+    // fragment (#) -- il ne doit donc jamais etre tronque ni reformate.
+    const message = `Pour participer a la consultation, ouvrez ce lien personnel :\n\n${r.lien_sms}\n\nCe lien ne fonctionne qu'une seule fois et ne permet a personne de savoir ce que vous avez repondu.`;
+    seqCodeMessage.innerHTML = `Pour participer a la consultation, ouvrez ce lien personnel :\n\n<span class="code-highlight">${r.lien_sms}</span>\n\nCe lien ne fonctionne qu'une seule fois et ne permet a personne de savoir ce que vous avez repondu.`;
     seqCopyBtn.dataset.message = message;
     seqCopyBtn.textContent = 'Copier ce message';
     seqCopyBtn.classList.remove('copied');
@@ -580,7 +583,14 @@
       } else {
         deptList.innerHTML = departements.map(dep => {
           const d = etat[dep];
-          return `<div class="dept-row"><span>${dep}</span><span class="dept-progress">${d.consommes} / ${d.generes} ont répondu</span></div>`;
+          // L API expose votes_recus, seuil_k_min et publiable. Sous le
+          // seuil, votes_recus vaut la chaine "< 240" : on n expose NI
+          // l effectif exact NI le manque, pour ne pas trahir la taille d une
+          // petite cohorte.
+          const etat = d.publiable
+            ? `${d.votes_recus} reponses — publiable`
+            : `${d.votes_recus} reponses — seuil de ${d.seuil_k_min} non atteint`;
+          return `<div class="dept-row"><span>${dep}</span><span class="dept-progress">${etat}</span></div>`;
         }).join('');
       }
 
@@ -591,9 +601,18 @@
         if (cles.length > 0) {
           resultsArea.innerHTML = cles.map(dep => {
             const r = resultats[dep];
-            const comptesTexte = Object.entries(r.comptes_BRUTS_sans_DP)
+            // resultats_bruits : comptages APRES bruit differentiel et
+            // projection sur le simplexe. Le serveur n expose jamais les
+            // comptes bruts -- l ancien nom du champ, comptes_BRUTS_sans_DP,
+            // etait un residu d une intention abandonnee.
+            const comptesTexte = Object.entries(r.resultats_bruits || {})
               .map(([k, v]) => `${k}: ${v}`).join(', ');
-            return `<div class="dept-row"><span>${dep} (${r.effectif} réponses)</span><span class="dept-progress">${comptesTexte}</span></div>`;
+            // L API ne renvoie pas de champ effectif : elle expose
+            // resultats_bruits et budget_epsilon. L effectif se deduit de la
+            // somme des comptages publies -- la projection sur le simplexe
+            // garantit qu ils somment exactement a l effectif reel.
+            const total = Object.values(r.resultats_bruits || {}).reduce((a, b) => a + b, 0);
+            return `<div class="dept-row"><span>${dep} (${total} réponses)</span><span class="dept-progress">${comptesTexte}</span></div>`;
           }).join('');
         }
       }
