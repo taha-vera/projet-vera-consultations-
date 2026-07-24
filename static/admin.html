@@ -587,10 +587,13 @@
           // seuil, votes_recus vaut la chaine "< 240" : on n expose NI
           // l effectif exact NI le manque, pour ne pas trahir la taille d une
           // petite cohorte.
-          const etat = d.publiable
-            ? `${d.votes_recus} reponses — publiable`
-            : `${d.votes_recus} reponses — seuil de ${d.seuil_k_min} non atteint`;
-          return `<div class="dept-row"><span>${dep}</span><span class="dept-progress">${etat}</span></div>`;
+          // NB: ne pas nommer cette variable "etat" -- ce nom est deja pris
+          // par la reponse JSON dans la portee englobante, et la redeclaration
+          // cassait silencieusement le rendu de toute la liste.
+          const libelle = d.publiable
+            ? `${d.votes_recus} réponses — publiable`
+            : `${d.votes_recus} réponses — seuil de ${d.seuil_k_min} non atteint`;
+          return `<div class="dept-row"><span>${dep}</span><span class="dept-progress">${libelle}</span></div>`;
         }).join('');
       }
 
