@@ -41,10 +41,25 @@ app = FastAPI(title="VERA Consultation")
 # double). On refuse donc de demarrer si plus d'un worker est detecte.
 # --------------------------------------------------------------------------
 def _verifier_worker_unique():
-    import os
-    # uvicorn --workers N definit WEB_CONCURRENCY ou lance N processus.
-    # On lit la variable d'environnement que uvicorn/gunicorn propagent.
+    import os, sys
+    # Deux sources a verifier, et la premiere ne suffit PAS :
+    # - WEB_CONCURRENCY est une convention GUNICORN. uvicorn --workers N en
+    #   ligne de commande ne pose PAS cette variable. Le commentaire precedent
+    #   affirmait le contraire : la garde ne se declenchait donc pas sur un
+    #   uvicorn --workers 2, le serveur demarrait avec plusieurs processus et
+    #   la composition epsilon se dedoublait SILENCIEUSEMENT (Porte 4 cassee
+    #   sans aucune erreur). Meme motif que la Porte 19 : une protection qui
+    #   repose sur une hypothese d'environnement non verifiee.
+    # - On inspecte donc aussi sys.argv pour attraper --workers / -w.
     nb_workers = os.environ.get("WEB_CONCURRENCY")
+    argv = sys.argv
+    for i, arg in enumerate(argv):
+        if arg in ("--workers", "-w") and i + 1 < len(argv):
+            nb_workers = argv[i + 1]
+            break
+        if arg.startswith("--workers="):
+            nb_workers = arg.split("=", 1)[1]
+            break
     if nb_workers is not None:
         try:
             if int(nb_workers) > 1:
