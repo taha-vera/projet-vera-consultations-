@@ -159,6 +159,18 @@ garantie tient, aucune attaque ne casse la borne — mais le chemin le plus
 praticable passe par la composition des groupes, que VERA ne peut pas contrôler
 puisqu'il ne connaît pas vos membres.
 
+**La page d'accueil est servie par nginx, depuis `/root/vitrine/`.** Elle n'est
+pas dans l'application : c'est un fichier statique, copie du dépôt lors du
+déploiement.
+
+```bash
+mkdir -p /root/vitrine
+cp /root/repo-push/index.html /root/vitrine/
+```
+
+Sans cela, la racine du domaine renvoie 404 — et c'est l'adresse que tapera
+quiconque à qui vous donnez le nom du service.
+
 **Donnez-leur l'outil, pas l'adresse brute.** Ce guide renvoyait vers
 `https://votre-domaine/api/engagement_cles`, qui affiche du JSON contenant des
 clés publiques en hexadécimal — illisible pour qui n'est pas informaticien. Un
