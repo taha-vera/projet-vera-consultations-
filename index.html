@@ -4,8 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VERA — Consultation d'entreprise a confidentialité différentielle</title>
-<meta name="description" content="VERA est un service heberge, au code public, qui publie le resultat d'une consultation sensible sans rendre lisible la reponse d'un individu. Confidentialite differentielle a epsilon = 0,5 (OpenDP) et signatures aveugles RSABSSA.">
-<meta name="keywords" content="confidentialite differentielle, consultation anonyme, climat social, RGPD, OpenDP, differential privacy, signature aveugle, RSABSSA">
+<meta name="description" content="VERA publie le résultat d'une consultation d'entreprise sans rendre lisible aucune réponse individuelle. Confidentialité différentielle ε = 0,5, signatures aveugles RSABSSA, code public et limites documentées.">
+<meta name="author" content="VERA">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://vera-consultation.fr/">
+<meta property="og:title" content="VERA — consultation d'entreprise anonyme, garantie vérifiable">
+<meta property="og:description" content="Un résultat collectif publié sans qu'aucune réponse individuelle soit lisible. Les limites du dispositif sont écrites avant l'appel à l'action.">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary">
+<link rel="canonical" href="https://vera-consultation.fr/">
+
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: system-ui, sans-serif; color: #1a1a1a; line-height: 1.6; }
@@ -126,6 +134,23 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 </section>
 <section style="background:#f8fafc;">
 <div class="container">
+<div class="card">
+<h3>Comment l'anonymat tient techniquement</h3>
+<p>Votre navigateur tire un secret que personne d'autre ne voit, puis le
+<strong>masque</strong> avant de l'envoyer au serveur. Le serveur signe sans
+pouvoir lire ce qu'il signe — c'est une <strong>signature aveugle</strong>
+(RSABSSA, RFC 9474). Votre navigateur retire ensuite le masque : il obtient une
+signature valide que le serveur n'a jamais vue.</p>
+<p>Au dépôt, vous présentez cette signature. Le serveur la vérifie sans pouvoir
+la rattacher à l'invitation qui l'a produite. Deux registres coexistent, et
+<strong>aucune ligne ne les relie</strong> : les invitations consommées d'un
+côté, les réponses agrégées de l'autre.</p>
+<p>Le code de cette page est public et son empreinte publiée : un tiers peut la
+recalculer en deux commandes — voir la
+<a href="https://github.com/taha-vera/projet-vera-consultations-/blob/main/VERIFICATION_CLIENT.md">procédure
+de vérification</a>.</p>
+</div>
+
 <h2>Ce que VERA peut poser comme question</h2>
 
 <div class="card">
@@ -207,6 +232,27 @@ si le traitement sort ou non du champ du règlement.</p>
 </section>
 <section>
 <div class="container">
+<h2>Devenir la première organisation</h2>
+
+<div class="card">
+<h3>Ce qu'un pilote implique</h3>
+<p><strong>Aucune consultation réelle n'a encore eu lieu.</strong> C'est écrit
+plus haut, et c'est le point qui décide de tout : le taux de participation n'a
+jamais été mesuré, et c'est lui qui détermine si votre effectif suffit.</p>
+<p>Concrètement, un pilote demande : un groupe d'au moins 600 personnes,
+joignables en sept jours ; une question à trois options qui vous intéresse
+vraiment ; un représentant du personnel prêt à contrôler le nombre
+d'invitations ; et un transporteur d'invitations indépendant de l'hébergeur.</p>
+<p>De notre côté : l'instance, l'hébergement chez un tiers, le code déjà
+public. Nous ne voyons jamais votre liste de membres — le système ne la demande
+à aucun moment.</p>
+<p><strong>Faites d'abord examiner le dossier.</strong> Le code, le modèle de
+menace et les limites sont publics précisément pour ça. Votre DPO tranchera la
+qualification RGPD, que nous ne revendiquons pas. Si après cet examen le
+dispositif vous convient, écrivez à
+<strong>securite@vera-consultation.fr</strong>.</p>
+</div>
+
 <h2>Comment ça marche</h2>
 <div class="grid">
 <div class="card"><h3>1. Ouverture</h3><p>L'organisateur ouvre une consultation. Chaque participant reçoit une invitation a usage unique, envoyee depuis la liste de l'organisation, jamais transmise a l'hébergeur.</p></div>
@@ -228,7 +274,10 @@ si le traitement sort ou non du champ du règlement.</p>
 &mdash;
 <a href="https://github.com/taha-vera/projet-vera-consultations-/blob/main/LICENSE" style="color:#60a5fa;">AGPL-3.0</a>
 </p>
-<p style="margin-top:1rem; font-size:0.9rem;">Contact : sécurité@vera-consultation.fr</p>
+<p style="margin-top:1rem; font-size:0.9rem;">
+Signalement de vulnérabilité : securite@vera-consultation.fr<br>
+Page mise à jour le 7 septembre 2026.
+</p>
 </div>
 </footer>
 </body>

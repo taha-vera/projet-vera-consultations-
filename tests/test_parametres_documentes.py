@@ -282,6 +282,9 @@ for nom, proprietaire in DECLARATIONS_UNIQUES.items():
 # garde la trace sans reintroduire l'erreur.
 
 FORMULATIONS_RETIREES = {
+    "sécurité@": "adresse mail accentuee : elle n'existe pas et le courrier "
+                 "rebondit. Ecrire securite@vera-consultation.fr. Introduit le "
+                 "07/09/2026 par une correction d'accents trop large",
     "ne conserve alors plus rien":
         "faux : historique_consultations survit a la cloture (LIMITS section 9)",
     "consultations par an":
@@ -317,8 +320,13 @@ CITATION = ("disait", "ecrivait", "affirmait", "formulation", "figurait",
             "etait", "était", "jusqu'au", "jusqu'a", "de l'epoque",
             "26/08", "27/08", "07/09")
 
+# LE HTML AUSSI. Ce controle parcourait les .py et les .md, pas les pages --
+# alors que le controle des parametres, dans ce meme fichier, les inclut depuis
+# le 04/09. Deux listes pour la meme notion, et elles avaient diverge : une
+# adresse mail cassee dans index.html est passee inapercue le 07/09.
 for chemin in sorted(RACINE.glob("*.py")) + sorted(RACINE.glob("*.md")) \
-        + sorted(RACINE.glob("tests/*.py")) + sorted(RACINE.glob("docs/**/*.md")):
+        + sorted(RACINE.glob("tests/*.py")) + sorted(RACINE.glob("docs/**/*.md")) \
+        + sorted(RACINE.glob("*.html")) + sorted(RACINE.glob("static/*.html")):
     # Ce fichier s'exclut : il DOIT contenir les formulations interdites, c'est
     # sa raison d'etre. Sans cette ligne, la garde se denonce elle-meme --
     # constate en l'ecrivant.
