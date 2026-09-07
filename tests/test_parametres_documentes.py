@@ -282,6 +282,12 @@ for nom, proprietaire in DECLARATIONS_UNIQUES.items():
 # garde la trace sans reintroduire l'erreur.
 
 FORMULATIONS_RETIREES = {
+    "ne conserve alors plus rien":
+        "faux : historique_consultations survit a la cloture (LIMITS section 9)",
+    "consultations par an":
+        "le plafond porte sur les PUBLICATIONS et sur douze mois GLISSANTS ; "
+        "« par an » autorise 4 en decembre et 4 en janvier, soit epsilon = 4,0 "
+        "en deux mois",
     "tahahouari@hotmail.fr":
         "adresse personnelle remplacee le 07/09/2026 par "
         "securite@vera-consultation.fr ; deux auditeurs l'avaient relevee",

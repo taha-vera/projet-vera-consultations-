@@ -372,7 +372,9 @@ Il ne convient pas à un scrutin où un écart d'une voix compte.
 
 ---
 
-## Fréquence : pas plus de quatre consultations par an sur le même groupe
+## Fréquence : pas plus de quatre publications par période de douze mois glissants
+
+*Douze mois **glissants**, pas une année civile : sans cette précision, quatre publications en décembre et quatre en janvier respecteraient la règle tout en portant ε à 4,0 en deux mois. Et des **publications**, non des consultations : déclarer plusieurs groupes contenant les mêmes personnes donne autant de mesures sur elles.*
 
 Chaque publication révèle une petite quantité d'information sur le groupe.
 Interroger plusieurs fois les mêmes personnes accumule cette exposition.

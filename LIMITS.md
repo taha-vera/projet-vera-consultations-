@@ -1309,8 +1309,8 @@ faire.
 ## 14. Le budget epsilon ne survit pas a la clôture : règle d'usage sur le nombre de consultations
 
 > **EN CLAIR, sans jargon.**
-> La protection de VERA s'use si vous consultez plusieurs fois les MEMES
-> personnes. Une ou deux consultations par an sur un groupe : protection
+> La protection de VERA s'use si vous publiez plusieurs fois sur les MEMES
+> personnes. Une ou deux publications sur douze mois glissants : protection
 > solide. Quatre : encore correcte. Au-dela de six, la protection cesse d'etre
 > defendable : dans le pire cas -- un employeur qui connaitrait deja toutes les
 > autres reponses -- il pourrait deviner juste jusqu'a dix-neuf fois sur vingt.
@@ -1533,6 +1533,33 @@ la maniere dont elles ont ete trouvees -- et souvent, comment un correctif a
 ferme un cas au lieu d'une classe. C'est ce qu'un auditeur exterieur lit pour
 savoir si ce projet se corrige ou se defend. Les deplacer, ce n'est pas les
 minimiser : c'est cesser de les faire passer pour ce qu'ils ne sont pas.
+
+### « Par an » autorisait le double, et trois documents le disaient
+
+Constat d'un audit externe le 07/09/2026. La regle etait ecrite « pas plus de
+quatre consultations **par an** ». Deux imprecisions dans quatre mots.
+
+**« Par an » se lit comme une annee civile** : quatre publications en decembre
+et quatre en janvier respectent la lettre tout en portant epsilon a 4,0 en deux
+mois, soit une certitude pire-cas de 98 %. La regle porte sur douze mois
+**glissants**, et ce document le disait correctement ailleurs -- mais pas dans
+son propre encadre « EN CLAIR », ni dans le guide, ni sur la page d'accueil.
+
+**Et « consultations » au lieu de « publications »** : la correction du 04/09,
+apres l'exercice d'equipe rouge, n'avait pas ete propagee a ces trois endroits.
+Declarer k groupes contenant les memes personnes donne k mesures en un seul
+cycle.
+
+Le meme audit a releve que la page affirmait qu'apres cloture « le serveur ne
+conserve alors plus rien », alors que la section 9 dit qu'`historique_consultations`
+survit. Corrige.
+
+*Son premier constat -- la divergence entre les cinq conditions de la page et
+celles de ce document -- etait deja corrige depuis le 04/09, et exactement comme
+il le preconisait : c'est la page qui avait raison, et la liste d'ici a ete
+rendue homogene. Il decrivait un etat vieux de trois jours. Deux constats sur
+trois, et les deux justes ont fait apparaitre deux occurrences de plus que
+celles qu'il citait.*
 
 ### L'adresse de signalement etait une boite personnelle
 
