@@ -282,6 +282,9 @@ for nom, proprietaire in DECLARATIONS_UNIQUES.items():
 # garde la trace sans reintroduire l'erreur.
 
 FORMULATIONS_RETIREES = {
+    "tahahouari@hotmail.fr":
+        "adresse personnelle remplacee le 07/09/2026 par "
+        "securite@vera-consultation.fr ; deux auditeurs l'avaient relevee",
     "exactement ce que le protocole existe pour ne pas conserver":
         "surestime le risque du cache de signatures ; voir LIMITS.md section 1",
     "aucun lien jeton<->signature n'est stocke":
@@ -299,8 +302,14 @@ FORMULATIONS_RETIREES = {
 #
 # Sur la meme ligne, l'exemption est verifiable a l'oeil : qui cite doit
 # marquer sa citation la ou elle est.
+# « etait » et « jusqu'au » manquaient : ce controle refusait des marqueurs que
+# HISTORIQUE, dans le meme fichier, accepte depuis toujours. Deux listes pour la
+# meme notion, et elles avaient divergé -- constate le 07/09/2026 en datant une
+# adresse retiree dans docs/archive.
 CITATION = ("disait", "ecrivait", "affirmait", "formulation", "figurait",
-            "retiree", "retire le", "corrigee le", "\u00ab ", "26/08", "27/08")
+            "retiree", "retire le", "corrigee le", "\u00ab ",
+            "etait", "était", "jusqu'au", "jusqu'a", "de l'epoque",
+            "26/08", "27/08", "07/09")
 
 for chemin in sorted(RACINE.glob("*.py")) + sorted(RACINE.glob("*.md")) \
         + sorted(RACINE.glob("tests/*.py")) + sorted(RACINE.glob("docs/**/*.md")):

@@ -18,7 +18,7 @@ exact, et c'est voulu -- ce qui manquait etait de le dire.
 
 N'ouvrez pas de ticket public sur GitHub pour un probleme de securite.
 
-Contact : tahahouari@hotmail.fr
+Contact : securite@vera-consultation.fr
 
 A inclure dans le rapport :
 - Commit git concerne (SHA)
@@ -58,5 +58,5 @@ Pas de programme de prime pour le moment.
 
 ## Contact
 
-Taha Houari -- tahahouari@hotmail.fr
+Taha Houari -- securite@vera-consultation.fr
 Depot : https://github.com/taha-vera/projet-vera-consultations-

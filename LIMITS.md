@@ -667,6 +667,27 @@ version successive ». C'était vrai en `journal_mode=WAL`, abandonne le 13/08. 
 pendant la transaction et disparait au commit : il n'y a plus d'historique
 persistant. La lecture répétée du fichier `.db` lui-même reste le vecteur.)*
 
+### L'adresse de signalement etait une boite personnelle
+
+Deux auditeurs l'ont releve, en notant que la correction couterait cinq minutes
+pour un effet disproportionne sur la perception. Un chercheur en securite qui
+lit `SECURITY.md` et y trouve une adresse Hotmail en tire une conclusion sur le
+serieux du dispositif, avant meme d'avoir lu une ligne de code.
+
+`securite@vera-consultation.fr` depuis le 07/09/2026, sur le domaine du projet.
+Ce n'est pas une redirection mais une boite : les reponses partent donc du meme
+domaine que celui qui recoit, ce qui evite qu'un echange sur une vulnerabilite
+change d'adresse en cours de route.
+
+L'ancienne adresse est retiree de `SECURITY.md`, du README, du modele de menace
+et de la vitrine. Elle subsiste dans `docs/archive/`, datee comme le reste de ce
+document. Une garde interdit qu'elle reapparaisse ailleurs.
+
+*En ecrivant cette garde, une incoherence interne est apparue : la liste des
+marqueurs qui excusent une citation datee ne contenait ni « etait » ni
+« jusqu'au », alors que l'autre controle du meme fichier les accepte depuis
+toujours. Deux listes pour la meme notion, et elles avaient diverge. Alignees.*
+
 ### « Base chiffree » promettait plus que le code ne fait
 
 Constat d'un audit externe le 04/09/2026. `VERA_DB_KEY` etait decrite comme la

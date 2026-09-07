@@ -25,7 +25,9 @@
 
 **Version :** 2.0 -- 31/07/2026
 **Depot :** https://github.com/taha-vera/projet-vera-consultations-
-**Contact :** tahahouari@hotmail.fr
+**Contact :** l'adresse de l'epoque etait tahahouari@hotmail.fr (jusqu'au 07/09/2026)
+*(Adresse actuelle : securite@vera-consultation.fr. Ce document est un
+instantane date, conserve comme trace, et n'est pas mis a jour.)*
 **URL production A LA DATE DE CE DOCUMENT :** https://vera-consultation.duckdns.org
 *(La production est sur `vera-consultation.fr` depuis le 02/09/2026. Ce
 document est un instantane date, conserve comme trace : il n'est pas mis a

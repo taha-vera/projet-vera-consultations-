@@ -600,7 +600,7 @@ vers le crate `blind-rsa-signatures` 0.17. Aucune primitive cryptographique n'a
 
 ## Sécurité
 
-**Signalement de vulnérabilité :** tahahouari@hotmail.fr
+**Signalement de vulnérabilité :** securite@vera-consultation.fr
 
 Merci de **ne pas ouvrir d'issue publique** pour une vulnérabilité touchant
 l'anonymat ou la garantie ε. Délai de réponse visé : **7 jours**.
@@ -660,7 +660,7 @@ chaîne de sous-traitance au sens de l'article 28 du RGPD. Une organisation qui
 envisage VERA doit poser la question avant de s'engager, et la réponse figurera
 au contrat.
 
-**Contact :** tahahouari@hotmail.fr
+**Contact :** securite@vera-consultation.fr
 
 Toute contribution touchant un mécanisme lié à une porte fermée doit inclure la
 re-vérification de cette porte, avec sa preuve reproductible.

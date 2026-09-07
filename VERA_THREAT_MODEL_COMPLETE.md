@@ -1,6 +1,6 @@
 # VERA Consultation — Modele de menace
 
-**Auteur :** Taha Houari · tahahouari@hotmail.fr
+**Auteur :** Taha Houari · securite@vera-consultation.fr
 **Depot :** https://github.com/taha-vera/projet-vera-consultations-
 **Production :** https://vera-consultation.fr (migre le 02/09/2026 ; l'ancien nom DuckDNS reste servi, meme certificat)
 
