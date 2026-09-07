@@ -34,7 +34,7 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 <header>
 <div class="container">
 <h1>Publier le résultat d'une consultation sensible, sans rendre lisible aucune réponse individuelle.</h1>
-<p>VERA publie un résultat collectif (consultation interne, climat social) sans rendre lisible la contribution d'un individu. La garantie repose sur deux choses inseparables : un mécanisme mathematique vérifiable, et une separation des roles — celui qui heberge n'a pas la liste des membres, celui qui a la liste n'heberge pas.</p>
+<p>VERA publie un résultat collectif (consultation interne, climat social) sans rendre lisible la contribution d'un individu. La garantie repose sur deux choses inseparables : un mécanisme mathematique vérifiable, et une separation des roles — celui qui hébergé n'a pas la liste des membres, celui qui a la liste n'hébergé pas.</p>
 <div class="cta">
 <a href="https://github.com/taha-vera/projet-vera-consultations-" class="btn btn-primary">Voir sur GitHub</a>
 <a href="https://github.com/taha-vera/projet-vera-consultations-/blob/main/VERA_THREAT_MODEL_COMPLETE.md" class="btn btn-secondary">Modele de menace</a>
@@ -56,7 +56,7 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 </div>
 <div class="card">
 <h3>Aucune vérification possible</h3>
-<p>Ni le répondant ni un tiers ne peut verifier que les donnees brutes ont reellement ete détruites.</p>
+<p>Ni le répondant ni un tiers ne peut vérifier que les données brutes ont reellement ete détruites.</p>
 </div>
 </div>
 </div>
@@ -67,7 +67,7 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 <div class="grid">
 <div class="card">
 <h3>Une garantie chiffrée, pas un engagement moral</h3>
-<p>Le bruit ajoute aux résultats publies est calcule analytiquement par OpenDP, une bibliotheque auditee : epsilon = 0,5 exact, inscrit dans le code et expose publiquement. Ce que cette garantie couvre, et ce qu'elle ne couvre pas, est ecrit noir sur blanc dans les limites.</p>
+<p>Le bruit ajoute aux résultats publies est calcule analytiquement par OpenDP, une bibliotheque auditée : epsilon = 0,5 exact, inscrit dans le code et expose publiquement. Ce que cette garantie couvre, et ce qu'elle ne couvre pas, est ecrit noir sur blanc dans les limites.</p>
 </div>
 <div class="card">
 <h3>Non-persistance</h3>
@@ -75,11 +75,11 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 </div>
 <div class="card">
 <h3>Protection du répondant atypique</h3>
-<p>Le bruit differentiel protege chaque participant, y compris celui qui repond differemment des autres.</p>
+<p>Le bruit differentiel protégé chaque participant, y compris celui qui repond differemment des autres.</p>
 </div>
 <div class="card">
 <h3>Consultation, pas vote</h3>
-<p>VERA donne une tendance fiable, pas un decompte exact. Ce flou maitrise est precisement ce qui protege les personnes.</p>
+<p>VERA donne une tendance fiable, pas un decompte exact. Ce flou maitrise est precisement ce qui protégé les personnes.</p>
 </div>
 </div>
 </div>
@@ -89,12 +89,12 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 <h2>Invariants du protocole</h2>
 <p style="margin-bottom:1.5rem; color:#64748b;">Ce que le code garantit &mdash; et ce qu'il ne peut pas garantir seul.</p>
 <ul>
-<li>La donnee brute n'est jamais stockee ni exposee</li>
-<li>Les sorties sont des agregats statistiques bruites, irreversibles</li>
+<li>La donnée brute n'est jamais stockee ni exposee</li>
+<li>Les sorties sont des agregats statistiques bruites, irréversibles</li>
 <li>Confidentialité différentielle : budget epsilon plafonne et borne</li>
 <li>Seuil minimum de participants (K = 240) : refus de publier en dessous</li>
 <li>Une invitation a usage unique : un jeton consomme ne peut plus servir</li>
-<li>Limites du modèle de menace documentees, pas dissimulees</li>
+<li>Limites du modèle de menace documentées, pas dissimulees</li>
 </ul>
 <p style="margin-top:1.5rem;" data-vera-conditions><strong>Ce que le code ne peut pas garantir seul.</strong> L'anonymat tient aussi a cinq conditions que le code ne vérifie pas : un hébergement assuré par un tiers distinct de l'organisation, un transporteur d'invitations indépendant de cet hébergeur, l'attestation de l'effectif par un représentant du personnel, des groupes qui ne se recoupent pas, et pas plus de quatre <strong>publications par periode de douze mois glissants</strong> portant sur les mêmes personnes. Elles sont détaillées dans les <a href="https://github.com/taha-vera/projet-vera-consultations-/blob/main/LIMITS.md">limites</a>, et aucune n'est optionnelle.</p>
 <p><strong>État du projet.</strong> Fonctionnel sur le parcours testé et soumis à plusieurs audits de code, jamais déployé en conditions réelles : aucune consultation avec de vrais participants n'a encore eu lieu.</p>
@@ -103,7 +103,7 @@ footer { background: #0f172a; color: #94a3b8; padding: 2rem 0; text-align: cente
 </section>
 <section>
 <div class="container">
-<h2>Garanties vérifiables</h2>
+<h2>Les chiffres clés</h2>
 <div class="grid">
 <div class="card" style="text-align:center">
 <div class="metric">0,5</div>
@@ -148,6 +148,27 @@ décide de votre éligibilité.</p>
 1 000. <strong>Ce taux n'a jamais été mesuré sur VERA</strong> : c'est l'inconnue
 principale du projet, et la raison d'être du premier déploiement réel.</p>
 <p>En dessous de 240 réponses, rien n'est publié. VERA refuse.</p>
+<p><strong>Pourquoi 240 et pas un autre nombre.</strong> C'est un seuil <strong>mesuré</strong>, pas choisi : à 240 réponses, l'erreur introduite par le bruit reste sous <strong>12 voix</strong> dans 95 % des publications — soit 5 % de l'effectif. Vérifié sur 20 000 tirages à quatre effectifs différents. En dessous, la même erreur pèse trop lourd : 12 voix sur 100 réponses, c'est 12 %.</p>
+</div>
+
+<div class="card">
+<h3>Sept jours, pas plus</h3>
+<p>Une consultation dure <strong>sept jours au maximum</strong>. Passé ce délai,
+les clés de signature expirent et les liens deviennent inutilisables : c'est ce
+qui garantit qu'une invitation ne circule pas indéfiniment.</p>
+<p>Ce n'est donc pas 600 personnes qu'il faut, mais <strong>600 personnes en
+sept jours</strong>, relances comprises. C'est la contrainte la plus décisive
+pour organiser votre consultation, et il vaut mieux la connaître avant qu'après.</p>
+</div>
+
+<div class="card">
+<h3>Une instance par organisation</h3>
+<p>VERA n'est pas un service mutualisé. <strong>Chaque organisation dispose de sa
+propre instance</strong> — sa base, ses clés, son budget de confidentialité. Deux
+organisations ne partagent jamais un serveur.</p>
+<p>Vous n'installez rien et n'administrez rien : c'est VERA qui opère. Mais
+l'instance est la vôtre, et cela change ce que vous devez inscrire à votre
+registre de traitements.</p>
 </div>
 
 <div class="card">
@@ -164,15 +185,15 @@ si le traitement sort ou non du champ du règlement.</p>
 <div class="grid">
 <div class="card">
 <h3>La liste des invités reste la votre</h3>
-<p>VERA ne connait pas vos membres — c'est ce qui protege leur anonymat. Il ne peut donc verifier ni que les invitations sont parties aux bonnes personnes, ni qu'elles ne sont parties qu'a elles. La fiabilite du résultat repose sur l'intégrité de votre liste de diffusion.</p>
+<p>VERA ne connait pas vos membres — c'est ce qui protégé leur anonymat. Il ne peut donc vérifier ni que les invitations sont parties aux bonnes personnes, ni qu'elles ne sont parties qu'a elles. La fiabilite du résultat repose sur l'intégrité de votre liste de diffusion.</p>
 </div>
 <div class="card">
 <h3>Consultation, pas scrutin</h3>
-<p>Il n'y a ni recu, ni urne publique, ni recomptage possible : un decompte vérifiable trahirait les personnes que le bruit protege. Pour un scrutin contraignant ou juridiquement opposable, cette garantie manquante est redhibitoire — VERA n'est pas concu pour cet usage.</p>
+<p>Il n'y a ni recu, ni urne publique, ni recomptage possible : un decompte vérifiable trahirait les personnes que le bruit protégé. Pour un scrutin contraignant ou juridiquement opposable, cette garantie manquante est redhibitoire — VERA n'est pas concu pour cet usage.</p>
 </div>
 <div class="card">
 <h3>L'hébergeur compte</h3>
-<p>La garantie tient contre un tiers et contre un operateur honnete-mais-curieux. Face a une organisation qui aurait interet a desanonymiser ET qui heberge elle-meme le serveur, un hébergement par un tiers de confiance est nécessaire.</p>
+<p>La garantie tient contre un tiers et contre un operateur honnete-mais-curieux. Face a une organisation qui aurait interet a desanonymiser ET qui hébergé elle-meme le serveur, un hébergement par un tiers de confiance est nécessaire.</p>
 </div>
 <div class="card">
 <h3>Fréquence des consultations</h3>
@@ -207,7 +228,7 @@ si le traitement sort ou non du champ du règlement.</p>
 &mdash;
 <a href="https://github.com/taha-vera/projet-vera-consultations-/blob/main/LICENSE" style="color:#60a5fa;">AGPL-3.0</a>
 </p>
-<p style="margin-top:1rem; font-size:0.9rem;">Contact : securite@vera-consultation.fr</p>
+<p style="margin-top:1rem; font-size:0.9rem;">Contact : sécurité@vera-consultation.fr</p>
 </div>
 </footer>
 </body>
