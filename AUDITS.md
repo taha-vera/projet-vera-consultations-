@@ -62,6 +62,36 @@ rendue homogene. Il decrivait un etat vieux de trois jours. Deux constats sur
 trois, et les deux justes ont fait apparaitre deux occurrences de plus que
 celles qu'il citait.*
 
+### La page d'accueil portait une faute de conjugaison
+
+Constat d'un audit externe le 08/09/2026, sur les deux copies servies -- la
+vitrine github.io et vera-consultation.fr. Quatre phrases disaient « celui qui
+hébergé n'a pas la liste », « le bruit differentiel protégé chaque
+participant » : un accent au mauvais endroit avait transforme un verbe au
+present (« héberge », « protège ») en participe passe (« hébergé »,
+« protégé ») -- une passe de correction d'accents anterieure avait mal
+conjugue plutot que mal accentue.
+
+Sur une page dont l'argument entier est la rigueur, une faute de grammaire
+dans la phrase qui explique la separation des roles est ce qu'un DSI ou un
+DPO remarque en premier. Corrige, avec le reste des mots signales par le
+meme audit : mathematique, separation, decompte, bibliotheque, redhibitoire,
+et deux occurrences de « Modele de menace » restees sans accent dans les
+liens du pied de page.
+
+Ses trois autres constats decrivaient un etat deja corrige : la licence MIT
+du README (corrigee le 23/08), la contradiction « verifie en conditions
+reelles » (la phrase incriminee ne contient plus cette formule depuis le
+05/09), et la table de divergences taux/invites/precision/contact/version
+entre le site et le README (alignee depuis plusieurs jours). Verifie plutot
+que suppose.
+
+Son point sur la racine surchargee -- modules serveur, tests et fichiers du
+site au meme niveau -- reste juste, et il note lui-meme la raison de ne pas
+le faire aujourd'hui : les chemins sont lus par `VERIFICATION_CLIENT.md`, et
+un tel deplacement doit se faire en un seul commit tague, pas au fil de
+l'eau.
+
 ### L'adresse de signalement etait une boite personnelle
 
 Deux auditeurs l'ont releve, en notant que la correction couterait cinq minutes
