@@ -62,6 +62,18 @@ rendue homogene. Il decrivait un etat vieux de trois jours. Deux constats sur
 trois, et les deux justes ont fait apparaitre deux occurrences de plus que
 celles qu'il citait.*
 
+### La correction de la faute de conjugaison etait elle-meme incomplete
+
+Le lot precedent listait quatre occurrences precises citees par l'audit du
+08/09. Deux autres survivaient ailleurs dans la meme page -- « le bruit
+protégé » (pour « protège »), « qui hébergé elle-meme le serveur » (pour
+« héberge »). Trouvees en deployant, par une lecture directe de la page
+servie plutot qu'une supposition sur ce qui restait.
+
+Corrigees, avec un balayage systematique du motif plutot qu'une liste
+d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
+manque ces deux-la la premiere fois.
+
 ### La page d'accueil portait une faute de conjugaison
 
 Constat d'un audit externe le 08/09/2026, sur les deux copies servies -- la
