@@ -1059,18 +1059,23 @@ def effacer_cle_rsa():
 def charger_toutes_cles_chiffrees() -> dict:
     """Charge et dechiffre TOUTES les cles de departement (rechargement au boot).
     Renvoie {departement: (cle_privee_der, cle_publique_der, ouverture_unix)}.
-    Une cle sans salt (ancien format) est ignoree avec avertissement plutot que
-    de bloquer tout le rechargement.
 
-    FAIL-CLOSED si AUCUNE cle ne se dechiffre alors que la table en contient.
-    Auparavant un echec de dechiffrement etait avale par un `continue`
-    silencieux : si VERA_DB_KEY etait erronee au redemarrage (typo dans l'unit
-    systemd, restauration sur une autre machine, rotation mal appliquee), les
-    cles existantes etaient ignorees sans le moindre signal et de NOUVELLES
-    cles etaient generees a la premiere demande. Consequence : tous les liens
-    deja distribues par SMS -- qui portent l'empreinte de l'ancienne cle dans
-    leur fragment #k= -- devenaient invalides en pleine consultation, et le
-    RH ne l'apprenait que par les plaintes des votants.
+    UNE CLE SANS SALT (ancien format) COMPTE DESORMAIS COMME UN ECHEC, comme
+    tout autre echec de dechiffrement -- elle n'est plus seulement journalisee
+    et ignoree. Cette docstring disait le contraire (« ignoree avec
+    avertissement plutot que de bloquer ») apres le correctif du 09/09/2026,
+    qui a etendu le refus a toute perte partielle : `if rows and echecs`
+    compte cette branche comme n'importe quel autre echec. Un audit externe a
+    trouve la contradiction en relisant la docstring a cote du code.
+
+    FAIL-CLOSED SUR TOUTE PERTE, PAS SEULEMENT LA PERTE TOTALE. Version
+    initiale : `if rows and not resultat`, qui ne se declenchait que si
+    AUCUNE cle n'etait exploitable. Un dechiffrement partiel -- une seule
+    cle sur plusieurs, salt absent ou VERA_DB_KEY partiellement corrompue --
+    laissait demarrer un ensemble incomplet : `generer_autorisations`
+    fabriquerait une cle neuve pour le departement perdu, changeant
+    l'empreinte de l'ENSEMBLE, invalidant tous les liens de TOUS les groupes.
+    Meme issue que le cas total, pour un declencheur plus probable.
 
     Refuser de demarrer est le comportement sur : l'operateur voit
     immediatement l'erreur, corrige la cle, et redemarre sans avoir rien
@@ -1087,7 +1092,10 @@ def charger_toutes_cles_chiffrees() -> dict:
     for dep, priv_hex, pub_hex, ouverture, salt_hex in rows:
         if salt_hex is None:
             echecs += 1
-            print(f"ATTENTION : cle du departement '{dep}' en ancien format (sans salt), ignoree.")
+            # « ignoree » etait vrai avant le 09/09 ; cette cle compte desormais
+            # dans `echecs`, donc dans le refus de demarrer s'il y en a d'autres.
+            print(f"ATTENTION : cle du departement '{dep}' en ancien format (sans salt) -- "
+                  f"comptee comme un echec de dechiffrement.")
             continue
         salt = bytes.fromhex(salt_hex)
         f = _get_fernet(salt)

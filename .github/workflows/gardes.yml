@@ -35,6 +35,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # HISTORIQUE COMPLET, requis par l'etape de balayage de secrets
+          # plus bas. Un premier correctif (09/09, matin) pretendait l'avoir
+          # branche ici mais n'ecrivait que le commentaire plus bas -- deux
+          # ecritures successives sur la meme variable Python, la seconde
+          # ecrasant la premiere sans jamais reassigner la chaine modifiee.
+          # Un audit externe l'a trouve en clonant le commit pousse et en
+          # cherchant `with:` a cote de `fetch-depth`, pas seulement le mot
+          # dans un commentaire. Corrige reellement le 09/09, soir.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -149,8 +159,7 @@ jobs:
       # 525 commits n'a rien trouve : cinq occurrences, toutes des constantes de
       # test explicites. Cette etape empeche que cela cesse d'etre vrai.
       #
-      # fetch-depth: 0 est pose sur l'etape actions/checkout ci-dessus (04/09,
-      # branche reellement le 09/09 apres qu'un audit l'ait signale absente).
+      # fetch-depth: 0 est pose sur l'etape actions/checkout ci-dessus.
       - name: Aucun secret dans l'historique complet
         run: |
           git rev-list --count HEAD

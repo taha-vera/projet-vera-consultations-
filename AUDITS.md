@@ -74,6 +74,42 @@ Corrigees, avec un balayage systematique du motif plutot qu'une liste
 d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
 manque ces deux-la la premiere fois.
 
+### Le patch qui corrigeait la garde CI ne la corrigeait pas
+
+Un relecteur a clone le commit `01acffa` -- pas le patch, le commit pousse --
+et cherche `with: fetch-depth: 0` comme cle YAML, pas comme texte dans un
+commentaire. Elle n'y etait pas. Le correctif du 09/09 (matin) avait deux
+ecritures successives sur la meme variable Python (`s.replace(...)` sans
+jamais reassigner `s`), la seconde ecrasant la premiere : seul le commentaire
+survivait. Le message affichait « fetch-depth branche », le `grep` d'apres
+trouvait une ligne, et je l'ai crue bonne sans verifier que c'etait le `with:`
+et non le commentaire.
+
+**Plus grave que l'etat d'avant.** Le premier commentaire disait « est requis »
+-- un lecteur attentif voyait le manque. Le second affirmait « est pose sur
+l'etape ci-dessus » : la CI restait verte, le commentaire attestait, rien
+n'etait verifie. C'est le motif exact que ce document traque partout ailleurs,
+cette fois dans son propre correctif.
+
+Corrige, et verifie differemment cette fois : en parsant le YAML avec
+`yaml.safe_load()` et en lisant `steps[0]['with']['fetch-depth']`, pas en
+comptant les occurrences d'une chaine de caracteres.
+
+**Meme releve : la docstring de `charger_toutes_cles_chiffrees` contredisait
+son propre code.** Le correctif du fail-closed etendu (09/09, matin) avait
+change `if rows and not resultat` en `if rows and echecs` -- une cle sans salt
+compte desormais comme un echec -- sans mettre a jour la docstring, qui disait
+encore « ignoree avec avertissement plutot que de bloquer », ni le `print` six
+lignes avant le `raise`, qui disait encore « ignoree ». Alignes.
+
+**La reference CVE a ete demandee en confirmation** -- l'API GitHub avait
+limite le releveur en plein controle. Verifiee via cinq sources independantes
+au moment de l'ecrire (GitHub Advisory Database, SentinelOne, GitLab Advisory
+Database, une mise a jour Fedora, et le changelog amont pyca/cryptography) :
+GHSA-g6cj-pr64-35w5 / CVE-2026-69247, severite CVSS 8.2 (High), Bleichenbacher
+sur `pkcs7_decrypt_der/pem/smime`, introduite en 44.0.0, corrigee en 50.0.0.
+Reference confirmee, maintenue telle quelle.
+
 ### Huit constats, huit confirmes : le meilleur taux de tout le journal
 
 Audit du 09/09/2026, dépôt cloné en entier -- API, persistance, gestionnaire
