@@ -10,7 +10,24 @@ uvicorn==0.49.0
 pydantic==2.13.4
 
 # Chiffrement de la cle RSA persistee (Fernet/AES-128 + PBKDF2)
-cryptography==49.0.0
+#
+# 49.0.0 portait CVE-2026-69247 (GHSA-g6cj-pr64-35w5, severite 8.2/High) : un
+# oracle de Bleichenbacher sur pkcs7_decrypt_der/pem/smime. VERA n'appelle
+# AUCUNE de ces trois fonctions -- seuls Fernet et PBKDF2HMAC sont utilises
+# (vera_persistance.py), non affectes. La faille n'etait donc pas exploitable
+# ici. Releve par un audit externe le 09/09/2026, qui recommandait de
+# confronter la version aux avis avant presentation -- fait.
+#
+# Mis a jour quand meme : un scanner automatise (dependabot, snyk, pip-audit)
+# signale 49.0.0 independamment de l'usage reel, et laisser une CVE connue
+# dans requirements.txt affaiblit la confiance qu'un auditeur externe accorde
+# au reste du depot. Fernet et PBKDF2HMAC sont des API stables ; aucun
+# changement de signature attendu.
+#
+# A VERIFIER SUR LE SERVEUR (reseau requis, indisponible dans cet
+# environnement) : pip install -r requirements.txt puis ./run_tests.sh avant
+# de considerer ce lot deploye.
+cryptography==50.0.0
 
 # Calcul numerique (tests, validation empirique)
 numpy==2.5.0

@@ -20,7 +20,7 @@ import threading
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Header, Cookie, Response, Request
+from fastapi import FastAPI, HTTPException, Cookie, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -29,7 +29,11 @@ from pydantic import BaseModel, Field
 import vera_admin_auth as auth
 import vera_blind_sig as vbs
 from vera_epsilon_budget import BudgetEpsilonParDepartement
-from vera_dp_noise import appliquer_bruit_dp, publier_histogramme_dp
+# appliquer_bruit_dp n'est plus importe : jamais appele, seulement cite
+# dans un commentaire plus bas expliquant pourquoi publier_histogramme_dp
+# fait le travail differemment. Import mort releve par un audit externe
+# le 09/09/2026.
+from vera_dp_noise import publier_histogramme_dp
 
 app = FastAPI(title="VERA Consultation")
 
@@ -219,7 +223,27 @@ except OSError as _e:
 # Le retrait échoue FRANCHEMENT plutôt qu'en silence : voir
 # vera_admin_auth.amorcer_compte_principal(), où vit la logique — placée là pour
 # être testable sans fastapi, sans opendp et sans le module Rust.
-auth.amorcer_compte_principal()
+#
+# LE RETOUR N'ETAIT PAS VERIFIE ICI, ET C'ETAIT LE MEME DEFAUT UN NIVEAU
+# PLUS HAUT.
+#
+# La fonction retourne None si VERA_ADMIN_USER/VERA_ADMIN_HASH sont absents
+# -- documente comme tel dans sa docstring -- mais cet appel ignorait la
+# valeur de retour. Consequence : le service demarrait, acceptait des votes,
+# mais PERSONNE ne pouvait jamais publier ni CLOTURER -- donc l'effacement
+# promis aux participants n'avait pas lieu. Dans un module qui refuse de
+# demarrer pour un worker en trop ou une ecoute non-loopback, c'etait
+# l'incoherence la plus visible : le seul cas ou l'absence totale d'un
+# controle passait inapercue. Constat d'un audit externe le 09/09/2026.
+_compte_amorce = auth.amorcer_compte_principal()
+if _compte_amorce is None:
+    raise RuntimeError(
+        "VERA REFUSE DE DEMARRER : ni VERA_ADMIN_USER, ni VERA_ADMIN_HASH ne "
+        "sont definis. Sans compte d'administration, personne ne peut publier "
+        "ni cloturer une consultation -- l'effacement promis aux participants "
+        "n'aurait jamais lieu. Definir ces deux variables dans l'unite "
+        "systemd (voir generer_empreinte() pour calculer VERA_ADMIN_HASH)."
+    )
 
 # CORS restreint au domaine de VERA. allow_origins=["*"] etait inutilement
 # large : tout le client (page de vote, tableau de bord) est servi depuis ce
@@ -376,13 +400,16 @@ effectif_par_departement.update(_effectifs_persistes)
 # comme interrupteur.
 # --------------------------------------------------------------------------
 try:
-    from vera_signature_manager import (
-        GestionnaireSignature,
-        decoder_token_depuis_url,
-        encoder_token_pour_url,
-        TokenDejaUtiliseError,
-        SignatureInvalideError,
-    )
+    # Les quatre symboles retires ici -- decoder_token_depuis_url,
+    # encoder_token_pour_url, TokenDejaUtiliseError, SignatureInvalideError --
+    # appartiennent au Modele A (jeton signe cote serveur, encode dans l'URL),
+    # remplace par le Modele B (aveuglement cote client) : voir
+    # generer_token_signe() dans vera_signature_manager.py, qui leve
+    # explicitement RuntimeError si on l'appelle encore. Ni ce fichier ni les
+    # tests ne les utilisaient plus. Releve par un audit externe le
+    # 09/09/2026 ; les definitions restent dans vera_signature_manager.py,
+    # seul l'import mort est retire.
+    from vera_signature_manager import GestionnaireSignature
     gestionnaire_signature = GestionnaireSignature()
     gestionnaire_signature.ouvrir_consultation()
     SIGNATURE_AVEUGLE_DISPONIBLE = True
@@ -801,7 +828,24 @@ class CreerCompteRequete(BaseModel):
 
 
 @app.post("/api/admin/creer_compte_rh")
-def creer_compte_rh(payload: CreerCompteRequete):
+def creer_compte_rh(payload: CreerCompteRequete, request: Request):
+    # ANTI-FORCE-BRUTE, AJOUTE LE 09/09/2026.
+    #
+    # /api/rh/connexion recoit tout l'arsenal -- blocage croissant par IP,
+    # blocage par compte -- et cette route, qui cree des comptes RH avec les
+    # memes pouvoirs (publication, CLOTURE donc effacement, generation
+    # d'autorisations), n'avait RIEN. Ni verification applicative, ni bloc
+    # nginx dedie : elle tombait dans le fourre-tout a 5 r/s, rafale 20 --
+    # bien plus permissif que le 1 r/s de la connexion. Le secret est compare
+    # a temps constant (compare_digest), ce qui protege contre une fuite par
+    # timing, pas contre un grand nombre d'essais. Constat d'un audit externe
+    # le 09/09/2026.
+    #
+    # Reutilise le meme mecanisme que /api/rh/connexion plutot que d'en ecrire
+    # un second : c'est deja celui qui gere le blocage croissant par IP.
+    ip_client = _ip_client(request)
+    _verifier_anti_bruteforce(ip_client)
+
     if not _secret_admin_creation:
         raise HTTPException(
             status_code=503,
@@ -819,7 +863,10 @@ def creer_compte_rh(payload: CreerCompteRequete):
     # En octets, la comparaison reste a temps constant et accepte tout.
     if not hmac.compare_digest(payload.secret_admin.encode("utf-8"),
                                _secret_admin_creation.encode("utf-8")):
+        _enregistrer_echec(ip_client)
         raise HTTPException(status_code=403, detail="Secret administrateur incorrect")
+
+    _reinitialiser_echecs(ip_client)
 
     if len(payload.mot_de_passe) < 8:
         raise HTTPException(status_code=422, detail="Mot de passe trop court (8 caractères minimum)")
@@ -938,6 +985,34 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     except ValueError:
         raise HTTPException(status_code=422, detail="message_aveugle_hex n'est pas de l'hexadecimal valide.")
 
+    # LONGUEUR VALIDEE AVANT LA CONSOMMATION DU JETON, PAS APRES.
+    #
+    # RSABSSA opere modulo n : avec la cle 2048 bits generee par le module Rust
+    # (vera_blind_sig/src/lib.rs), un message aveugle valide fait EXACTEMENT
+    # 256 octets. Le schema Pydantic acceptait jusqu'a 2000 caracteres hex --
+    # bien plus large que necessaire -- et rien ne verifiait la taille avant
+    # d'appeler la primitive.
+    #
+    # Consequence, avant ce correctif : un message de mauvaise taille faisait
+    # lever PyValueError cote Rust (vera_blind_sig/src/lib.rs), devenu
+    # ValueError en Python, capture par AUCUN except de cet endpoint -- 500
+    # avec trace interne, ALORS QUE LE JETON ETAIT DEJA CONSOMME (ligne
+    # suivante). La voix etait perdue sans recours possible hors nouvelle
+    # invitation.
+    #
+    # C'est exactement la classe que /api/repondre avait fermee : valider les
+    # longueurs AVANT d'appeler la primitive cryptographique, jamais apres.
+    # Le correctif de /api/repondre avait ferme ce cas-la, pas la classe.
+    # Constat d'un audit externe le 09/09/2026.
+    LONGUEUR_MESSAGE_AVEUGLE_OCTETS = 256
+    if len(message_aveugle) != LONGUEUR_MESSAGE_AVEUGLE_OCTETS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"message_aveugle_hex doit representer exactement "
+                   f"{LONGUEUR_MESSAGE_AVEUGLE_OCTETS} octets pour une cle RSA "
+                   f"2048 bits ; recu {len(message_aveugle)}.",
+        )
+
     emp_jeton = hashlib.sha384(payload.jeton_autorisation.encode("utf-8")).hexdigest()
     emp_message = hashlib.sha384(message_aveugle).hexdigest()
 
@@ -970,11 +1045,19 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     # 3. Signer a l'aveugle (seule etape serveur du protocole RSABSSA).
     try:
         sig_aveugle = gestionnaire_signature.signer_message_aveugle(departement, message_aveugle)
-    except RuntimeError as e:
+    except (RuntimeError, ValueError) as e:
         # Endpoint PUBLIC : le detail de l'exception reste cote serveur. Le
         # renvoyer exposerait des internes du gestionnaire de signature a
         # quiconque appelle la route, sans rien apporter au votant -- qui ne
         # peut de toute facon qu'attendre ou demander un nouveau lien.
+        #
+        # ValueError AJOUTE : le module Rust leve PyValueError sur toute
+        # entree malformee qu'il rejette (vera_blind_sig/src/lib.rs), qui
+        # devient ValueError en Python. La validation de longueur ci-dessus
+        # ferme le cas CONNU ; cette capture est le filet pour tout ce que le
+        # Rust pourrait encore refuser sans qu'on l'ait anticipe -- le jeton
+        # est deja consomme a ce stade, un 500 nu serait la pire reponse
+        # possible.
         print(f"ERREUR : signature aveugle impossible pour '{departement}' : {e}")
         raise HTTPException(
             status_code=503,

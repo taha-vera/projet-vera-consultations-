@@ -74,6 +74,82 @@ Corrigees, avec un balayage systematique du motif plutot qu'une liste
 d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
 manque ces deux-la la premiere fois.
 
+### Huit constats, huit confirmes : le meilleur taux de tout le journal
+
+Audit du 09/09/2026, dépôt cloné en entier -- API, persistance, gestionnaire
+de signature, auth, DP, budget epsilon, module Rust, `vote.html`, `admin.html`,
+conf nginx, workflows CI. Chaque point citait un fichier et une ligne. Les huit
+ont ete verifies un par un sur le code reel, et **les huit tenaient** -- le
+meilleur taux recu sur ce projet.
+
+**Le plus grave, confirme jusqu'au type d'exception leve par le Rust.** Le
+jeton est consomme avant la tentative de signature. Un message aveugle de
+mauvaise taille fait lever `PyValueError` cote Rust, devenu `ValueError` en
+Python -- capture par AUCUN `except` de l'endpoint, qui n'attrapait que
+`RuntimeError`. 500 avec trace interne, jeton deja brule, voix perdue sans
+recours. C'est exactement la classe que `/api/repondre` avait fermee ; le
+correctif avait ferme ce cas-la, pas la classe. Une validation de longueur
+(256 octets, coherente avec la cle RSA 2048 bits) precede desormais la
+consommation, et la capture est elargie a `ValueError` en filet de securite.
+**Verifie a l'execution** : 256 octets passent, toute autre taille est
+refusee en 422 avant que le jeton ne soit touche.
+
+**La garde CI la plus recente etait inerte depuis sa creation.** Le
+commentaire de l'etape de balayage de secrets disait "fetch-depth: 0 est
+requis" depuis le 04/09 -- sans que ce parametre soit jamais pose sur
+`actions/checkout`. La garde tournait sur un seul commit depuis le premier
+jour. Corrige.
+
+**Le fail-closed sur les cles ne couvrait que la perte totale.**
+`if rows and not resultat` laissait demarrer un dechiffrement partiel -- 4
+cles sur 5 suffisaient. Consequence identique au cas total que ce garde-fou
+visait deja : `generer_autorisations` fabriquerait une cle neuve pour le
+departement perdu, changeant l'empreinte de l'ensemble, invalidant tous les
+liens de tous les groupes. Etendu a toute perte. **Verifie a l'execution** :
+une seule cle corrompue sur trois bloque desormais le demarrage.
+
+**L'absence de compte admin ne produisait aucune erreur.**
+`amorcer_compte_principal()` retourne `None`, documente comme tel, si
+`VERA_ADMIN_USER`/`VERA_ADMIN_HASH` sont absents -- et l'appelant ignorait ce
+retour. Le service demarrait, acceptait des votes, mais personne ne pouvait
+jamais publier ni CLOTURER : l'effacement promis n'aurait jamais lieu. Dans un
+module qui refuse de demarrer pour un worker en trop ou une ecoute non-
+loopback, c'etait l'incoherence la plus visible. Le retour est desormais
+verifie, et son absence leve un refus explicite.
+
+**La redirection HTTP vers HTTPS ne couvrait qu'un nom sur trois.** Un bloc
+`if ($host = ...)` genere par Certbot, figé sur l'ancien domaine DuckDNS au
+premier reglage, jamais etendu lors de la migration du 02/09 : `.fr` et
+`www.` tombaient sur un `return 404` inconditionnel. Etendu aux trois noms.
+
+**La creation de compte RH etait le seul endpoint privilegie sans aucune
+protection.** Ni verification applicative, ni bloc nginx dedie -- elle
+tombait dans le fourre-tout a 5 r/s quand `/api/rh/connexion` en recoit 1,
+avec blocage croissant. Un compte obtenu donne publication, cloture (donc
+effacement) et generation d'autorisations. Reutilise le meme mecanisme anti-
+force-brute, ajoute un bloc nginx au meme niveau, documente
+`VERA_SECRET_CREATION_COMPTE` -- absente du README jusqu'ici -- avec une
+recommandation d'entropie.
+
+**`admin.html` avait un point d'injection non exploitable, mais implicite.**
+`${r.lien_sms}` et `${ligneEcheance}` s'inseraient bruts dans `innerHTML`,
+seuls du fichier a ne pas passer par `echapperHtml`. Non exploitable
+aujourd'hui -- le jeton vient de `token_urlsafe`, le nom de groupe est deja
+contraint cote serveur -- mais c'etait une dependance implicite a un encodage
+distant. Echappe.
+
+**Quatre points mineurs, tous confirmes.** `/static/vote.html` etait le seul
+bloc du parcours de vote sans `limit_req`, alors que `/vote` -- qui sert la
+meme page -- en porte un. Quatre imports morts retires : `Header` (fastapi,
+jamais utilise), `appliquer_bruit_dp` (jamais appele, seulement cite dans un
+commentaire), et deux symboles + deux exceptions de `vera_signature_manager`
+appartenant au Modele A (jeton signe cote serveur), remplace par le Modele B
+depuis longtemps. Et `cryptography==49.0.0` portait CVE-2026-69247
+(GHSA-g6cj-pr64-35w5, 8.2/High, Bleichenbacher sur le dechiffrement PKCS#7) --
+verifie que VERA n'appelle aucune des trois fonctions concernees (seuls
+`Fernet` et `PBKDF2HMAC` sont utilises, non affectes), mis a jour vers 50.0.0
+quand meme : un scanner automatise la signale independamment de l'usage reel.
+
 ### La page d'accueil portait une faute de conjugaison
 
 Constat d'un audit externe le 08/09/2026, sur les deux copies servies -- la

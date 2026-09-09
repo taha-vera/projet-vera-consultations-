@@ -868,7 +868,22 @@
       ? `\n\nVous avez jusqu'au ${echeanceTexte}.`
       : '';
     const message = `Pour participer a la consultation, ouvrez ce lien personnel :\n\n${r.lien_sms}${ligneEcheance}\n\nCe lien ne fonctionne qu'une seule fois et ne permet a personne de savoir ce que vous avez repondu.`;
-    seqCodeMessage.innerHTML = `Pour participer a la consultation, ouvrez ce lien personnel :\n\n<span class="code-highlight">${r.lien_sms}</span>${ligneEcheance}\n\nCe lien ne fonctionne qu'une seule fois et ne permet a personne de savoir ce que vous avez repondu.`;
+    // ECHAPPE, SEUL POINT DU FICHIER QUI NE L'ETAIT PAS.
+    //
+    // r.lien_sms et ligneEcheance ne sont pas exploitables aujourd'hui :
+    // le jeton vient de token_urlsafe (alphabet restreint), et le nom de
+    // groupe est deja contraint par le motif valide cote serveur (aucun
+    // caractere HTML-special). Mais c'etait une dependance IMPLICITE a cet
+    // encodage distant, dans un fichier ou tout le reste passe par
+    // echapperHtml. Constat d'un audit externe le 09/09/2026.
+    //
+    // echapperHtml n'echappe que < > & " ' -- les caracteres de l'URL
+    // (: / # = &... ne sont pas dans cette liste sauf &) restent lisibles.
+    const lienEchappe = echapperHtml(r.lien_sms);
+    const echeanceEchappee = echeanceTexte
+      ? `\n\nVous avez jusqu'au ${echapperHtml(echeanceTexte)}.`
+      : '';
+    seqCodeMessage.innerHTML = `Pour participer a la consultation, ouvrez ce lien personnel :\n\n<span class="code-highlight">${lienEchappe}</span>${echeanceEchappee}\n\nCe lien ne fonctionne qu'une seule fois et ne permet a personne de savoir ce que vous avez repondu.`;
     seqCopyBtn.dataset.message = message;
     seqCopyBtn.textContent = 'Copier ce message';
     seqCopyBtn.classList.remove('copied');

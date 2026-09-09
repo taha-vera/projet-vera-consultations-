@@ -1100,14 +1100,33 @@ def charger_toutes_cles_chiffrees() -> dict:
             continue
         resultat[dep] = (cle_privee, bytes.fromhex(pub_hex), ouverture)
 
-    # Des cles existent en base mais AUCUNE n'est exploitable : la cle de
-    # chiffrement est presque certainement la mauvaise. Continuer reviendrait
-    # a regenerer des cles et a invalider tous les liens en circulation.
-    if rows and not resultat:
+    # REFUS SUR TOUTE PERTE, PAS SEULEMENT LA PERTE TOTALE.
+    #
+    # Ce garde-fou ne se declenchait QUE si aucune cle n'etait exploitable :
+    # `if rows and not resultat`. Un dechiffrement partiel -- 4 cles sur 5,
+    # une seule VERA_DB_KEY corrompue ou remplacee entre deux redemarrages --
+    # laissait le serveur demarrer avec un ensemble incomplet.
+    #
+    # Consequence, identique au cas total que ce garde-fou visait deja :
+    # `generer_autorisations` appelle `cle_publique()`, CREATRICE si la cle
+    # est absente. Pour le departement perdu, elle en fabriquerait une
+    # nouvelle -- l'empreinte de l'ENSEMBLE des cles change, et TOUS LES
+    # VOTANTS DE TOUS LES GROUPES recoivent "la configuration du serveur ne
+    # correspond pas a ce lien", l'issue meme que ce fail-closed existe pour
+    # empecher. Le correctif du 26/08 avait ferme le cas total, pas la
+    # classe. Constat d'un audit externe le 09/09/2026.
+    #
+    # Des cles existent en base et au moins une n'est PAS exploitable : la cle
+    # de chiffrement ne correspond plus a l'ensemble stocke. Continuer
+    # reviendrait a regenerer des cles pour les departements perdus et a
+    # invalider tous les liens en circulation, pour ceux-la comme pour les
+    # autres.
+    if rows and echecs:
         raise RuntimeError(
             f"VERA REFUSE DE DEMARRER : {len(rows)} cle(s) RSA presente(s) en base, "
-            f"aucune dechiffrable ({echecs} echec(s)). VERA_DB_KEY ne correspond pas "
-            "aux cles stockees. Verifier la variable d'environnement dans l'unit "
+            f"{echecs} non dechiffrable(s) (sur {len(rows)}). VERA_DB_KEY ne "
+            "correspond pas a l'ensemble des cles stockees. Verifier la variable "
+            "d'environnement dans l'unit "
             "systemd. Demarrer malgre tout regenererait des cles et invaliderait "
             "TOUS les liens de vote deja distribues."
         )

@@ -288,6 +288,7 @@ Variables d'environnement de l'unité systemd :
 | `VERA_DB_KEY` | Chiffre **la clé privée RSA** au repos (64 caractères hexadécimaux). **Obligatoire.** Ne chiffre pas le reste de la base — voir ci-dessous. | — |
 | `VERA_ADMIN_USER` | Identifiant du compte d'amorçage | — |
 | `VERA_ADMIN_HASH` | Empreinte PBKDF2 du mot de passe, format `sel$hash` | — |
+| `VERA_SECRET_CREATION_COMPTE` | Secret exigé par `/api/admin/creer_compte_rh` pour créer un nouveau compte RH. **Absent, la route reste désactivée** (503). Comparé à temps constant (`hmac.compare_digest`), protégé par le même blocage croissant par IP et le même bloc nginx dédié que `/api/rh/connexion` (ajouté le 09/09/2026, constat d'un audit externe). Choisir une valeur d'au moins 32 caractères aléatoires — `openssl rand -base64 32` — puisqu'un compte obtenu donne publication, clôture (donc effacement) et génération d'autorisations. | — |
 | `VERA_DB_PATH` | Emplacement de la base | `/root/vera_state.db` |
 | `VERA_VERROU_PROCESSUS` | Verrou d'instance unique | à côté de la base |
 | `VERA_DOMAINE` | Origine HTTPS du service. Sert d'origine CORS et de base aux liens d'invitation. Le démarrage échoue si elle n'est pas en `https://`. | `https://vera-consultation.fr` |

@@ -149,8 +149,8 @@ jobs:
       # 525 commits n'a rien trouve : cinq occurrences, toutes des constantes de
       # test explicites. Cette etape empeche que cela cesse d'etre vrai.
       #
-      # fetch-depth: 0 est requis -- sans lui, actions/checkout ne recupere
-      # qu'un commit et le balayage ne verifierait rien.
+      # fetch-depth: 0 est pose sur l'etape actions/checkout ci-dessus (04/09,
+      # branche reellement le 09/09 apres qu'un audit l'ait signale absente).
       - name: Aucun secret dans l'historique complet
         run: |
           git rev-list --count HEAD
