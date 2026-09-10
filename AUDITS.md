@@ -74,6 +74,37 @@ Corrigees, avec un balayage systematique du motif plutot qu'une liste
 d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
 manque ces deux-la la premiere fois.
 
+### Le premier audit ecrit avec le prompt dedie a ce motif : deux cas, les deux confirmes
+
+`fetch-depth: 0` a ete verifie reellement branche cette fois -- par
+`yaml.safe_load()`, pas par un comptage de texte. Puis l'audit a cherche des
+affirmations qui decrivent une condition plus etroite que celle du code, sans
+qu'aucun mecanisme ne les fasse correspondre.
+
+**Le tableau du modele de menace decrivait encore le fail-closed d'avant le
+09/09.** « Si des cles existent mais qu'AUCUNE ne se dechiffre » -- c'etait la
+formulation `if rows and not resultat`, remplacee par `if rows and echecs` le
+jour meme. La docstring de la fonction et son `print` avaient ete alignes ;
+le tableau, seule des trois formulations qu'un lecteur externe consulte
+d'abord, ne l'avait pas ete. Un lecteur qui s'y fiait croyait la Porte 11 plus
+permissive qu'elle ne l'est.
+
+**Et mon propre commentaire de correction en avait reintroduit une, plus
+discrete, dans le MEME commit qui corrigeait le cas voisin.** « Cette cle
+compte desormais dans `echecs`, donc dans le refus de demarrer s'il y en a
+d'autres » -- « d'autres » suggerait un pluriel requis. **Verifie a
+l'execution** : une seule cle sans salt, sur trois cles par ailleurs saines,
+suffit a declencher le refus. Le commentaire sous-estimait la garde qu'il
+venait de corriger.
+
+*Meme mecanisme d'ecriture dans les deux sens : une correction peut sur-
+corriger le texte qu'elle repare, tout comme un premier passage peut
+sous-corriger.*
+
+Au passage, une inexactitude d'attribution relevee sans la compter comme ce
+motif : le commentaire sur `httpx2` disait « meme auteur (Tom Christie /
+encode) » -- le depot est `pydantic/httpx2`, pas encode. Corrige.
+
 ### Le patch qui corrigeait la garde CI ne la corrigeait pas
 
 Un relecteur a clone le commit `01acffa` -- pas le patch, le commit pousse --

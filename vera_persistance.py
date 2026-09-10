@@ -1093,7 +1093,12 @@ def charger_toutes_cles_chiffrees() -> dict:
         if salt_hex is None:
             echecs += 1
             # « ignoree » etait vrai avant le 09/09 ; cette cle compte desormais
-            # dans `echecs`, donc dans le refus de demarrer s'il y en a d'autres.
+            # dans `echecs` -- ELLE SEULE suffit a declencher le refus de
+            # demarrer, `if rows and echecs` ne demandant pas d'autres echecs.
+            # Le commentaire qui corrigeait cette divergence le 09/09 en avait
+            # reintroduit une plus discrete (« s'il y en a d'autres », qui
+            # suggerait un pluriel requis) -- releve par un audit externe le
+            # 10/09/2026, dans le commit meme qui corrigeait le cas voisin.
             print(f"ATTENTION : cle du departement '{dep}' en ancien format (sans salt) -- "
                   f"comptee comme un echec de dechiffrement.")
             continue

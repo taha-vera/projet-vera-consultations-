@@ -49,7 +49,7 @@ scikit-learn==1.9.0
 # serveur, qui ne le charge jamais. Releve le 03/09/2026 comme ambiguite du
 # fichier d'installation -- le constat etait juste, la ligne ne le disait pas.
 # https://pypi.org/project/httpx2/ -- successeur de httpx, meme auteur
-# (Tom Christie / encode). Le nom ressemble a un typosquat et deux relecteurs
+# (Tom Christie, depot pydantic/httpx2). Le nom ressemble a un typosquat et deux relecteurs
 # ont tique : starlette 1.6+ exige httpx2, pas httpx.
 httpx2==2.12.0
 
