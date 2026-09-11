@@ -279,6 +279,14 @@ nom de domaine. **Ne modifiez pas les blocs `access_log off` ni la directive
 `error_log crit`** : ils ferment un canal de corrélation documenté (portes 23
 et 26).
 
+Copiez `infra/vera-consultation.service` vers
+`/etc/systemd/system/vera-consultation.service` et remplacez les quatre
+`CHANGER_MOI` par des valeurs réelles — **jamais dans ce fichier avant de le
+committer**. L'unité réelle n'a été versionnée pour la première fois que le
+10/09/2026 : jusque-là, elle n'existait qu'éditée à la main sur le serveur,
+sans trace git ni revue. Un audit externe l'avait signalé comme le principal
+point encore ouvert du durcissement système.
+
 ### Configuration
 
 Variables d'environnement de l'unité systemd :

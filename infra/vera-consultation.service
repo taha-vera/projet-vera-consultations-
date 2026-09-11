@@ -1,0 +1,70 @@
+[Unit]
+Description=VERA Consultation API (FastAPI/uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root
+
+# SECRETS : valeurs reelles POSEES SUR LE SERVEUR UNIQUEMENT, jamais ici.
+#
+# Ce fichier a ete versionne pour la premiere fois le 10/09/2026 : jusque-la,
+# l'unite qui controle reellement l'execution -- ExecStart, variables
+# d'environnement -- n'existait que sur le serveur, editee a la main. Aucune
+# modification n'avait de trace git, de revue, ni de garantie que ce dossier
+# `infra/` documente ce qui tourne reellement. Releve indirectement en
+# recuperant l'unite reelle pour la versionner.
+#
+# VERA_DOMAINE                  : le domaine public du service.
+# VERA_ADMIN_USER                : identifiant du compte d'amorcage.
+# VERA_ADMIN_HASH                : empreinte PBKDF2 (format sel_hex$hash_hex),
+#                                   jamais le mot de passe en clair -- voir
+#                                   LIMITS.md section 12 sur la fuite du 31/07.
+# VERA_SECRET_CREATION_COMPTE    : secret de /api/admin/creer_compte_rh.
+#                                   Au moins 32 caracteres aleatoires :
+#                                   openssl rand -base64 32
+# VERA_DB_KEY                    : chiffre la cle privee RSA au repos.
+#                                   64 caracteres hexadecimaux :
+#                                   openssl rand -hex 32
+#                                   Rotation : cloturer toute consultation
+#                                   active d'abord (purge les cles chiffrees),
+#                                   puis poser la nouvelle valeur.
+Environment="VERA_DOMAINE=https://vera-consultation.fr"
+Environment="VERA_ADMIN_USER=CHANGER_MOI"
+Environment="VERA_ADMIN_HASH=CHANGER_MOI"
+Environment="VERA_SECRET_CREATION_COMPTE=CHANGER_MOI"
+Environment="VERA_DB_KEY=CHANGER_MOI"
+
+ExecStart=/root/vera_blind_sig/.venv/bin/python3 -m uvicorn vera_consultation_api:app --no-access-log --host 127.0.0.1 --port 8001
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/root/consultation.log
+StandardError=append:/root/consultation.log
+
+# DURCISSEMENT MINIMAL, SANS RISQUE POUR LE SERVICE EN COURS.
+#
+# NoNewPrivileges n'affecte aucun acces fichier : il empeche seulement le
+# processus d'obtenir des privileges supplementaires (setuid, capacites). Sans
+# effet fonctionnel connu sur ce service, donc pose sans hesitation.
+NoNewPrivileges=true
+
+# CE QUI N'EST PAS FAIT ICI, ET POURQUOI.
+#
+# ProtectSystem=strict, un utilisateur systeme dedie, et un deplacement de la
+# base vers /var/lib/vera ont ete recommandes par un audit externe. Chacun
+# change ce que le processus peut lire ou ecrire sur le disque -- un mauvais
+# reglage casse le service sans avertissement prealable, sur un systeme qui
+# sert des votes. Aucun ne peut etre verifie sans un redemarrage reel et un
+# controle post-redemarrage, ce qu'un patch texte ne permet pas de garantir.
+#
+# A faire deliberement, hors consultation active, avec la sequence :
+#   1. ProtectSystem=strict + ReadWritePaths=/root (le service ecrit la base
+#      et le journal dans /root ; sans cette ligne, ProtectSystem=strict
+#      romprait le demarrage)
+#   2. Verifier : systemctl restart, systemctl status, curl sur /vote
+#   3. Seulement ensuite, envisager un utilisateur dedie et /var/lib/vera --
+#      qui exige de deplacer la base existante, pas seulement de changer un
+#      chemin dans ce fichier.
+
+[Install]
+WantedBy=multi-user.target
