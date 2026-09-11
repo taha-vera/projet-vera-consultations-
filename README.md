@@ -287,6 +287,13 @@ committer**. L'unité réelle n'a été versionnée pour la première fois que l
 sans trace git ni revue. Un audit externe l'avait signalé comme le principal
 point encore ouvert du durcissement système.
 
+`purger_logs_apres_publication.sh` vide `/root/consultation.log` après
+clôture et diffusion des résultats — à lancer manuellement, une fois. Il
+existait dans le dépôt sans être mentionné nulle part ailleurs ; relevé le
+11/09/2026 en vérifiant un document qui le citait, à tort, comme preuve d'un
+mécanisme d'effacement automatique. Il ne l'est pas : c'est un geste
+volontaire de l'opérateur, pas une garde.
+
 ### Configuration
 
 Variables d'environnement de l'unité systemd :
