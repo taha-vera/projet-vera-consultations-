@@ -74,6 +74,28 @@ Corrigees, avec un balayage systematique du motif plutot qu'une liste
 d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
 manque ces deux-la la premiere fois.
 
+### Second run reel : le parcours HTTP complet verifie hors du mainteneur, pour la premiere fois
+
+Le meme jour, second passage apres correction de `VERA_DB_PATH`. Trois tests
+passent avant le premier echec -- et parmi eux, `test_parcours_http.py` :
+authentification RH, emission de jetons, signature aveugle REELLE par le
+module Rust compile, depot du vote, anti-rejeu, refus sous K_MIN, cloture.
+La chaine cryptographique complete, executee de bout en bout, par une machine
+qui n'est pas celle du mainteneur -- une premiere sur ce projet, apres deux
+audits externes qui n'avaient pu que la LIRE.
+
+Le quatrieme test (`test_cycle_vie_cle`) echoue ensuite sur `VERA_DB_KEY`
+absente -- meme famille que `VERA_DB_PATH` la fois precedente :
+`run_tests.sh` la genere elle-meme si absente et la partage pour tout le
+passage, ce que ce job ne faisait pas en appelant les fichiers directement.
+Corrige de la meme facon : une cle aleatoire par execution du job, exportee
+avant la boucle des six tests.
+
+Les deux echecs venaient de la meme cause structurelle -- des variables que
+`run_tests.sh` pose silencieusement, invisibles tant qu'on ne l'a pas lu ligne
+par ligne -- trouvees l'une apres l'autre, par la lecture d'un vrai journal
+d'execution, pas par relecture anticipee du script.
+
 ### Premier run reel du job crypto : la compilation a reussi, l'etape suivante non
 
 Le 12/09/2026, premiere execution reelle sur GitHub Actions. Bonne nouvelle

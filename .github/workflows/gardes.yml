@@ -240,14 +240,25 @@ jobs:
           cd vera_blind_sig
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 ../.venv/bin/maturin develop --release
 
-      # PREMIER RUN REEL LE 12/09/2026 : la compilation a reussi (29s, premiere
-      # fois hors de la machine du mainteneur). L'etape suivante a echoue en 0s --
-      # pas un echec de test, le garde-fou test/production de
-      # vera_persistance.py refusant une base non jetable, parce que ce job
-      # appelait chaque fichier sans poser VERA_DB_PATH. Corrige en reprenant
-      # exactement le mecanisme de run_tests.sh (mktemp par test, nettoyage
-      # apres). Constate en lisant le journal d'une execution reelle, pas
-      # devine a l'avance.
+      # DEUX RUNS REELS LE 12/09/2026, DEUX VARIABLES MANQUANTES TROUVEES.
+      #
+      # 1er run : compilation reussie (29s, premiere fois hors de la machine
+      # du mainteneur), puis echec immediat -- VERA_DB_PATH absent, le
+      # garde-fou test/production de vera_persistance.py refusant la base par
+      # defaut. Corrige.
+      #
+      # 2e run : les TROIS premiers tests passent -- signature aveugle,
+      # primitive RSABSSA, PARCOURS HTTP COMPLET (authentification, emission,
+      # signature, depot, anti-rejeu, cloture) verifies pour la premiere fois
+      # hors de cette machine. Le 4e (cycle de vie des cles) echoue sur
+      # VERA_DB_KEY absente, meme categorie de variable que VERA_DB_PATH :
+      # run_tests.sh la genere elle-meme si absente et la partage pour tout
+      # le passage. Ce job, en appelant les fichiers directement, ne le
+      # faisait pas non plus. Corrige de la meme facon.
+      #
+      # Les deux trouvailles viennent de la lecture du journal, pas d'une
+      # supposition prealable -- c'est precisement ce que ce job existe pour
+      # produire.
       - name: Les six tests qui exigent le module compile
         # VERA_DB_PATH DOIT pointer vers une base jetable -- garde-fou du
         # projet lui-meme (vera_persistance.py), qui refuse tout script
@@ -257,6 +268,14 @@ jobs:
         # premier run reel sur GitHub Actions, echec immediat (0s), constate
         # par un tiers lisant le journal, pas devine ici.
         run: |
+          # VERA_DB_KEY, comme VERA_DB_PATH : run_tests.sh la genere elle-meme
+          # si absente (secrets.token_hex(32)) et la partage pour tout le
+          # passage -- une seule cle, pas une par test, parce qu'elle ne sert
+          # qu'a chiffrer une cle RSA jetable dans une base jetable. Deuxieme
+          # variable d'environnement que ce job oubliait de poser en appelant
+          # les fichiers directement, trouvee par le meme premier run reel que
+          # VERA_DB_PATH.
+          export VERA_DB_KEY=$(.venv/bin/python3 -c "import secrets; print(secrets.token_hex(32))")
           for t in test_signer_aveugle test_signature_production \
                    test_parcours_http test_cycle_vie_cle \
                    test_antirejeu_persistant test_non_regression_correctifs; do
