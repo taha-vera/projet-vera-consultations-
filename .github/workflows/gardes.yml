@@ -240,19 +240,27 @@ jobs:
           cd vera_blind_sig
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 ../.venv/bin/maturin develop --release
 
-      # NON TESTE DE BOUT EN BOUT AVANT CE COMMIT : la compilation Rust elle-meme
-      # n'a pas pu etre rejouee dans l'environnement qui a prepare ce patch -- ni
-      # rustup.rs ni static.rust-lang.org n'y sont accessibles, meme limite que
-      # les deux auditeurs externes du 30/08 et du 11/09. Le premier vrai run sur
-      # GitHub Actions, avec un acces reseau complet, sera le premier test de
-      # bout en bout de ce job -- y compris de cette etape venv, elle-meme
-      # ajoutee sur la foi d'un message d'erreur reproduit par un audit externe,
-      # pas d'une execution reussie ici.
+      # PREMIER RUN REEL LE 12/09/2026 : la compilation a reussi (29s, premiere
+      # fois hors de la machine du mainteneur). L'etape suivante a echoue en 0s --
+      # pas un echec de test, le garde-fou test/production de
+      # vera_persistance.py refusant une base non jetable, parce que ce job
+      # appelait chaque fichier sans poser VERA_DB_PATH. Corrige en reprenant
+      # exactement le mecanisme de run_tests.sh (mktemp par test, nettoyage
+      # apres). Constate en lisant le journal d'une execution reelle, pas
+      # devine a l'avance.
       - name: Les six tests qui exigent le module compile
+        # VERA_DB_PATH DOIT pointer vers une base jetable -- garde-fou du
+        # projet lui-meme (vera_persistance.py), qui refuse tout script
+        # nomme test_*.py touchant la base de production par defaut
+        # (/root/vera_state.db). Ce job appelle chaque fichier directement,
+        # sans passer par run_tests.sh, qui pose cette variable lui-meme :
+        # premier run reel sur GitHub Actions, echec immediat (0s), constate
+        # par un tiers lisant le journal, pas devine ici.
         run: |
-          PYTHONPATH=. .venv/bin/python3 tests/test_signer_aveugle.py
-          PYTHONPATH=. .venv/bin/python3 tests/test_signature_production.py
-          PYTHONPATH=. .venv/bin/python3 tests/test_parcours_http.py
-          PYTHONPATH=. .venv/bin/python3 tests/test_cycle_vie_cle.py
-          PYTHONPATH=. .venv/bin/python3 tests/test_antirejeu_persistant.py
-          PYTHONPATH=. .venv/bin/python3 tests/test_non_regression_correctifs.py
+          for t in test_signer_aveugle test_signature_production \
+                   test_parcours_http test_cycle_vie_cle \
+                   test_antirejeu_persistant test_non_regression_correctifs; do
+            base_jetable=$(mktemp -u /tmp/vera_ci_XXXXXX.db)
+            VERA_DB_PATH="$base_jetable" PYTHONPATH=. .venv/bin/python3 "tests/$t.py"
+            rm -f "$base_jetable" "$base_jetable"-wal "$base_jetable"-shm
+          done

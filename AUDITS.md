@@ -74,6 +74,26 @@ Corrigees, avec un balayage systematique du motif plutot qu'une liste
 d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
 manque ces deux-la la premiere fois.
 
+### Premier run reel du job crypto : la compilation a reussi, l'etape suivante non
+
+Le 12/09/2026, premiere execution reelle sur GitHub Actions. Bonne nouvelle
+d'abord : la compilation Rust a reussi en 29 secondes -- la toute premiere fois
+que ce module compile ailleurs que sur la machine du mainteneur, apres deux
+audits externes qui avaient bute sur le meme mur en lisant seulement le code.
+Le correctif du venv a fonctionne.
+
+L'etape suivante a echoue en 0 seconde -- pas un echec de test, un refus
+immediat. Le garde-fou test/production de `vera_persistance.py` (celui qui
+existe depuis le tout debut du projet : un script nomme `test_*.py` ne doit
+jamais toucher `/root/vera_state.db`) a bloque net, parce que ce job appelait
+chaque fichier directement sans poser `VERA_DB_PATH` -- ce que `run_tests.sh`
+fait lui-meme, invisible tant qu'on ne regarde pas comment.
+
+Corrige en reprenant exactement son mecanisme : une base jetable par
+`mktemp`, une par test, nettoyee apres. Trouve en lisant le journal d'une
+execution reelle sur GitHub Actions, pas devine a l'avance -- c'etait bien le
+premier test de bout en bout annonce, et il a servi a ca.
+
 ### Le job CI lui-meme aurait echoue, avant meme d'atteindre le Rust
 
 Un relecteur a confirme independamment le comportement httpx2 (installation
