@@ -474,6 +474,43 @@ for chemin in sorted(RACINE.glob("*.md")) + sorted(RACINE.glob("docs/**/*.md")):
                     f"bourrage ({total}) -- {motif}.\n    Une valeur derivee "
                     "recopiee derive.\n    " + ligne.strip()[:110])
 
+# --- La date de version ne doit pas trainer derriere HEAD --------------
+#
+# CONSTAT DU 11/09/2026, par un audit externe. README.md annoncait « 27 aout
+# 2026 » comme version courante alors que HEAD datait du 11/09 -- quinze jours
+# d'ecart, jamais signale, parce qu'aucune garde ne compare cette date a rien.
+# Le decompte de tests sur la meme ligne (36) restait juste par coincidence ;
+# seule la date derivait, invisible pour test_parametres_documentes.py qui ne
+# compare que des valeurs numeriques.
+#
+# On ne peut pas figer une date -- elle doit avancer a chaque session. On peut
+# en revanche detecter qu'elle a trop pris de retard sur le depot lui-meme.
+import subprocess as _subprocess
+import re as _re
+import datetime as _datetime
+
+_m = _re.search(r"Version courante.*?(\d{1,2}) (\w+) (\d{4})",
+                (RACINE / "README.md").read_text(encoding="utf-8", errors="replace"))
+_MOIS = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
+         "juillet": 7, "août": 8, "septembre": 9, "octobre": 10,
+         "novembre": 11, "décembre": 12}
+if _m and _m.group(2).lower() in _MOIS:
+    _date_readme = _datetime.date(int(_m.group(3)), _MOIS[_m.group(2).lower()], int(_m.group(1)))
+    try:
+        _date_head = _datetime.date.fromisoformat(
+            _subprocess.run(["git", "log", "-1", "--format=%ad", "--date=short"],
+                           cwd=RACINE, capture_output=True, text=True, timeout=5
+                           ).stdout.strip())
+        _ecart = (_date_head - _date_readme).days
+        if _ecart > 10:
+            echecs.append(
+                f"README.md annonce la version du {_date_readme.isoformat()}, "
+                f"mais le dernier commit date du {_date_head.isoformat()} -- "
+                f"{_ecart} jours d'ecart. Mettre a jour la ligne "
+                "« Version courante ».")
+    except (_subprocess.SubprocessError, ValueError, OSError):
+        pass  # pas un depot git ici (clone superficiel, environnement de test) : on ignore
+
 if echecs:
     print("ECHEC : la documentation contredit le code.\n")
     for e in echecs:
