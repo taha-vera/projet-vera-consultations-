@@ -187,3 +187,59 @@ jobs:
       # suite de tests, mais attrape une erreur de syntaxe avant le serveur.
       - name: Compilation des modules
         run: python3 -m py_compile vera_*.py tests/test_*.py
+
+
+  # SECOND JOB, EN PARALLELE -- LE CŒUR CRYPTOGRAPHIQUE, ENFIN EXECUTE EN CI.
+  #
+  # Deux audits externes, a six semaines d'intervalle (30/08 puis 11/09/2026),
+  # ont buté sur le meme mur : `rustc` 1.75 fourni par les depots Ubuntu
+  # standards ne satisfait pas `rust-version = "1.85"` exige par
+  # vera_blind_sig/Cargo.toml (une dependance transitive, const-oid 0.10, exige
+  # edition2024). Les deux ont donc LU le module Rust sans jamais le voir
+  # tourner -- et avec lui, six tests sur trente-six (le chemin de signature
+  # aveugle, l'anti-rejeu persistant, le cycle de vie de la cle) n'avaient
+  # jamais ete executes par personne d'exterieur au mainteneur.
+  #
+  # Ce job compile reellement le module et lance ces six tests, a chaque push.
+  # Il tourne en parallele du job "gardes" -- plus lent (compilation Rust),
+  # il ne doit pas ralentir le retour rapide des gardes structurelles.
+  crypto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust stable (>= 1.85 exige par Cargo.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dependances (opendp, maturin)
+        run: |
+          pip install --quiet -r requirements.txt
+          pip install --quiet maturin
+
+      - name: Compiler le module Rust (PyO3)
+        run: |
+          cd vera_blind_sig
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 maturin develop --release
+
+      # NON TESTE DE BOUT EN BOUT AVANT CE COMMIT : la compilation Rust elle-meme
+      # (l'etape precedente) n'a pas pu etre rejouee dans l'environnement qui a
+      # prepare ce patch -- ni rustup.rs ni static.rust-lang.org n'y sont
+      # accessibles, la meme limite que les deux auditeurs externes du 30/08 et
+      # du 11/09. Ce qui EST verifie : le YAML est valide, `pip install -r
+      # requirements.txt` suffit a rendre TestClient importable (confirme en
+      # installant reellement le fichier), et le test echoue proprement avec un
+      # message diagnostique quand le module manque plutot que de reussir a
+      # tort. Le premier vrai run sur GitHub Actions, avec un acces reseau
+      # complet, sera le premier test de bout en bout de ce job.
+      - name: Les six tests qui exigent le module compile
+        run: |
+          PYTHONPATH=. python3 tests/test_signer_aveugle.py
+          PYTHONPATH=. python3 tests/test_signature_production.py
+          PYTHONPATH=. python3 tests/test_parcours_http.py
+          PYTHONPATH=. python3 tests/test_cycle_vie_cle.py
+          PYTHONPATH=. python3 tests/test_antirejeu_persistant.py
+          PYTHONPATH=. python3 tests/test_non_regression_correctifs.py

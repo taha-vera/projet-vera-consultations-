@@ -74,6 +74,20 @@ Corrigees, avec un balayage systematique du motif plutot qu'une liste
 d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
 manque ces deux-la la premiere fois.
 
+### Le module Rust n'avait jamais tourne en dehors du mainteneur
+
+Deux audits externes, a six semaines d'intervalle (30/08 puis 11/09/2026), ont
+bute sur le meme mur : `rustc` 1.75 des depots Ubuntu standards ne satisfait
+pas `rust-version = "1.85"`. Les deux ont donc LU le module de signature
+aveugle sans jamais le voir tourner -- et avec lui, six tests sur trente-six
+n'avaient jamais ete executes par personne d'exterieur.
+
+Un second job CI compile desormais le module et lance ces six tests a chaque
+push, en parallele des gardes structurelles rapides. Non teste de bout en bout
+avant ce commit : la compilation Rust elle-meme n'a pas pu etre rejouee dans
+l'environnement qui l'a prepare, meme limite que les deux auditeurs. Le
+premier run reel sur GitHub Actions sera le premier test complet.
+
 ### Le premier audit ecrit avec le prompt dedie a ce motif : deux cas, les deux confirmes
 
 `fetch-depth: 0` a ete verifie reellement branche cette fois -- par
