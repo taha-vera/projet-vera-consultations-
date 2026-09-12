@@ -74,6 +74,26 @@ Corrigees, avec un balayage systematique du motif plutot qu'une liste
 d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
 manque ces deux-la la premiere fois.
 
+### Troisieme correctif : le compte admin manquait aussi, cinq tests desormais verifies
+
+Meme jour, meme cause structurelle une troisieme fois. Apres correction de
+`VERA_DB_PATH` puis `VERA_DB_KEY`, cinq tests sur six passent : signature
+aveugle, primitive RSABSSA complete, **parcours HTTP integral** avec signature
+reelle par le module Rust compile, cycle de vie des cles, anti-rejeu
+persistant. Le sixieme (`test_non_regression_correctifs`) echoue a
+l'import -- il charge `vera_consultation_api`, qui refuse de demarrer sans
+`VERA_ADMIN_USER` ni `VERA_ADMIN_HASH` : la garde ajoutee le 09/09 (audit des
+huit constats) precisement pour qu'une absence de compte admin ne passe plus
+inapercue.
+
+Corrige avec `generer_empreinte()`, la fonction que le message d'erreur cite
+lui-meme -- verifiee en l'executant reellement avant de l'inserer dans le job
+(`f797b4...$7f6187...`, format `sel$hash` conforme).
+
+Trois variables d'environnement, trouvees une a une, chacune reveillee par la
+correction de la precedente : c'est la nature meme d'un premier run reel, et
+c'est pour ca qu'il valait la peine d'etre tente plutot que suppose.
+
 ### Second run reel : le parcours HTTP complet verifie hors du mainteneur, pour la premiere fois
 
 Le meme jour, second passage apres correction de `VERA_DB_PATH`. Trois tests

@@ -240,25 +240,28 @@ jobs:
           cd vera_blind_sig
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 ../.venv/bin/maturin develop --release
 
-      # DEUX RUNS REELS LE 12/09/2026, DEUX VARIABLES MANQUANTES TROUVEES.
+      # TROIS RUNS REELS LE 12/09/2026, TROIS VARIABLES MANQUANTES TROUVEES,
+      # UNE A LA FOIS -- chacune reveillee par la correction de la precedente.
       #
       # 1er run : compilation reussie (29s, premiere fois hors de la machine
-      # du mainteneur), puis echec immediat -- VERA_DB_PATH absent, le
-      # garde-fou test/production de vera_persistance.py refusant la base par
-      # defaut. Corrige.
+      # du mainteneur), puis echec immediat -- VERA_DB_PATH absent.
       #
-      # 2e run : les TROIS premiers tests passent -- signature aveugle,
-      # primitive RSABSSA, PARCOURS HTTP COMPLET (authentification, emission,
-      # signature, depot, anti-rejeu, cloture) verifies pour la premiere fois
-      # hors de cette machine. Le 4e (cycle de vie des cles) echoue sur
-      # VERA_DB_KEY absente, meme categorie de variable que VERA_DB_PATH :
-      # run_tests.sh la genere elle-meme si absente et la partage pour tout
-      # le passage. Ce job, en appelant les fichiers directement, ne le
-      # faisait pas non plus. Corrige de la meme facon.
+      # 2e run : CINQ tests passent -- signature aveugle, primitive RSABSSA,
+      # PARCOURS HTTP COMPLET (authentification, emission, signature aveugle
+      # REELLE par le Rust compile, depot, anti-rejeu, refus sous seuil,
+      # cloture), cycle de vie des cles, anti-rejeu persistant : tous
+      # verifies hors de cette machine pour la premiere fois. Le 6e
+      # (non-regression) echoue en import sur VERA_ADMIN_USER/VERA_ADMIN_HASH
+      # absentes -- la garde ajoutee le 09/09 (commit huit_constats) qui
+      # refuse de demarrer sans compte admin.
       #
-      # Les deux trouvailles viennent de la lecture du journal, pas d'une
-      # supposition prealable -- c'est precisement ce que ce job existe pour
-      # produire.
+      # 3e correctif : les deux variables posees, VERA_ADMIN_HASH calculee
+      # avec generer_empreinte(), la fonction que le message d'erreur cite
+      # lui-meme.
+      #
+      # Les trois trouvailles viennent de la lecture de journaux reels, pas
+      # d'une supposition prealable -- c'est precisement ce que ce job existe
+      # pour produire.
       - name: Les six tests qui exigent le module compile
         # VERA_DB_PATH DOIT pointer vers une base jetable -- garde-fou du
         # projet lui-meme (vera_persistance.py), qui refuse tout script
@@ -276,6 +279,17 @@ jobs:
           # les fichiers directement, trouvee par le meme premier run reel que
           # VERA_DB_PATH.
           export VERA_DB_KEY=$(.venv/bin/python3 -c "import secrets; print(secrets.token_hex(32))")
+
+          # Troisieme variable manquante, trouvee par le meme 2e run reel :
+          # test_non_regression_correctifs importe vera_consultation_api, qui
+          # refuse de demarrer sans compte admin (garde ajoutee le 09/09, voir
+          # commit huit_constats -- celle-la meme qui empechait le service de
+          # tourner sans que personne ne puisse jamais publier ni cloturer).
+          # generer_empreinte() est la fonction que le message d'erreur cite
+          # lui-meme.
+          export VERA_ADMIN_USER=ci_test
+          export VERA_ADMIN_HASH=$(PYTHONPATH=. .venv/bin/python3 -c "from vera_admin_auth import generer_empreinte; print(generer_empreinte('mot_de_passe_ci_jetable'))")
+
           for t in test_signer_aveugle test_signature_production \
                    test_parcours_http test_cycle_vie_cle \
                    test_antirejeu_persistant test_non_regression_correctifs; do
