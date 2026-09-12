@@ -215,31 +215,44 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Installer les dependances (opendp, maturin)
+      - name: Creer le venv a la racine (requis par maturin)
+        # `maturin develop` refuse de s'executer hors environnement virtuel --
+        # verifie par un audit externe le 11/09/2026 : "Couldn't find a
+        # virtualenv or conda environment, but you need one to use this
+        # command." Un runner ubuntu-latest avec actions/setup-python n'en a
+        # aucun actif par defaut. Le job aurait echoue sur ce point, jamais
+        # atteint la compilation elle-meme.
+        #
+        # Cree a la RACINE du depot, pas dans vera_blind_sig/ : maturin
+        # detecte un .venv dans un dossier parent sans qu'il soit active, et
+        # run_tests.sh cherche PRECISEMENT ./.venv/bin/python3 en premier
+        # candidat (voir son en-tete) -- les deux se branchent dessus sans
+        # configuration supplementaire.
+        run: python3 -m venv .venv
+
+      - name: Installer les dependances dans le venv (opendp, maturin)
         run: |
-          pip install --quiet -r requirements.txt
-          pip install --quiet maturin
+          .venv/bin/pip install --quiet -r requirements.txt
+          .venv/bin/pip install --quiet maturin
 
       - name: Compiler le module Rust (PyO3)
         run: |
           cd vera_blind_sig
-          PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 maturin develop --release
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 ../.venv/bin/maturin develop --release
 
       # NON TESTE DE BOUT EN BOUT AVANT CE COMMIT : la compilation Rust elle-meme
-      # (l'etape precedente) n'a pas pu etre rejouee dans l'environnement qui a
-      # prepare ce patch -- ni rustup.rs ni static.rust-lang.org n'y sont
-      # accessibles, la meme limite que les deux auditeurs externes du 30/08 et
-      # du 11/09. Ce qui EST verifie : le YAML est valide, `pip install -r
-      # requirements.txt` suffit a rendre TestClient importable (confirme en
-      # installant reellement le fichier), et le test echoue proprement avec un
-      # message diagnostique quand le module manque plutot que de reussir a
-      # tort. Le premier vrai run sur GitHub Actions, avec un acces reseau
-      # complet, sera le premier test de bout en bout de ce job.
+      # n'a pas pu etre rejouee dans l'environnement qui a prepare ce patch -- ni
+      # rustup.rs ni static.rust-lang.org n'y sont accessibles, meme limite que
+      # les deux auditeurs externes du 30/08 et du 11/09. Le premier vrai run sur
+      # GitHub Actions, avec un acces reseau complet, sera le premier test de
+      # bout en bout de ce job -- y compris de cette etape venv, elle-meme
+      # ajoutee sur la foi d'un message d'erreur reproduit par un audit externe,
+      # pas d'une execution reussie ici.
       - name: Les six tests qui exigent le module compile
         run: |
-          PYTHONPATH=. python3 tests/test_signer_aveugle.py
-          PYTHONPATH=. python3 tests/test_signature_production.py
-          PYTHONPATH=. python3 tests/test_parcours_http.py
-          PYTHONPATH=. python3 tests/test_cycle_vie_cle.py
-          PYTHONPATH=. python3 tests/test_antirejeu_persistant.py
-          PYTHONPATH=. python3 tests/test_non_regression_correctifs.py
+          PYTHONPATH=. .venv/bin/python3 tests/test_signer_aveugle.py
+          PYTHONPATH=. .venv/bin/python3 tests/test_signature_production.py
+          PYTHONPATH=. .venv/bin/python3 tests/test_parcours_http.py
+          PYTHONPATH=. .venv/bin/python3 tests/test_cycle_vie_cle.py
+          PYTHONPATH=. .venv/bin/python3 tests/test_antirejeu_persistant.py
+          PYTHONPATH=. .venv/bin/python3 tests/test_non_regression_correctifs.py

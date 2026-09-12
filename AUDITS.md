@@ -74,6 +74,24 @@ Corrigees, avec un balayage systematique du motif plutot qu'une liste
 d'occurrences enumerees a la main -- c'est une liste enumeree qui avait
 manque ces deux-la la premiere fois.
 
+### Le job CI lui-meme aurait echoue, avant meme d'atteindre le Rust
+
+Un relecteur a confirme independamment le comportement httpx2 (installation
+minimale, app FastAPI factice, TestClient fonctionnel), et a trouve un defaut
+reel dans le job qui venait d'etre ajoute : `maturin develop --release` refuse
+de s'executer hors environnement virtuel -- verifie chez lui avec maturin
+1.15.0, message exact reproduit : *« Couldn't find a virtualenv or conda
+environment, but you need one to use this command. »* Un runner
+`actions/setup-python` n'en active aucun. Le job aurait echoue sur ce point,
+jamais atteint la compilation qu'il visait a tester.
+
+Corrige : un `.venv` est cree a la racine du depot avant l'etape maturin --
+pas dans `vera_blind_sig/`, pour deux raisons verifiees dans le depot
+lui-meme. Maturin detecte un `.venv` situe dans un dossier PARENT sans qu'il
+soit active. Et `run_tests.sh` cherche precisement `./.venv/bin/python3` en
+premier candidat (verifie dans son propre en-tete) : les deux mecanismes se
+branchent dessus sans configuration supplementaire.
+
 ### Le module Rust n'avait jamais tourne en dehors du mainteneur
 
 Deux audits externes, a six semaines d'intervalle (30/08 puis 11/09/2026), ont
