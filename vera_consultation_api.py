@@ -1556,9 +1556,18 @@ def cloturer_consultation(session_vera: Optional[str] = Cookie(None)):
     # {"statut": "enregistre"} et l'ecran "Reponse enregistree -- votre
     # contribution a ete integree au resultat collectif", alors que son vote
     # etait efface quelques millisecondes plus tard et n'apparaissait dans
-    # aucun resultat. Le message etait faux. La cloture est desormais atomique
-    # du point de vue des votes : soit un vote est compte et publie, soit il
-    # est refuse, jamais "accepte puis silencieusement detruit".
+    # aucun resultat. Le message etait faux. Ce verrou continu ferme l'ecart
+    # INTERNE a la cloture elle-meme (rien ne peut plus s'inserer entre son
+    # propre figement et son propre effacement).
+    #
+    # CA NE FERMAIT PAS L'ECART DU COTE DE L'APPELANT : /api/repondre verifie
+    # "deja publie" AVANT de tenter d'acquerir ce verrou (volontairement, pour
+    # ne rien consommer dans le cas courant) -- un vote qui passait ce
+    # controle pouvait donc encore ATTENDRE ce meme verrou pendant toute une
+    # cloture, puis s'ecrire juste apres, dans un etat deja efface. Ferme le
+    # 12/09/2026 par une reverification a l'interieur du verrou de
+    # /api/repondre, pas ici : c'est la ou l'ecriture a lieu qui doit se
+    # proteger, pas la ou l'effacement a lieu.
     resultats_finaux = {}
     with verrou:
         # 1. Figer/recuperer les resultats finaux des departements publiables.
@@ -2246,6 +2255,38 @@ def repondre(payload: ReponseModeleB):
     empreinte_k = hashlib.sha384(K).hexdigest()
 
     with verrou:
+        # REVERIFICATION APRES ACQUISITION DU VERROU -- le controle "deja
+        # publie" plus haut est volontairement place AVANT le verrou (pour ne
+        # rien consommer ni compter dans le cas courant), mais ca laisse une
+        # fenetre : un vote qui a franchi ce controle peut ensuite ATTENDRE le
+        # verrou pendant toute une publication ou une cloture, puis s'ecrire
+        # APRES coup dans un etat deja fige ou efface. Le votant recevrait
+        # "enregistre" pour une voix absente de tout resultat -- exactement ce
+        # que le controle en amont existe pour empecher, sauf qu'il ne protege
+        # que l'instant de son propre appel, pas l'attente qui suit.
+        #
+        # DEUX SIGNAUX, PARCE QU'AUCUN SEUL NE SUFFIT :
+        #   - nombre_publications > 0 : couvre UNE publication de departement
+        #     (_publier_departement ne vide pas effectif_par_departement).
+        #   - departement absent de effectif_par_departement : couvre une
+        #     CLOTURE complete, qui vide ce dict ET reinitialise le budget --
+        #     apres reset(), nombre_publications retombe a 0 pour tout le
+        #     monde, donc le premier signal seul redeviendrait aveugle une
+        #     fois la cloture terminee.
+        # Trouve par un audit externe le 12/09/2026, verifie sur les deux
+        # points de sortie de la cloture (_publier_departement,
+        # cloturer_consultation) avant d'ecrire ce correctif.
+        if (budget_epsilon.etat(payload.departement)["nombre_publications"] > 0
+                or payload.departement not in effectif_par_departement):
+            raise HTTPException(
+                status_code=409,
+                detail="Le resultat de votre groupe a deja ete publie ou la "
+                       "consultation a ete cloturee entre-temps : les "
+                       "reponses ne sont plus comptabilisees. Votre voix "
+                       "n'a PAS ete enregistree. Signalez-le a la personne "
+                       "qui vous a envoye ce lien.",
+            )
+
         # Fast-path memoire (evite un aller SQLite sur rejeu evident), mais
         # l'AUTORITE anti-rejeu est la contrainte PRIMARY KEY de la DB dans
         # enregistrer_vote_atomique. Ordre critique : on PERSISTE D'ABORD,

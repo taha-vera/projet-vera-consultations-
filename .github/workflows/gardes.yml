@@ -123,6 +123,14 @@ jobs:
       # VERA_AUDIT_REFERENCE.md affichait journal_mode=WAL, 48 h de duree de cle
       # et un bourrage a 200 octets, des semaines apres que les trois eurent
       # change. Aucun test ne lisait la documentation.
+      - name: Syntaxe JS des pages statiques (node --check)
+        # Ajoutee le 12/09/2026 -- aucun test anterieur n'invoquait un vrai
+        # interprete JS ; le validateur HTML ne verifie pas le contenu d'un
+        # bloc <script>. Trouve en corrigeant un autre defaut sur cette meme
+        # page : une erreur de concatenation JS serait passee inapercue sans
+        # ce controle.
+        run: python3 tests/test_syntaxe_js.py
+
       - name: Parametres documentes conformes au code
         run: python3 tests/test_parametres_documentes.py
 

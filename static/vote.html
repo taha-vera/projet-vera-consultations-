@@ -844,6 +844,31 @@
       if (!rSig.ok) throw new Error('signature refusee');
       const { signature_aveugle_hex, departement } = await rSig.json();
 
+      // LE DEPARTEMENT RENVOYE PAR LE SERVEUR DOIT CORRESPONDRE A CELUI DU
+      // LIEN, PAS ETRE CRU SUR PAROLE.
+      //
+      // L'engagement de cles (plus haut) verifie deja que la cle recue
+      // appartient a l'ensemble PUBLIE -- ca ferme une cle forgee. Ca ne
+      // ferme pas un operateur actif qui repondrait honnetement avec UNE cle
+      // reelle, mais celle d'un AUTRE departement que celui du lien : rien
+      // avant ce point ne comparait `departement` (renvoye ici) a
+      // `departementVote` (extrait du lien lui-meme). Le vote se deposerait
+      // alors sous le mauvais departement, deplacant une voix d'une urne a
+      // l'autre sans alerte -- le votant croit avoir vote pour son groupe.
+      //
+      // Trouve par un audit externe le 12/09/2026. Fail-closed : meme
+      // defense qu'ailleurs sur cette page, elle doit echouer en se
+      // fermant, pas en s'ouvrant.
+      if (departement !== departementVote) {
+        showError(
+          "Le serveur a repondu pour un groupe different de celui de votre " +
+          "lien. Ne continuez pas : cela peut indiquer un probleme du cote " +
+          "du serveur. Signalez-le a la personne qui vous a envoye ce lien.",
+          "Groupe incoherent"
+        );
+        return;
+      }
+
       const signature = await suite.finalize(publicKey, prepared, inv, fromHex(signature_aveugle_hex));
 
       const randomizer = prepared.slice(0, 32);

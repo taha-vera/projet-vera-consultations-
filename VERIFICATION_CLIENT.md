@@ -29,7 +29,7 @@ précisément celui que ces empreintes ferment.
 Version du 3 septembre 2026 (formule du conseil sur l'appareil personnel) :
 
 ```
-519a86a982173beb1fe350d8fa36f04cc9a73328087e0c69503da713b425d1a1  static/vote.html
+4dd923fd70bbaa3cc0ef5549d19978ca2a89af4b3c12ce1819823c9a6c6d5ea0  static/vote.html
 08e678cc5d64e9996cfe3cf54eb1220a1bb032c54d0c4351651f8aee057baa66  static/blindrsa-bundle.js
 ```
 

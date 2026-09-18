@@ -136,6 +136,73 @@ Corrige en reprenant exactement son mecanisme : une base jetable par
 execution reelle sur GitHub Actions, pas devine a l'avance -- c'etait bien le
 premier test de bout en bout annonce, et il a servi a ca.
 
+### Un vingt-troisieme audit trouve une vraie course, jamais vue en vingt-deux passages
+
+Clone reel, lecture du code Python, Rust, la page de vote, la conf nginx,
+et suite de tests lancee (31/37 chez le releveur -- les six manquants
+exigeant Rust, correctement identifies comme non representatifs). Quatre
+constats retenus sur sept ; les trois autres (fail-open documente, CI
+limitee aux gardes, style des commentaires) etaient soit deja fermes soit
+un choix a part entiere.
+
+**Le plus grave, et le plus subtil trouve sur ce projet a ce jour.** Le
+controle "deja publie" dans `/api/repondre` est place volontairement AVANT
+l'acquisition du verrou -- pour ne rien consommer dans le cas courant. Mais
+un vote qui le franchit peut ensuite ATTENDRE ce meme verrou pendant toute
+une publication ou une cloture, puis s'ecrire APRES coup, dans un etat deja
+fige ou efface. Le votant recevrait "enregistre" pour une voix absente de
+tout resultat.
+
+Un correctif anterieur (voir plus bas, "cloture atomique") avait ferme un
+ECART DIFFERENT -- celui interne a la cloture elle-meme -- et son
+commentaire affirmait a tort que la cloture etait "desormais atomique du
+point de vue des votes, jamais accepte puis silencieusement detruit". Ce
+n'etait vrai que pour l'ecart qu'il fermait, pas pour celui-ci. Corrige par
+une reverification A L'INTERIEUR du verrou de `/api/repondre`, avec DEUX
+signaux necessaires : `nombre_publications > 0` (couvre une publication de
+departement seul) ET l'absence du departement dans
+`effectif_par_departement` (couvre une cloture complete, qui vide ce dict
+ET reinitialise le budget -- apres quoi le premier signal seul seul
+redeviendrait aveugle). Verifie par simulation isolee sur les quatre cas
+possibles, le module Rust manquant dans cet environnement empechant une
+execution reelle. Le commentaire sur-affirmant de la cloture a ete corrige
+en meme temps, pour ne pas laisser une garantie fausse a cote d'une
+garantie vraie.
+
+**Une surpromesse etait revenue sur la vitrine.** La page disait encore
+"calcule analytiquement par OpenDP... epsilon = 0,5 exact", contredit deux
+sections plus bas par la formulation correcte ("bruit echantillonne,
+comptabilite demontree"). Deux affirmations opposees sur la meme page.
+Corrige, alignee sur la formulation exacte.
+
+**Un durcissement cote client.** `vote.html` verifiait que la cle recue
+appartenait a l'ensemble publie, mais jamais que le departement renvoye par
+le serveur correspondait a celui du LIEN. Un operateur actif honnete sur la
+signature mais menteur sur le departement pouvait deplacer une voix d'une
+urne a l'autre sans alerte. Corrige, fail-closed.
+
+**Un bug introduit en corrigeant ce dernier point, trouve par un vrai
+interprete plutot que suppose absent.** La correction ci-dessus contenait
+une erreur de concatenation JS -- des chaines adjacentes, valide en Python,
+pas en JavaScript. Le validateur HTML utilise partout ailleurs sur ce depot
+ne verifie pas le contenu d'un bloc `<script>` ; aucun test anterieur
+n'invoquait un vrai interprete JS. `node --check` etait disponible dans cet
+environnement : la faute a ete vue immediatement plutot que de partir en
+production. Un nouveau test (`test_syntaxe_js.py`) ferme desormais cette
+classe pour l'avenir -- il s'ignore proprement si `node` est absent, plutot
+que d'echouer sur l'environnement.
+
+**Trois fautes d'accent** signalees sur la vitrine ("ete détruites",
+"stockee ni exposee", "seuil MESURE, pas suppose") -- confirmees, absentes
+de LIMITS.md contrairement a ce que le document suggerait, corrigees a
+l'endroit ou elles existaient reellement.
+
+**Un point signale comme ouvert ne l'etait plus.** "La CI ne lance que les
+gardes structurelles" decrivait l'etat d'avant le meme jour : le job
+`crypto`, qui compile et teste le module Rust, venait d'etre valide en
+production quelques heures plus tot. Verifie avant de l'ecarter, pas
+suppose.
+
 ### Le job CI lui-meme aurait echoue, avant meme d'atteindre le Rust
 
 Un relecteur a confirme independamment le comportement httpx2 (installation
