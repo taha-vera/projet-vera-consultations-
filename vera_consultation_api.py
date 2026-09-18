@@ -2268,16 +2268,29 @@ def repondre(payload: ReponseModeleB):
         # DEUX SIGNAUX, PARCE QU'AUCUN SEUL NE SUFFIT :
         #   - nombre_publications > 0 : couvre UNE publication de departement
         #     (_publier_departement ne vide pas effectif_par_departement).
-        #   - departement absent de effectif_par_departement : couvre une
-        #     CLOTURE complete, qui vide ce dict ET reinitialise le budget --
+        #   - departement absent des groupes declares persistes : couvre une
+        #     CLOTURE complete, qui vide question_active (et donc ce que
+        #     charger_groupes_declares() renvoie) ET reinitialise le budget --
         #     apres reset(), nombre_publications retombe a 0 pour tout le
         #     monde, donc le premier signal seul redeviendrait aveugle une
         #     fois la cloture terminee.
-        # Trouve par un audit externe le 12/09/2026, verifie sur les deux
-        # points de sortie de la cloture (_publier_departement,
-        # cloturer_consultation) avant d'ecrire ce correctif.
+        #
+        # PREMIERE VERSION DE CE CORRECTIF (12/09/2026, meme jour) : testait
+        # `departement not in effectif_par_departement` au lieu des groupes
+        # declares persistes. BUG REEL, trouve en deployant : ce dict n'est
+        # peuple qu'APRES le PREMIER vote reussi d'un departement (ligne plus
+        # bas), jamais a la declaration des groupes -- donc le tout premier
+        # vote d'un departement legitime etait rejete a tort, la meme absence
+        # signifiant a la fois "jamais vote" et "cloture". Trouve par
+        # `test_parcours_http.py` en echouant en CI dans l'heure suivant le
+        # deploiement, pas devine a l'avance.
+        #
+        # `question_active` fige AVANT tout envoi de lien (docstring de
+        # charger_groupes_declares) et ne bouge plus tant que la consultation
+        # est ouverte : contrairement a effectif_par_departement, sa presence
+        # ne depend pas de l'ordre d'arrivee des votes.
         if (budget_epsilon.etat(payload.departement)["nombre_publications"] > 0
-                or payload.departement not in effectif_par_departement):
+                or payload.departement not in (persistance.charger_groupes_declares() or [])):
             raise HTTPException(
                 status_code=409,
                 detail="Le resultat de votre groupe a deja ete publie ou la "

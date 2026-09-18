@@ -136,6 +136,30 @@ Corrige en reprenant exactement son mecanisme : une base jetable par
 execution reelle sur GitHub Actions, pas devine a l'avance -- c'etait bien le
 premier test de bout en bout annonce, et il a servi a ca.
 
+### Le correctif de la course a lui-meme casse la production -- premier vote de chaque departement rejete
+
+Deploye, teste par `./run_tests.sh` : `test_parcours_http.py` en echec. Le
+signal choisi pour detecter une cloture -- absence du departement dans
+`effectif_par_departement` -- etait le mauvais : ce dictionnaire n'est
+peuple qu'APRES le premier vote reussi d'un departement (une ligne plus bas
+dans la meme fonction), jamais a la declaration des groupes. La meme
+absence signifiait donc a la fois « jamais vote » (normal) et « cloture »
+(le cas vise) -- indistinguable, et le premier cas est le plus frequent de
+tous : celui de CHAQUE premier vote de CHAQUE departement.
+
+Corrige avec `persistance.charger_groupes_declares()` a la place : cette
+liste est figee AVANT tout envoi de lien (persistee dans `question_active`,
+qui fait partie des tables videes a la cloture) et ne bouge plus tant que
+la consultation reste ouverte -- sa presence ne depend pas, contrairement a
+`effectif_par_departement`, de l'ordre d'arrivee des votes. Reverifie sur
+les cinq cas, y compris celui qui avait casse.
+
+C'est la troisieme fois sur ce projet qu'un correctif deploye en production
+revele son propre defaut par l'echec d'un test reel, plutot que par relecture
+anticipee -- apres les trois variables d'environnement manquantes du job
+crypto. Le motif se repete : verifier en conditions reelles trouve ce que la
+simulation isolee, aussi soigneuse soit-elle, ne peut pas voir.
+
 ### Un vingt-troisieme audit trouve une vraie course, jamais vue en vingt-deux passages
 
 Clone reel, lecture du code Python, Rust, la page de vote, la conf nginx,
