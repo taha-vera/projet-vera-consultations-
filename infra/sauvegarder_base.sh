@@ -1,30 +1,32 @@
 #!/usr/bin/env bash
-# sauvegarder_base.sh - Sauvegarde chiffree et journalisee de vera_state.db.
+# sauvegarder_base.sh - Sauvegarde chiffree de l'historique des consultations.
 #
-# POURQUOI CE SCRIPT EXISTE : aucune sauvegarde de la base n'existait hors du
-# serveur Hetzner. Un incident sur ce serveur (disque perdu, panne materielle,
-# suppression accidentelle) effacerait toute consultation en cours ou deja
-# publiee, meme avec VERA_DB_KEY en lieu sur -- cette cle dechiffre une cle
-# RSA, elle ne remplace pas la base elle-meme. Constat du 21/09/2026, en
-# fermant le point ouvert par PROCEDURE_REPRISE_VERA.md.
+# VERSION 2 (22/09/2026). La version 1 sauvegardait toute la base --
+# compteurs, jetons, cle RSA -- chaque nuit, et en gardait 7 (en realite 8,
+# voir plus bas). Un audit cible a montre que c'etait exactement la fuite
+# que le projet a fermee en abandonnant journal_mode=WAL, a l'echelle du
+# jour au lieu de la milliseconde : deux etats consecutifs de
+# `jetons_autorisation` (ou `tokens_consommes`) et de `compteurs_votes`,
+# lus ensemble, reconstituent quel jeton correspond a quelle reponse --
+# `vera_persistance.py`, commentaire sur l'abandon du WAL, et section sur
+# `jetons_autorisation` comme "cinquieme trace de participation". Pire :
+# meme avec UNE seule sauvegarde gardee, la base vivante a cote sur le
+# meme disque formait deja la paire comparable. Reduire la retention ne
+# fermait rien.
 #
-# CE QUE CE SCRIPT FAIT : une copie coherente de la base (via l'API de
-# sauvegarde du module sqlite3 de Python, pas une copie de fichier brute --
-# une copie brute pendant une ecriture produirait un fichier corrompu),
-# chiffree avec VERA_BACKUP_KEY, deposee dans /root/sauvegardes_vera/, avec
-# rotation sur 7 jours.
+# CE QUE CETTE VERSION SAUVEGARDE : uniquement la table
+# `historique_consultations` (nom de groupe + horodatage de cloture).
+# C'est la seule table de vera_persistance.py qui n'est PAS effacee par
+# `effacer_etat_consultation()` -- elle existe pour faire respecter la
+# regle des 4 consultations / 12 mois, pas pour reprendre un vote en
+# cours. Elle ne contient jamais de compteur, de jeton ni de cle : rien
+# qui se laisse mettre en correspondance avec un vote individuel.
 #
-# Passe par Python plutot que par l'outil `sqlite3` en ligne de commande :
-# ce dernier n'est pas installe par defaut et n'est utilise nulle part
-# ailleurs dans ce projet (verifie le 22/09/2026, avant d'ajouter une
-# dependance systeme qui n'existait pas). Le module sqlite3 de Python fait
-# la meme sauvegarde a chaud, sans rien installer de plus.
-#
-# CE QUE CE SCRIPT NE FAIT PAS : il n'envoie rien hors de ce serveur. Une
-# sauvegarde qui reste sur la meme machine que l'original ne protege pas
-# contre la perte du serveur lui-meme -- seulement contre une corruption ou
-# une erreur de manipulation locale. Voir la note de bas de fichier sur la
-# recuperation periodique.
+# CE QUE CA VEUT DIRE EN PRATIQUE : une consultation active ne survit
+# PAS a la perte du serveur. Ce script ne tente plus de le permettre --
+# PROCEDURE_REPRISE_VERA.md le disait deja ouvertement avant cette
+# version. Ce qui est protege, c'est la regle des 4/12 mois et rien
+# d'autre.
 
 set -euo pipefail
 
@@ -49,6 +51,18 @@ if [ ! -f "$CLE_SAUVEGARDE_FICHIER" ]; then
     exit 1
 fi
 
+# PERMISSIONS DU FICHIER DE CLE, PAS SEULEMENT SA PRESENCE.
+#
+# Un fichier de cle lisible par d'autres que root sur ce serveur mono-
+# utilisateur n'a pas de sens legitime -- releve par un audit cible le
+# 22/09/2026, qui notait que seule l'existence etait verifiee.
+permissions=$(stat -c '%a' "$CLE_SAUVEGARDE_FICHIER")
+if [ "$permissions" != "600" ]; then
+    log "ERREUR : $CLE_SAUVEGARDE_FICHIER a les permissions $permissions, 600 attendu."
+    log "  chmod 600 $CLE_SAUVEGARDE_FICHIER"
+    exit 1
+fi
+
 if [ ! -x "$PYTHON" ]; then
     log "ERREUR : interpreteur Python introuvable a $PYTHON."
     log "Ajuster VERA_PYTHON si le venv est ailleurs (voir PROCEDURE_REPRISE_VERA.md)."
@@ -59,43 +73,78 @@ mkdir -p "$DOSSIER_SAUVEGARDES"
 chmod 700 "$DOSSIER_SAUVEGARDES"
 
 copie_temporaire="$(mktemp /tmp/vera_backup_XXXXXX.db)"
-trap 'rm -f "$copie_temporaire"' EXIT
+trap 'shred -u "$copie_temporaire" 2>/dev/null || rm -f "$copie_temporaire"' EXIT
 
-# Copie coherente a chaud : le module sqlite3 de Python gere le
-# verrouillage lui-meme, contrairement a `cp` sur un fichier en cours
-# d'ecriture.
+# Export d'UNE SEULE table, pas une copie de la base entiere. Pas
+# d'API .backup() ici : elle copierait tout, y compris ce qu'on a
+# precisement decide de ne plus jamais sortir de la base vivante.
 "$PYTHON" -c "
-import sqlite3, sys
+import sqlite3
 src = sqlite3.connect('$BASE_SOURCE')
 dst = sqlite3.connect('$copie_temporaire')
-with dst:
-    src.backup(dst)
+dst.execute(
+    'CREATE TABLE historique_consultations '
+    '(groupe TEXT NOT NULL, close_unix REAL NOT NULL, '
+    'PRIMARY KEY (groupe, close_unix))'
+)
+lignes = src.execute('SELECT groupe, close_unix FROM historique_consultations').fetchall()
+dst.executemany(
+    'INSERT INTO historique_consultations (groupe, close_unix) VALUES (?, ?)',
+    lignes,
+)
+dst.commit()
 dst.close()
 src.close()
 "
 
-fichier_chiffre="$DOSSIER_SAUVEGARDES/vera_state_${horodatage}.db.enc"
+# ECRITURE ATOMIQUE : chiffrer vers un fichier .tmp, verifier qu'il se
+# dechiffre, puis renommer seulement en cas de succes. Une interruption
+# en cours d'ecriture (disque plein, processus tue) laisse alors un
+# .tmp orphelin au pire, jamais un .enc final tronque compte dans la
+# retention comme s'il etait bon -- releve par le meme audit.
+fichier_final="$DOSSIER_SAUVEGARDES/vera_historique_${horodatage}.db.enc"
+fichier_tmp="${fichier_final}.tmp"
+trap 'shred -u "$copie_temporaire" 2>/dev/null || rm -f "$copie_temporaire"; rm -f "$fichier_tmp"' EXIT
+
 openssl enc -aes-256-cbc -pbkdf2 -salt \
     -pass "file:$CLE_SAUVEGARDE_FICHIER" \
     -in "$copie_temporaire" \
-    -out "$fichier_chiffre"
+    -out "$fichier_tmp"
 
-taille=$(stat -c%s "$fichier_chiffre")
-log "Sauvegarde ecrite : $fichier_chiffre ($taille octets)"
+if ! openssl enc -d -aes-256-cbc -pbkdf2 \
+        -pass "file:$CLE_SAUVEGARDE_FICHIER" \
+        -in "$fichier_tmp" | "$PYTHON" -c "
+import sqlite3, sys, tempfile
+data = sys.stdin.buffer.read()
+with tempfile.NamedTemporaryFile(suffix='.db') as f:
+    f.write(data)
+    f.flush()
+    sqlite3.connect(f.name).execute('SELECT COUNT(*) FROM historique_consultations')
+"; then
+    log "ERREUR : le fichier chiffre vient d'etre ecrit mais ne se relit pas correctement."
+    log "Rien n'a ete conserve pour cette execution -- pas de sauvegarde silencieusement cassee."
+    exit 1
+fi
+
+mv "$fichier_tmp" "$fichier_final"
+taille=$(stat -c%s "$fichier_final")
+log "Sauvegarde ecrite et verifiee : $fichier_final ($taille octets)"
 
 # Rotation : ne garder que les fichiers de moins de RETENTION_JOURS jours.
-find "$DOSSIER_SAUVEGARDES" -name 'vera_state_*.db.enc' -mtime "+$RETENTION_JOURS" -print -delete \
+# NOTE : `find -mtime +N` retient en pratique jusqu'a N+1 jours (arrondi
+# de find sur les jours entiers, verifie le 22/09/2026) -- sans
+# consequence ici, cette table ne contient plus rien de sensible.
+find "$DOSSIER_SAUVEGARDES" -name 'vera_historique_*.db.enc' -mtime "+$RETENTION_JOURS" -print -delete \
     | while read -r f; do log "Supprime (retention $RETENTION_JOURS j) : $f"; done
 
-log "OK. $(ls "$DOSSIER_SAUVEGARDES"/vera_state_*.db.enc 2>/dev/null | wc -l) sauvegarde(s) conservee(s)."
+log "OK. $(ls "$DOSSIER_SAUVEGARDES"/vera_historique_*.db.enc 2>/dev/null | wc -l) sauvegarde(s) conservee(s)."
 
-# RESTAURATION (a la main, en cas B de PROCEDURE_REPRISE_VERA.md) :
+# RESTAURATION :
 #   openssl enc -d -aes-256-cbc -pbkdf2 \
 #     -pass "file:/root/.vera_backup_key" \
-#     -in vera_state_<date>.db.enc -out vera_state.db
+#     -in vera_historique_<date>.db.enc -out historique_restaure.db
 #
-# RECUPERATION HORS DU SERVEUR (a faire toi-meme, periodiquement -- ce
-# script ne l'automatise pas) : depuis ton telephone, en Termux,
-#   scp root@<ip-serveur>:/root/sauvegardes_vera/vera_state_*.db.enc .
-# Une sauvegarde qui ne quitte jamais ce serveur ne protege pas contre la
-# perte de ce serveur precisement -- seulement contre une corruption locale.
+# Ceci restaure UNIQUEMENT le registre des 4 consultations / 12 mois, pas
+# une consultation active -- voir l'en-tete de ce fichier. Une base
+# neuve (cas B de PROCEDURE_REPRISE_VERA.md) peut reimporter cette table
+# directement pour ne pas perdre la regle de frequence.
