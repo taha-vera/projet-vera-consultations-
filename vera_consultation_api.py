@@ -1882,6 +1882,23 @@ def declarer_groupes(payload: DeclarerGroupesRequete,
     """
     exiger_session(session_vera)
 
+    # ORDRE DE LA QUESTION (D3, audit cible du 10/2026). definir_question
+    # refuse (409) des que la premiere cle existe -- or declarer_groupes cree
+    # TOUTES les cles du lot immediatement, plus bas. Sans ce controle, un RH
+    # qui declarait ses groupes avant de rediger l'intitule figeait une
+    # question VIDE (''), sans recours autre que recommencer toute la
+    # consultation. Le texte d'aide de admin.html annoncait a tort que le gel
+    # survenait « a la generation du premier lien » -- en realite, ici, des
+    # la declaration.
+    if persistance.charger_question() is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Definissez d'abord l'intitule de la consultation "
+                   "(POST /api/rh/question). Declarer les groupes cree "
+                   "immediatement toutes les cles et fige la question : le "
+                   "faire dans le mauvais ordre figerait un intitule vide.",
+        )
+
     if persistance.charger_groupes_declares() is not None:
         raise HTTPException(
             status_code=409,
