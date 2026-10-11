@@ -317,6 +317,33 @@ def page_vote():
 
 verrou = threading.Lock()
 
+# Verrou DEDIE a declarer_groupes (Temps 1), distinct de `verrou` ci-dessus
+# (comptage des votes / budget epsilon).
+#
+# POURQUOI UN VERROU SEPARE. declarer_groupes peut tenir ce verrou plusieurs
+# secondes, voire plusieurs dizaines de secondes pour une organisation a
+# nombreux groupes (generation RSA-2048 : environ 0,13s par groupe, mesure
+# le 10/2026). Le reutiliser gelerait le depot de votes en cours et le
+# budget epsilon pendant toute cette duree -- des operations sans aucun
+# rapport avec la declaration des groupes.
+#
+# POURQUOI UN VERROU DU TOUT. Audit cible du 10/2026, D1 : rien n'empechait
+# deux appels concurrents a declarer_groupes de passer tous les deux le
+# controle "pas encore declare" (charger_groupes_declares() is None), de
+# creer chacun leurs propres cles (additives, jamais exclusives cote
+# gestionnaire_signature), puis d'ecrire chacun sa propre liste via un
+# UPSERT qui acceptait sans erreur une seconde ecriture. La liste persistee
+# finissait par etre celle du dernier arrive ; l'agregat, lui, restait celui
+# de TOUTES les cles creees par les DEUX appels -- un groupe fantome,
+# signable nulle part (bloque par le controle redondant de
+# generer_autorisations) mais present dans l'agregat que le RH est invite a
+# publier hors bande. Reproduit avec un vrai serveur et deux requetes HTTP
+# authentifiees, legerement decalees.
+#
+# Le serveur tourne en un seul worker (WEB_CONCURRENCY impose a 1, voir plus
+# haut) : un verrou de module suffit, pas besoin d'un verrou distribue.
+_verrou_declaration_groupes = threading.Lock()
+
 
 # Compteurs cumules par departement, jamais une liste de reponses
 # individuelles -- decision actee apres challenge multi-IA (ChatGPT + Grok,
@@ -1282,13 +1309,54 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
                    "maintenant invaliderait les liens deja distribues.",
         )
 
-    # SEULEMENT MAINTENANT. Empreinte de la cle publique de l'epoque
-    # (engagement de cle) : le RH la met dans chaque lien, le client verifiera
-    # la cle recue contre elle.
-    try:
-        pk_der = gestionnaire_signature.cle_publique(payload.departement)
-    except RuntimeError:
-        raise HTTPException(status_code=503, detail="Aucune consultation active.")
+    # NE CREE JAMAIS DE CLE ICI (D2, audit cible du 10/2026).
+    #
+    # Avant ce correctif, cette ligne appelait cle_publique() -- CREATRICE si
+    # la cle est absente. Cela semblait sans risque : declarer_groupes cree
+    # deja toutes les cles, et le controle juste au-dessus exige que le
+    # groupe soit declare. Mais apres expiration des cles (7 jours) PUIS un
+    # redemarrage du processus, ouvrir_consultation() efface les cles
+    # expirees de la memoire tandis que `groupes_declares` survit (seule la
+    # cloture explicite l'efface). Un lot de jetons genere a ce moment pour
+    # UN SEUL groupe recreait alors une cle ISOLEE pour ce groupe -- exactement
+    # le defaut que la declaration prealable existe pour empecher. Les liens
+    # de ce lot embarquaient un agregat qui ne couvrait que ce groupe, perime
+    # des qu'un AUTRE groupe declare recevait a son tour un lot et sa propre
+    # cle. Reproduit en vieillissant l'horodatage de creation des cles puis en
+    # simulant le redemarrage.
+    #
+    # cles_publiques_toutes() ne cree rien ; elle ne renvoie que les cles
+    # ACTIVES (pas les expirees, a la difference de cle_publique_si_existe,
+    # reservee aux endpoints publics ou l'expired-mais-verifiable est le bon
+    # comportement).
+    cles_actives = {d["departement"] for d in gestionnaire_signature.cles_publiques_toutes()}
+    if payload.departement not in cles_actives:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Aucune cle active pour « {payload.departement} ». Si la "
+                   "consultation a redemarre apres expiration des cles (7 "
+                   "jours), aucune cle ne peut etre recreee pour un seul "
+                   "groupe sans fausser l'agregat deja publie hors bande. "
+                   "Cloturez et recommencez la consultation.",
+        )
+
+    # INVARIANT (D1 + D2) : l'ensemble des cles ACTIVES doit correspondre
+    # EXACTEMENT a la liste declaree -- ni cle manquante (expiration suivie
+    # d'un redemarrage avant que tous les groupes aient regenere un lot, D2),
+    # ni cle en trop (groupe fantome d'une course sur declarer_groupes, D1 --
+    # desormais empechee par _verrou_declaration_groupes, mais ceci reste un
+    # filet de securite si ce verrou etait un jour retire ou mal pose).
+    # Sans ce controle, l'agregat renvoye juste apres pourrait ne correspondre
+    # ni a ce que le RH croit avoir declare, ni a ce qu'il a deja publie hors
+    # bande pour un lot anterieur.
+    if cles_actives != set(declares):
+        raise HTTPException(
+            status_code=503,
+            detail="Incoherence entre les cles actives et la liste des "
+                   "groupes declares : aucun lien ne peut etre genere de "
+                   "maniere fiable dans cet etat. Contactez le support "
+                   "technique avant de reessayer.",
+        )
 
     # Le lien porte l'empreinte de l'ENSEMBLE des cles, pas celle du seul
     # groupe concerne.
@@ -1879,15 +1947,44 @@ def declarer_groupes(payload: DeclarerGroupesRequete,
 
     groupes.sort()
 
-    # Creer toutes les cles MAINTENANT, pour que l'empreinte soit complete.
-    try:
-        for nom in groupes:
-            gestionnaire_signature.cle_publique(nom)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    # SEQUENCE CRITIQUE (D1, audit cible du 10/2026) : relire l'etat
+    # "pas encore declare", creer toutes les cles, puis ecrire la liste
+    # doivent s'executer comme une seule operation. Le controle fait plus
+    # haut (hors verrou) n'est qu'un raccourci pour le cas courant ; c'est
+    # CELUI-CI, sous _verrou_declaration_groupes, qui empeche reellement un
+    # second appel concurrent de s'intercaler entre lecture, creation et
+    # ecriture -- la course que le controle seul, sans verrou, laissait
+    # passer (deux requetes HTTP authentifiees, legerement decalees,
+    # recevaient toutes les deux ce controle a "pas encore declare").
+    with _verrou_declaration_groupes:
+        if persistance.charger_groupes_declares() is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Les groupes ont deja ete declares pour cette "
+                       "consultation (ecriture concurrente detectee pendant "
+                       "la preparation). Rechargez la page.",
+            )
 
-    persistance.persister_groupes_declares(groupes)
-    agregat = gestionnaire_signature.agregat_cles()
+        # Creer toutes les cles MAINTENANT, pour que l'empreinte soit complete.
+        try:
+            for nom in groupes:
+                gestionnaire_signature.cle_publique(nom)
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e))
+
+        # Defense en profondeur : meme si ce verrou etait un jour retire ou
+        # mal pose, persister_groupes_declares() refuse desormais d'ecraser
+        # une liste deja presente -- UPDATE conditionnelle sur
+        # groupes_declares IS NULL, voir sa docstring dans
+        # vera_persistance.py -- et le signale par sa valeur de retour.
+        if not persistance.persister_groupes_declares(groupes):
+            raise HTTPException(
+                status_code=409,
+                detail="Les groupes ont deja ete declares pour cette "
+                       "consultation (ecriture concurrente detectee a la "
+                       "persistance). Rechargez la page.",
+            )
+        agregat = gestionnaire_signature.agregat_cles()
 
     # Avertissement de frequence. Chaque publication apprend un peu sur la
     # population : quatre consultations annuelles sur un meme groupe restent

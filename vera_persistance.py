@@ -932,16 +932,40 @@ def compter_consultations_recentes(groupe, fenetre_secondes=365 * 24 * 3600):
 
 
 def persister_groupes_declares(groupes):
-    """Fige la liste des groupes. Ecrit sur la ligne de question_active."""
+    """Fige la liste des groupes. Ecrit sur la ligne de question_active,
+    SEULEMENT si aucune liste n'y est deja inscrite.
+
+    Renvoie True si l'ecriture a eu lieu, False si une liste existait deja --
+    l'appelant DOIT verifier cette valeur et refuser (409) dans ce cas.
+
+    DEFENSE EN PROFONDEUR, PAS LA PROTECTION PRINCIPALE. L'appelant
+    (declarer_groupes) serialise deja les appels concurrents avec un verrou
+    de module ; ce False ne devrait jamais survenir en pratique. Mais avant
+    le 10/2026, cette fonction utilisait un UPSERT inconditionnel
+    (`ON CONFLICT(id) DO UPDATE SET groupes_declares = excluded...`), qui
+    acceptait SANS ERREUR une seconde ecriture quelle que soit la valeur
+    deja presente. Deux appels concurrents a declarer_groupes passaient
+    alors tous les deux le controle amont ("pas encore declare"), creaient
+    chacun leurs cles (additives cote gestionnaire_signature, jamais
+    exclusives), et le second ecrasait silencieusement la liste du premier
+    -- pendant que l'agregat publie au RH continuait de couvrir les cles des
+    DEUX appels. Audit cible du 10/2026 (D1), reproduit avec un vrai
+    serveur. La clause WHERE ci-dessous rend cette ecriture refusee, et
+    verifiable, meme si le verrou amont etait un jour retire ou mal pose."""
     import json as _json
     with _verrou_db:
-        _conn.execute(
+        curseur = _conn.execute(
             "INSERT INTO question_active (id, intitule, groupes_declares) "
             "VALUES (1, '', ?) "
-            "ON CONFLICT(id) DO UPDATE SET groupes_declares = excluded.groupes_declares",
+            "ON CONFLICT(id) DO UPDATE SET groupes_declares = excluded.groupes_declares "
+            "WHERE question_active.groupes_declares IS NULL",
             (_json.dumps(groupes, ensure_ascii=False),),
         )
+        if curseur.rowcount == 0:
+            _conn.rollback()
+            return False
         _conn.commit()
+        return True
 
 
 def charger_ouverture_depots():
