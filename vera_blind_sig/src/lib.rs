@@ -30,20 +30,31 @@ fn aveugler_message(cle_publique_der: Vec<u8>, message: Vec<u8>) -> PyResult<(Ve
         .map_err(|e| PyValueError::new_err(format!("Cle publique invalide: {e}")))?;
     let resultat = pk.blind(&mut DefaultRng, &message)
         .map_err(|e| PyValueError::new_err(format!("Erreur aveuglement: {e}")))?;
-    // unwrap_or_default() rend un vecteur VIDE si le crate ne produit pas de
-    // randomizer. finaliser_signature en exige alors exactement 32 octets et
-    // refuse -- mais l'echec surviendrait APRES que le serveur a signe et
-    // consomme le jeton : le votant perdrait sa voix sans recours.
+    // Le type qui compte ici est celui code en dur juste au-dessus
+    // (PublicKeySha384PSSRandomized::from_der, ligne 29) -- PAS le
+    // KeyPair::<Sha384, PSS, Randomized> de generer_cles (ligne 9). Le DER
+    // SPKI ne code pas le mode Randomized/Deterministic : changer seulement
+    // la ligne 9 n'aurait aucun effet ici. Une premiere version de ce
+    // commentaire (03/09/2026) renvoyait vers la ligne 9 -- corrige le
+    // 24/09/2026 par un audit cible, verifie contre le crate source
+    // (blind-rsa-signatures 0.17.2, lib.rs:299 et :742) : avec ce type,
+    // blind() renvoie toujours Some(MessageRandomizer), jamais None. Le cas
+    // ci-dessous est donc inatteignable aujourd'hui.
     //
-    // Le type Randomized (voir generer_cles) garantit sa presence : le cas ne
-    // peut pas se produire tant que ce parametre de type ne change pas. C'est
-    // une fragilite de forme, relevee lors de la premiere lecture de ce fichier
-    // le 03/09/2026 -- dix audits l'avaient laisse dans leurs angles morts,
-    // faute de chaine Rust.
-    //
-    // Si le type devait changer, echouer ICI plutot qu'a la finalisation : le
-    // jeton n'est pas encore consomme a ce stade.
-    let randomizer_bytes: Vec<u8> = resultat.msg_randomizer.map(|r| r.0.to_vec()).unwrap_or_default();
+    // ok_or_else PLUTOT QUE unwrap_or_default : si ce type venait a changer
+    // un jour vers une variante Deterministic, on veut echouer ICI, avant
+    // que le serveur ait signe et consomme le jeton -- pas plus tard dans
+    // finaliser_signature, ou le votant perdrait sa voix sans recours.
+    // Un unwrap_or_default() precedent rendait un vecteur VIDE dans ce cas
+    // au lieu d'echouer : la ligne suivante fermait ce trou en apparence
+    // seulement, l'intention n'etait pas realisee par le code.
+    let randomizer_bytes: Vec<u8> = resultat
+        .msg_randomizer
+        .map(|r| r.0.to_vec())
+        .ok_or_else(|| PyValueError::new_err(
+            "Aveuglement sans randomizer : le type de cle a change, ou le crate ne garantit plus \
+             Some(MessageRandomizer) pour ce mode. Echoue ici plutot qu'a la finalisation."
+        ))?;
     Ok((resultat.blind_message.into(), resultat.secret.into(), randomizer_bytes))
 }
 
@@ -63,6 +74,15 @@ fn finaliser_signature(
     }
     let mut randomizer_array = [0u8; 32];
     randomizer_array.copy_from_slice(&msg_randomizer);
+    // NOTE (audit cible du 24/09/2026, verifie contre le crate source) :
+    // pk.finalize() ci-dessous ne lit jamais blind_message -- seuls
+    // blind_sig et result.secret le sont (blind-rsa-signatures 0.17.2,
+    // lib.rs:~772-789). Passer une valeur vide ou incoherente ici ne fait
+    // pas echouer la finalisation. Ce n'est pas un probleme de securite : la
+    // signature obtenue est verifiee juste apres, dans finalize() lui-meme
+    // (self.verify(...)), donc une falsification serait de toute facon
+    // rejetee la. Le parametre reste dans cette API pour rester explicite
+    // sur ce que BlindingResult transporte, pas parce qu'il est verifie ici.
     let blinding_result = blind_rsa_signatures::BlindingResult {
         blind_message: blind_message.into(),
         secret: secret.into(),
