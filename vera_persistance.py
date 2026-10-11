@@ -1252,13 +1252,32 @@ def persister_publication_atomique(departement, epsilon_consomme, nb_publication
     transaction. Empeche l'etat incoherent "budget consomme mais resultat
     absent" qui, apres un crash entre deux commits separes, verrouillait
     definitivement un departement (deja_publie=True mais resultat introuvable).
-    Un crash laisse desormais soit les deux ecritures, soit aucune."""
+    Un crash laisse desormais soit les deux ecritures, soit aucune.
+
+    DURCISSEMENT (audit cible du 10/2026, D1) : l'ecriture dans
+    resultats_publies n'a PLUS de clause ON CONFLICT. L'appelant unique
+    (_publier_departement) ne doit jamais appeler cette fonction deux fois
+    pour le meme departement -- il lit resultats_publies AVANT (court-circuit
+    "deja publie") precisement pour l'eviter. Si cette fonction est malgre
+    tout appelee une seconde fois pour le meme departement, c'est que ce
+    court-circuit a echoue : la contrainte PRIMARY KEY doit alors lever une
+    IntegrityError bruyante, jamais ecraser silencieusement un resultat deja
+    fige en moyennant un second tirage de bruit sur le meme vecteur (ce qui
+    annulerait le bruit -- voir vera_dp_noise.py)."""
     import json
     with _verrou_db:
-        sql_budget = "INSERT INTO budget_epsilon (departement, epsilon_consomme, nb_publications) VALUES (?, ?, ?) ON CONFLICT(departement) DO UPDATE SET epsilon_consomme = excluded.epsilon_consomme, nb_publications = excluded.nb_publications"
-        _conn.execute(sql_budget, (departement, epsilon_consomme, nb_publications))
-        sql_resultat = "INSERT INTO resultats_publies (departement, resultat_json) VALUES (?, ?) ON CONFLICT(departement) DO UPDATE SET resultat_json = excluded.resultat_json"
-        _conn.execute(sql_resultat, (departement, json.dumps(resultat_dict)))
+        try:
+            sql_budget = "INSERT INTO budget_epsilon (departement, epsilon_consomme, nb_publications) VALUES (?, ?, ?) ON CONFLICT(departement) DO UPDATE SET epsilon_consomme = excluded.epsilon_consomme, nb_publications = excluded.nb_publications"
+            _conn.execute(sql_budget, (departement, epsilon_consomme, nb_publications))
+            sql_resultat = "INSERT INTO resultats_publies (departement, resultat_json) VALUES (?, ?)"
+            _conn.execute(sql_resultat, (departement, json.dumps(resultat_dict)))
+        except Exception:
+            # Rollback explicite : sans lui, l'ecriture budget_epsilon qui a
+            # reussi juste au-dessus resterait en attente sur cette connexion
+            # (transaction implicite jamais commitee), pret a etre commitee
+            # par erreur par un futur appel sans rapport sur la meme connexion.
+            _conn.rollback()
+            raise
         _conn.commit()  # un seul commit -> atomicite
 
 

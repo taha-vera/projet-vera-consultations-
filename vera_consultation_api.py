@@ -1371,6 +1371,19 @@ def _publier_departement(departement, effectif):
 
     Retourne un dict pret a etre renvoye au client.
     """
+    # GARDE-FOU, pas une preuve : threading.Lock.locked() dit qu'UN thread tient
+    # le verrou, pas que c'est CELUI-CI. N'empeche donc pas un appel mal protege
+    # par le meme thread, mais attrape l'oubli le plus probable -- un futur
+    # appelant ajoute sans `with verrou:`. Un if explicite, pas un assert : ce
+    # dernier disparait avec python -O (meme raison que pour signer_aveugle).
+    if not verrou.locked():
+        raise RuntimeError(
+            "_publier_departement() appelee sans que 'verrou' soit tenu par "
+            "l'appelant -- violation de l'invariant documente plus haut. Deux "
+            "appels concurrents pourraient sinon publier deux tirages de bruit "
+            "differents pour le meme departement."
+        )
+
     etat_avant = budget_epsilon.etat(departement)
 
     if etat_avant["nombre_publications"] > 0:
@@ -1686,16 +1699,30 @@ def cloturer_consultation(session_vera: Optional[str] = Cookie(None)):
         compteurs_par_departement.clear()
         effectif_par_departement.clear()
 
-    # 5. Vider le set des tokens consommes du gestionnaire.
-    try:
-        gestionnaire_signature._tokens_consommes.clear()
-        # Le budget epsilon en memoire doit etre purge comme les autres
-        # registres : la table est videe par effacer_etat_consultation, mais
-        # sans ce reset l'objet garderait nombre_publications > 0 et rendrait
-        # tout departement de meme nom non publiable a la consultation suivante.
-        budget_epsilon.reset()
-    except Exception:
-        pass
+        # 5. Vider le set des tokens consommes et le budget epsilon en memoire.
+        #
+        # DURCISSEMENT (audit cible du 10/2026, D3) : ces deux lignes sont
+        # desormais SOUS LE MEME VERROU que les etapes 1-4, et non plus apres
+        # sa liberation. Rien d'exploitable ne s'en servait aujourd'hui (voir
+        # l'audit : la cle de signature est detruite a l'etape 2 et rouverte
+        # seulement apres ce bloc, donc aucun /api/signer_aveugle ne peut
+        # recreer un effectif entre la liberation du verrou et ce reset) --
+        # mais faire reposer la garantie sur l'ordre de DEUX fonctions
+        # differentes plutot que sur un seul verrou est plus fragile que
+        # necessaire pour un cout nul.
+        try:
+            gestionnaire_signature._tokens_consommes.clear()
+            # Le budget epsilon en memoire doit etre purge comme les autres
+            # registres : la table est videe par effacer_etat_consultation, mais
+            # sans ce reset l'objet garderait nombre_publications > 0 et rendrait
+            # tout departement de meme nom non publiable a la consultation suivante.
+            budget_epsilon.reset()
+        except Exception as e:
+            # NE JAMAIS avaler cette erreur en silence (ancien comportement :
+            # `except Exception: pass`). A ce stade la base est deja effacee
+            # (etape 3) ; un reset manque ici laisserait la memoire en
+            # desaccord avec elle, sans qu'aucune trace n'en dise rien.
+            print(f"ATTENTION : purge memoire post-cloture incomplete ({e}).")
 
     # 6. Rouvrir une consultation neuve (nouvelle cle) pour un usage ulterieur.
     #    ISOLE DANS UN try : a ce stade les donnees sont DEJA detruites et les
