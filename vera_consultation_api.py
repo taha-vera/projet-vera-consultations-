@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from cryptography.hazmat.primitives import serialization
 
 import vera_admin_auth as auth
 import vera_blind_sig as vbs
@@ -1038,27 +1039,99 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
                    "une nouvelle invitation.",
         )
 
-    departement = persistance.consommer_jeton_autorisation(payload.jeton_autorisation)
+    # Lecture SEULE du departement, AVANT de consommer le jeton -- pour
+    # connaitre n (le modulus RSA de ce departement) et signer avant de
+    # consommer. Cet ordre ferme la CLASSE entiere des echecs qui
+    # consommaient le jeton puis perdaient la voix (pas seulement le cas
+    # message_aveugle >= n : tout refus impreveu du module Rust, cf. le
+    # filet plus bas). consommer_jeton_autorisation, appele plus bas, reste
+    # la seule source de verite ATOMIQUE pour l'anti-double-vote
+    # (vera_persistance.py, UPDATE ... WHERE utilise=0 + rowcount,
+    # inchangee) : cette lecture ne fait qu'anticiper. Audit cible du
+    # 24-25/09/2026 sur vera_blind_sig/src/lib.rs.
+    departement = persistance.lire_departement_jeton(payload.jeton_autorisation)
     if departement is None:
         raise HTTPException(status_code=403, detail="Jeton d'autorisation invalide ou deja utilise.")
 
-    # 3. Signer a l'aveugle (seule etape serveur du protocole RSABSSA).
+    # cle_publique_si_existe, PAS cle_publique : lecture seule, ne demarre
+    # pas le minuteur d'expiration de la consultation au premier appel
+    # (vera_signature_manager.py, _obtenir_ou_creer_cle). Meme fonction que
+    # /api/cle_publique, ou un client honnete recupere deja n -- un
+    # departement legitime a donc toujours sa cle a ce stade.
+    try:
+        cle_pub_der = gestionnaire_signature.cle_publique_si_existe(departement)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Aucune consultation active.")
+    except KeyError:
+        raise HTTPException(status_code=403, detail="Jeton d'autorisation invalide ou deja utilise.")
+
+    # RSABSSA opere modulo n : un message aveugle valide verifie m < n. La
+    # validation de longueur ci-dessus ne couvre pas ce cas -- un message de
+    # EXACTEMENT 256 octets peut quand meme representer une valeur >= n.
+    # Sans ce controle, un tel message consommait le jeton puis echouait a
+    # la signature (voir plus bas) : la voix etait perdue sans recours.
+    # Erreur du CLIENT : 422, pas 503 -- reessayer ne changerait rien.
+    n = serialization.load_der_public_key(cle_pub_der).public_numbers().n
+    if int.from_bytes(message_aveugle, "big") >= n:
+        raise HTTPException(
+            status_code=422,
+            detail="message_aveugle_hex ne represente pas une valeur valide pour cette cle publique.",
+        )
+
+    # 3. Signer a l'aveugle (seule etape serveur du protocole RSABSSA) --
+    # AVANT de consommer le jeton. Tout refus d'ici, prevu ou non, laisse
+    # donc le jeton intact plutot que de perdre la voix.
     try:
         sig_aveugle = gestionnaire_signature.signer_message_aveugle(departement, message_aveugle)
-    except (RuntimeError, ValueError) as e:
+    except (RuntimeError, ValueError, KeyError) as e:
         # Endpoint PUBLIC : le detail de l'exception reste cote serveur. Le
         # renvoyer exposerait des internes du gestionnaire de signature a
         # quiconque appelle la route, sans rien apporter au votant -- qui ne
         # peut de toute facon qu'attendre ou demander un nouveau lien.
         #
         # ValueError AJOUTE : le module Rust leve PyValueError sur toute
-        # entree malformee qu'il rejette (vera_blind_sig/src/lib.rs), qui
-        # devient ValueError en Python. La validation de longueur ci-dessus
-        # ferme le cas CONNU ; cette capture est le filet pour tout ce que le
-        # Rust pourrait encore refuser sans qu'on l'ait anticipe -- le jeton
-        # est deja consomme a ce stade, un 500 nu serait la pire reponse
-        # possible.
+        # entree malformee qu'il rejette (vera_blind_sig/src/lib.rs). Cette
+        # capture est le filet pour tout ce que le Rust pourrait encore
+        # refuser sans qu'on l'ait anticipe -- et depuis ce correctif, le
+        # jeton n'est PAS encore consomme a ce stade : ce filet ne coute
+        # plus de voix, quelle que soit la raison du refus.
+        #
+        # KeyError AJOUTE : signer_message_aveugle est lecture seule depuis
+        # ce correctif (vera_signature_manager.py) -- elle ne cree plus de
+        # cle. Le seul moyen d'atteindre ce cas est qu'une consultation se
+        # soit fermee ET qu'une nouvelle se soit ouverte pour ce departement
+        # entre le controle ci-dessus et cet appel : une action RH complete
+        # entre deux lignes d'une meme requete, pas atteignable en pratique,
+        # mais traite proprement plutot que suppose impossible.
         print(f"ERREUR : signature aveugle impossible pour '{departement}' : {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Le service de signature est momentanement indisponible. Reessayez dans quelques instants.",
+        )
+
+    # Consommation reelle, ATOMIQUE, maintenant que la signature existe.
+    # Cas rare : ce jeton a ete consomme par une autre requete concurrente
+    # entre la lecture ci-dessus et cet appel -- la signature qu'on vient de
+    # calculer n'est alors PAS renvoyee, exactement comme ce cas se
+    # comportait deja avant ce correctif.
+    departement_consomme = persistance.consommer_jeton_autorisation(payload.jeton_autorisation)
+    if departement_consomme is None:
+        raise HTTPException(status_code=403, detail="Jeton d'autorisation invalide ou deja utilise.")
+    if departement_consomme != departement:
+        # PAS un assert : ce code tourne avec `python -O` sur le serveur
+        # (aucune garantie explicite du contraire), qui supprime purement et
+        # simplement les instructions assert -- ce controle disparaitrait
+        # silencieusement. Anomalie de coherence des donnees, pas un cas
+        # normal : la signature existe deja (calcul RSA prive effectue) mais
+        # ne DOIT pas etre renvoyee tant que le departement declare ne
+        # correspond pas exactement a celui lu au debut de cette requete.
+        # Rien de sig_aveugle ne doit fuiter ici -- ni dans le detail, ni
+        # dans un log qui l'inclurait en clair.
+        print(
+            f"ERREUR : incoherence jeton -- lire_departement_jeton a rendu "
+            f"'{departement}', consommer_jeton_autorisation '{departement_consomme}', "
+            f"pour le meme jeton."
+        )
         raise HTTPException(
             status_code=503,
             detail="Le service de signature est momentanement indisponible. Reessayez dans quelques instants.",

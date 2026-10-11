@@ -646,6 +646,29 @@ def persister_jeton_autorisation(jeton, departement):
         _conn.commit()
 
 
+def lire_departement_jeton(jeton):
+    """Lecture SEULE : renvoie le departement associe a ce jeton, ou None si
+    le jeton est inconnu ou deja utilise. Ne modifie PAS `utilise`.
+
+    A la difference de consommer_jeton_autorisation, ne consomme rien : sert
+    a connaitre le departement (donc la cle publique, donc le modulus n) et
+    a signer AVANT de consommer, pour que le jeton reste intact si la
+    signature echoue -- audit cible du 24-25/09/2026 sur
+    vera_blind_sig/src/lib.rs. consommer_jeton_autorisation reste la seule
+    source de verite ATOMIQUE pour l'anti-double-vote (UPDATE ... WHERE
+    utilise=0 + rowcount, ci-dessous, inchangee) : un jeton lu ici comme
+    valide peut avoir ete consomme par une autre requete concurrente au
+    moment de l'appel a consommer_jeton_autorisation -- celle-ci le detecte
+    alors normalement (renvoie None), sans consequence nouvelle."""
+    with _verrou_db:
+        emp = _empreinte_jeton(jeton)
+        row = _conn.execute(
+            "SELECT departement FROM jetons_autorisation WHERE jeton = ? AND utilise = 0",
+            (emp,),
+        ).fetchone()
+    return row[0] if row else None
+
+
 def consommer_jeton_autorisation(jeton):
     """Consomme un jeton d'autorisation de facon ATOMIQUE. Renvoie le
     departement si le jeton existait et n'etait pas encore utilise, sinon None.

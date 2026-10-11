@@ -359,11 +359,26 @@ class GestionnaireSignature:
         clair (il est aveugle), ne fait PAS l'aveuglement (le client l'a fait)
         ni la finalisation (le client la fera). Il ne peut donc pas relier ce
         qu'il signe au token final -> unlinkability effective.
+
+        LECTURE SEULE depuis le 25-26/09/2026 (audit cible sur
+        vera_blind_sig/src/lib.rs, D1) : leve KeyError si la cle n'existe pas
+        deja, NE LA CREE PLUS. L'appelant (/api/signer_aveugle) verifie deja
+        la cle via cle_publique_si_existe() et en extrait n AVANT d'appeler
+        cette methode, pour rejeter un message_aveugle >= n sans consommer le
+        jeton. Si cette methode creait encore une cle a la volee, un cas
+        limite (cle absente au moment du controle, presente au moment de
+        signer -- inatteignable en pratique, voir plus bas, mais plus
+        possible du tout maintenant par construction) signerait avec un n
+        different de celui verifie. Seul appelant dans ce depot :
+        /api/signer_aveugle, qui a deja verifie la cle juste avant -- cette
+        methode ne cree donc plus jamais de cle en usage normal.
         Renvoie la signature aveugle (bytes)."""
         with self._verrou:
             if not self._consultation_ouverte:
                 raise RuntimeError("Impossible de signer: aucune consultation active.")
-            priv, _pub = self._obtenir_ou_creer_cle(departement)
+            if departement not in self._cles:
+                raise KeyError(departement)
+            priv, _pub = self._cles[departement]
             sig_aveugle = bytes(vbs.signer_aveugle(list(priv), list(message_aveugle_bytes)))
         return sig_aveugle
 
