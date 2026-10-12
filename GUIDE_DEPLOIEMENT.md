@@ -66,7 +66,7 @@ de liens utilisables. Détail et clause type : `LIMITS.md` §12bis.
 
 Une seule question, trois réponses possibles : oui, non, je m'abstiens.
 
-La question se fige dès la génération du premier lien et ne peut plus être
+La question se fige dès la déclaration des groupes et ne peut plus être
 modifiée. C'est volontaire : la changer en cours de route permettrait de
 mélanger des réponses portant sur deux questions différentes.
 

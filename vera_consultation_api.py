@@ -609,8 +609,10 @@ def _reinitialiser_echecs(ip: str, compte: str = "") -> None:
 
 
 # Valeur par DEFAUT. L'intitule reel est defini par l'organisation via
-# POST /api/rh/question, tant qu'aucune cle n'existe (donc avant la generation
-# du premier lien). Il est ensuite fige pour toute la consultation : le laisser
+# POST /api/rh/question, tant qu'aucune cle n'existe (donc avant la
+# declaration des groupes, qui cree toutes les cles d'un coup -- PAS avant
+# la generation du premier lien, une etape ulterieure ; cf. D3, audit cible
+# 10/2026). Il est ensuite fige pour toute la consultation : le laisser
 # modifiable permettrait de recueillir 200 reponses sur une question, de la
 # changer, puis d'en recueillir 40 autres et de publier le tout comme un
 # resultat unique -- une manipulation invisible dans les chiffres.
@@ -640,7 +642,8 @@ def question_courante():
     defaut aux votants suivants, dont les reponses etaient comptees dans le MEME
     compteur que celles portant sur la vraie question. Substitution silencieuse
     de question -- exactement ce que definir_question interdit deliberement en
-    figeant l'intitule des la generation du premier lien.
+    figeant l'intitule des la declaration des groupes (pas a la generation du
+    premier lien, une etape ulterieure ; cf. D3, audit cible 10/2026).
 
     Nouveau comportement : on sert le dernier intitule lu avec succes (cache
     memoire), et si aucun n'a jamais ete lu, on refuse plutot que de deviner.
@@ -1849,7 +1852,9 @@ def definir_question(payload: QuestionRequete, session_vera: Optional[str] = Coo
     """Definit l'intitule de la consultation.
 
     N'est accepte que tant qu'AUCUNE cle n'existe, c'est-a-dire avant la
-    generation du premier lien. Ensuite la question est figee : la modifier en
+    declaration des groupes -- qui cree toutes les cles d'un coup (voir
+    declarer_groupes) -- PAS avant la generation du premier lien, une etape
+    ulterieure (cf. D3, audit cible 10/2026). Ensuite la question est figee : la modifier en
     cours de route permettrait de recueillir des reponses sur une question, de
     la changer, puis de publier l'ensemble comme un resultat unique -- une
     manipulation que rien dans les chiffres ne trahirait.
