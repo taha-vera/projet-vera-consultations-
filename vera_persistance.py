@@ -606,6 +606,14 @@ def _empreinte_jeton(jeton):
     return hashlib.sha256(jeton.encode("utf-8")).hexdigest()
 
 
+class CollisionJetonErreur(Exception):
+    """Levee par persister_jetons_autorisation_lot si l'empreinte d'un jeton
+    du lot coincide avec une empreinte deja en base (ou avec une autre
+    empreinte du MEME lot). Voir la docstring de cette fonction : c'est
+    volontairement un echec, jamais un lot partiel."""
+    pass
+
+
 def persister_jetons_autorisation_lot(jetons, departement):
     """Enregistre les empreintes de PLUSIEURS jetons en UNE transaction.
 
@@ -619,15 +627,43 @@ def persister_jetons_autorisation_lot(jetons, departement):
 
     Ici : un executemany, un commit, un fsync. Le gain est de deux ordres de
     grandeur sur un lot de 1000.
+
+    TOUT OU RIEN SUR COLLISION (D6, audit cible du 10/2026). Avant ce
+    correctif, l'INSERT portait `ON CONFLICT(jeton) DO NOTHING` : si
+    l'empreinte SHA-256 d'un jeton de ce lot coincidait avec une empreinte
+    deja presente (meme jeton regenere par hasard, ou authentique collision
+    de hachage entre deux jetons DIFFERENTS -- l'un et l'autre d'une
+    improbabilite astronomique avec 192 bits d'entropie par jeton, mais
+    fail-open si jamais cela arrivait, ou si un bug rendait un jour les
+    jetons moins aleatoires), la ligne en conflit etait silencieusement
+    ignoree. La fonction renvoyait quand meme un succes, et l'appelant
+    construisait N liens SMS pour, potentiellement, N-1 lignes persistees :
+    le jeton en trop ne menait a aucune ligne a lui, ou pire, partageait la
+    ligne d'un AUTRE jeton deja attribue -- deux liens, une seule
+    consommation possible, l'un des deux titulaires perdrait sa voix sans
+    qu'aucun message d'erreur n'apparaisse avant ce moment-la.
+
+    Desormais : aucune clause ON CONFLICT. Une collision fait echouer
+    `executemany` (IntegrityError, contrainte PRIMARY KEY sur `jeton`),
+    la transaction entiere est annulee -- AUCUN jeton du lot n'est persiste,
+    jamais un lot partiel -- et CollisionJetonErreur est levee pour que
+    l'appelant puisse re-essayer avec un tout nouveau lot plutot que de
+    rendre une reponse qui semblerait reussie.
     """
     if not jetons:
         return
     with _verrou_db:
-        _conn.executemany(
-            "INSERT INTO jetons_autorisation (jeton, departement, utilise) VALUES (?, ?, 0) "
-            "ON CONFLICT(jeton) DO NOTHING",
-            [(_empreinte_jeton(j), departement) for j in jetons],
-        )
+        try:
+            _conn.executemany(
+                "INSERT INTO jetons_autorisation (jeton, departement, utilise) VALUES (?, ?, 0)",
+                [(_empreinte_jeton(j), departement) for j in jetons],
+            )
+        except sqlite3.IntegrityError as e:
+            _conn.rollback()
+            raise CollisionJetonErreur(
+                f"collision d'empreinte de jeton pour le departement "
+                f"« {departement} » : {e}"
+            ) from e
         _conn.commit()
 
 

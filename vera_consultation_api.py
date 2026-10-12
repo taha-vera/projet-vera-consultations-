@@ -1395,7 +1395,22 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
     jetons = [secrets.token_urlsafe(24) for _ in range(payload.quantite)]
 
     # UNE SEULE transaction pour tout le lot (voir C-8 dans la persistance).
-    persistance.persister_jetons_autorisation_lot(jetons, payload.departement)
+    #
+    # D6 (audit cible du 10/2026) : CollisionJetonErreur signale que ce lot
+    # n'a PU ETRE PERSISTE DU TOUT (transaction annulee, voir la docstring de
+    # persister_jetons_autorisation_lot) -- jamais un lot partiel. Un simple
+    # nouvel appel tirera un lot entierement nouveau (secrets.token_urlsafe
+    # neuf a chaque fois) ; la probabilite d'une seconde collision est alors
+    # independante et tout aussi negligeable.
+    try:
+        persistance.persister_jetons_autorisation_lot(jetons, payload.departement)
+    except persistance.CollisionJetonErreur:
+        raise HTTPException(
+            status_code=503,
+            detail="Collision improbable detectee lors de la generation des "
+                   "jetons. Aucun jeton de ce lot n'a ete enregistre -- "
+                   "relancez simplement la generation.",
+        )
 
     for jeton in jetons:
         # TOUT le credential passe par le FRAGMENT (#), rien en query string.
