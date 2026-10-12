@@ -39,6 +39,20 @@ prouvee, pas l'absence.
 
 C'est aussi pourquoi un echec ici doit etre lu avec prudence : une machine
 chargee produit des correlations fantomes. Le test le dit dans son message.
+
+EXTENSION (audit cible 10/2026) : ce qui precede ne chronometre QUE
+appliquer_bruit_dp, prise isolement. Le chemin reellement expose par
+_publier_departement est publier_histogramme_dp, qui l'enchaine avec
+_projeter_sur_simplexe -- une boucle dont le nombre d'iterations
+dependait des DONNEES (une case de vote proche de zero oscillant sous
+zero bien plus longtemps qu'une repartition equilibree). Mesure
+independante avant correctif : jusqu'a 59 iterations contre 1 sur un cas
+realiste a N=240, ecart median jusqu'a 8,7 % de la duree d'appel, signe
+constant sur 7/7 repetitions -- un signal que ce fichier n'a jamais vu
+puisqu'il ne mesurait pas ce chemin. La PHASE 2 ci-dessous chronometre
+desormais publier_histogramme_dp au complet, sur le profil qui maximise
+cette variation (une case a zero), avec la meme methodologie que la
+PHASE 1 (seuil relatif, signe constant exige).
 """
 
 import itertools
@@ -52,7 +66,7 @@ import time
 RACINE = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE))
 
-from vera_dp_noise import appliquer_bruit_dp  # noqa: E402
+from vera_dp_noise import appliquer_bruit_dp, publier_histogramme_dp  # noqa: E402
 
 # Sept valeurs : les deux extremes de BOUNDS et cinq intermediaires. La
 # methodologie du 30/06 est conservee pour que les deux mesures restent
@@ -277,6 +291,74 @@ if p_u < SEUIL_P and ecart > seuil_ecart:
             + ", ".join(f"{d:+.0f}" for d in signes) + " ns.\n"
             "    Le signe est constant : ce n'est pas de l'ordonnanceur.")
 
+# --- PHASE 2 : pipeline complet publier_histogramme_dp (audit 10/2026) ---
+#
+# Tout ce qui precede chronometre appliquer_bruit_dp SEULE. Le chemin
+# reellement expose par _publier_departement est publier_histogramme_dp,
+# qui l'enchaine avec _projeter_sur_simplexe. On compare donc, a effectif
+# N=240 FIXE (seule la repartition change) :
+#   - EQUILIBRE    : aucune case ne s'approche de zero ;
+#   - CASE_LIMITE  : une case a zero -- le profil qui, avant correctif,
+#     maximisait le nombre d'iterations de la projection.
+# Memes criteres qu'en PHASE 1 : seuil relatif, signe constant exige.
+
+N_PIPELINE = 240
+EQUILIBRE_PIPELINE = {"oui": 80, "non": 80, "abstention": 80}
+CASE_LIMITE_PIPELINE = {"oui": 240, "non": 0, "abstention": 0}
+REPETITIONS_PIPELINE = 400
+
+
+def mesurer_pipeline(comptes, repetitions=1):
+    durees = []
+    for _ in range(repetitions):
+        debut = time.perf_counter_ns()
+        publier_histogramme_dp(comptes, N_PIPELINE)
+        durees.append(time.perf_counter_ns() - debut)
+    return statistics.median(durees) if repetitions > 1 else durees[0]
+
+
+eq_p, lim_p = [], []
+sequence_p = ([(EQUILIBRE_PIPELINE, eq_p), (CASE_LIMITE_PIPELINE, lim_p)]
+              * REPETITIONS_PIPELINE)
+random.shuffle(sequence_p)
+for comptes, cible in sequence_p:
+    cible.append(mesurer_pipeline(comptes))
+
+u_p, p_up = mann_whitney_u(eq_p, lim_p)
+med_eq_p, med_lim_p = statistics.median(eq_p), statistics.median(lim_p)
+ecart_p = abs(med_lim_p - med_eq_p)
+seuil_p_pipeline = statistics.median(eq_p + lim_p) * FRACTION_EXPLOITABLE
+
+signes_p = []
+if p_up < SEUIL_P and ecart_p > seuil_p_pipeline:
+    for _ in range(REPETITIONS_SIGNE):
+        e2, l2 = [], []
+        seq2 = ([(EQUILIBRE_PIPELINE, e2), (CASE_LIMITE_PIPELINE, l2)]
+                * 200)
+        random.shuffle(seq2)
+        for comptes, cible in seq2:
+            cible.append(mesurer_pipeline(comptes))
+        signes_p.append(statistics.median(l2) - statistics.median(e2))
+
+    positifs_p = sum(1 for d in signes_p if d > 0)
+    negatifs_p = sum(1 for d in signes_p if d < 0)
+    coherent_p = max(positifs_p, negatifs_p) >= MAJORITE_SIGNE
+
+    if coherent_p:
+        echecs.append(
+            f"PHASE 2 (pipeline complet) : la duree de "
+            f"publier_histogramme_dp differe selon la repartition des "
+            f"votes, de facon CONSTANTE : U = {u_p:.0f}, p = {p_up:.4f}, "
+            f"ecart median {ecart_p:.0f} ns sur "
+            f"{statistics.median(eq_p + lim_p):.0f} ns "
+            f"({100 * ecart_p / statistics.median(eq_p + lim_p):.1f} %).\n"
+            f"    mediane EQUILIBRE : {med_eq_p:.0f} ns ; "
+            f"CASE_LIMITE : {med_lim_p:.0f} ns.\n"
+            f"    Ecarts signes sur {REPETITIONS_SIGNE} repetitions : "
+            + ", ".join(f"{d:+.0f}" for d in signes_p) + " ns.\n"
+            "    Le signe est constant : probablement "
+            "_projeter_sur_simplexe qui n'itere plus a nombre fixe.")
+
 # --- Verdict --------------------------------------------------------------
 
 if echecs:
@@ -295,9 +377,22 @@ if signes:
                      ", ".join(f"{d:+.0f}" for d in signes) + " ns, "
                      "sens non constant")
 
-print(f"OK : Porte 3 -- aucun canal temporel exploitable. "
-      f"Spearman rho = {rho:+.3f} (p exact = {p:.4f}), etendue des medianes "
-      f"{etendue:.0f} ns ; ecart median aux bornes {ecart:.0f} ns sur "
-      f"{reference:.0f} ns ({100 * ecart / reference:.1f} %, seuil "
+reference_p = statistics.median(eq_p + lim_p)
+detail_signes_p = ""
+if signes_p:
+    detail_signes_p = ("; ecarts signes " +
+                       ", ".join(f"{d:+.0f}" for d in signes_p) + " ns, "
+                       "sens non constant")
+
+print(f"OK : Porte 3 (PHASE 1, appliquer_bruit_dp seule) -- aucun canal "
+      f"temporel exploitable. Spearman rho = {rho:+.3f} (p exact = {p:.4f}), "
+      f"etendue des medianes {etendue:.0f} ns ; ecart median aux bornes "
+      f"{ecart:.0f} ns sur {reference:.0f} ns "
+      f"({100 * ecart / reference:.1f} %, seuil "
       f"{100 * FRACTION_EXPLOITABLE:.0f} %){detail_signes}.")
+print(f"OK : Porte 3 (PHASE 2, pipeline publier_histogramme_dp complet) -- "
+      f"ecart median EQUILIBRE/CASE_LIMITE {ecart_p:.0f} ns sur "
+      f"{reference_p:.0f} ns ({100 * ecart_p / reference_p:.1f} %, seuil "
+      f"{100 * FRACTION_EXPLOITABLE:.0f} %), p = {p_up:.4f}"
+      f"{detail_signes_p}.")
 sys.exit(0)

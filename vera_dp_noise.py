@@ -19,6 +19,18 @@ configurations (scale=4 et scale=20). L'ecart de medianes est inferieur
 a 1 microseconde dans les deux cas -- inexploitable via reseau HTTP dont
 la latence est de l'ordre de 50-100 millisecondes. Formulation honnete :
 fuite sub-microseconde detectee, non exploitable en conditions reelles.
+
+MISE A JOUR (audit cible 10/2026) : cette mesure ne portait que sur
+appliquer_bruit_dp seule. Le chemin reellement expose par
+_publier_departement est publier_histogramme_dp, qui enchaine
+appliquer_bruit_dp PUIS _projeter_sur_simplexe -- et cette derniere avait
+un nombre d'iterations dependant des donnees (jusqu'a 59 contre 1,
+ecart median jusqu'a 8,7% sur le pipeline complet, signe constant sur
+7/7 repetitions : aurait echoue au test de la Porte 3 s'il l'avait
+mesure). Voir le docstring de _projeter_sur_simplexe pour le detail et
+le correctif (nombre d'iterations desormais fixe). La garantie
+epsilon-DP n'etait pas en cause (post-traitement), seule la couverture
+de la preuve de temps quasi-constant l'etait.
 """
 
 import opendp.prelude as dp
@@ -115,24 +127,44 @@ def appliquer_bruit_dp(valeur_brute: int) -> int:
 # --------------------------------------------------------------------------
 
 def _projeter_sur_simplexe(valeurs_bruitees: list[float], total: int) -> list[int]:
-    """Projette un vecteur bruite sur {x >= 0, somme(x) = total}."""
+    """Projette un vecteur bruite sur {x >= 0, somme(x) = total}.
+
+    NOMBRE D'ITERATIONS FIXE, PAS DE SORTIE ANTICIPEE (Porte 3, audit
+    cible 10/2026). Une version anterieure sortait de la boucle (`break`)
+    des que le vecteur convergeait. Le NOMBRE d'iterations necessaires --
+    donc le temps de calcul -- depend de la repartition reelle des votes :
+    une case proche de zero oscille sous/au-dessus de zero bien plus
+    longtemps qu'une repartition equilibree (mesure independante : jusqu'a
+    59 iterations contre 1 sur des cas realistes a N=240). Chronometre sur
+    le pipeline complet (publier_histogramme_dp), l'ecart median atteint
+    8,7 % de la duree d'appel, signe constant sur 7/7 repetitions
+    independantes -- un signal que `tests/test_porte3_timing.py` n'avait
+    jamais mesure, lui qui ne chronometre qu'appliquer_bruit_dp seule. La
+    garantie epsilon-DP n'etait pas en cause (ceci reste du post-
+    traitement, gratuit en epsilon), mais la preuve de temps quasi-constant
+    ne couvrait pas ce chemin, pourtant le seul reellement expose par
+    _publier_departement.
+    Desormais les 100 iterations s'executent TOUJOURS, convergence
+    atteinte ou non ; la convergence est verifiee apres coup, comme avant.
+    Une fois le point fixe atteint, une iteration de plus ne change rien :
+    x >= 0 => max(0, x) = x, et ecart = (total - total) / k = 0 => v
+    inchange. Rejouer les iterations restantes ne change donc jamais le
+    resultat -- seulement le temps, desormais identique quelle que soit la
+    repartition.
+    """
     v = [float(x) for x in valeurs_bruitees]
     k = len(v)
     for _ in range(100):
         v = [max(0.0, x) for x in v]
         ecart = (total - sum(v)) / k
         v = [x + ecart for x in v]
-        if abs(sum(v) - total) < 1e-9 and all(x >= -1e-9 for x in v):
-            break
-    else:
-        # La boucle s'est terminee sans converger.
-        #
-        # 100 iterations suffisent tres largement -- la projection converge en
-        # quelques passes sur trois cases -- mais sortir en silence publierait
-        # un vecteur hors du simplexe : somme differente de N, ou case negative.
-        # Ce n'est pas une fuite (tout ceci est du post-traitement, gratuit en
-        # epsilon), c'est un RESULTAT FAUX publie sans que rien ne le signale.
-        # Constat d'un audit externe le 04/09/2026.
+
+    if not (abs(sum(v) - total) < 1e-9 and all(x >= -1e-9 for x in v)):
+        # Sortir en silence publierait un vecteur hors du simplexe : somme
+        # differente de N, ou case negative. Ce n'est pas une fuite (tout
+        # ceci est du post-traitement, gratuit en epsilon), c'est un
+        # RESULTAT FAUX publie sans que rien ne le signale. Constat d'un
+        # audit externe le 04/09/2026.
         raise ValueError(
             f"projection non convergee apres 100 iterations : somme "
             f"{sum(v):.6f} pour un total attendu de {total}. Publier ce "
