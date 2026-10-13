@@ -316,6 +316,43 @@ seule facon de rendre la continuite independante d'une personne. Toute
 organisation dont la consultation a un enjeu reel devrait l'exiger avant
 deploiement (voir `GUIDE_DEPLOIEMENT.md`).
 
+### Integrite du deploiement : le code audite n'etait pas celui qui tournait
+
+**Constat du 13/10/2026.** L'unite systemd declarait `WorkingDirectory=/root`,
+pas le clone git (`/root/repo-push`) sur lequel portent les correctifs decrits
+dans ce document. Python resout `import vera_consultation_api` et le montage
+`StaticFiles(directory="static")` relativement a ce dossier de travail -- le
+service chargeait donc des copies figees des fichiers, posees la avant le
+suivi git, jamais mises a jour depuis.
+
+**Portee.** Chaque `git push` suivi d'un redemarrage semblait reussir --
+aucune erreur, aucun avertissement -- mais ne changeait rien au code reellement
+execute. Decouvert par un effet de bord sans rapport (un bouton ajoute a
+`static/admin.html` n'apparaissait pas sur la page servie), puis confirme par
+`diff` direct entre les deux dossiers : **D1, D2, D3, D6, le correctif de la
+Porte 3 (canal temporel), l'echappement HTML du lien SMS et les corrections de
+texte n'avaient jamais ete deployes**, bien que chacun ait ete commite, pousse,
+et le redemarrage confirme « active (running) ». La base (`VERA_DB_PATH`,
+absolue, `/root/vera_state.db` par defaut) n'etait pas concernee : aucune
+donnee n'a ete affectee, et la rotation de `VERA_ADMIN_HASH` (variable
+d'environnement de l'unite, pas un fichier) fonctionnait deja normalement.
+
+**Depuis quand precisement :** indetermine. Les fichiers figes dans `/root`
+portaient des dates de fin aout a mi-septembre 2026 ; la duree exacte pendant
+laquelle les correctifs d'audit sont restes sans effet n'est pas reconstituee.
+
+**Correctif :** `WorkingDirectory` pointe desormais sur `/root/repo-push`. Le
+clone git devient l'unique source executee -- plus de copie parallele a tenir
+synchronisee a la main, et donc plus d'etape de synchronisation oubliable.
+
+**Ce que ce correctif ne garantit pas.** Rien n'empeche aujourd'hui qu'un
+redemarrage reussisse sans que le code servi corresponde a ce que ce document
+decrit -- seule une verification active (comparer un marqueur du fichier
+source a ce que renvoie une requete directe au service, comme cela a permis de
+detecter ce cas) le confirme. A faire systematiquement apres tout deploiement
+touchant un fichier servi directement (statique ou module importe), plutot que
+de se fier au seul statut `active (running)`.
+
 ### Hors perimetre
 
 - Observateur reseau (IP, timing en transit) — delegue a VPN/Tor
