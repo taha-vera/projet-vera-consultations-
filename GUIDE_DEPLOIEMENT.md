@@ -159,13 +159,19 @@ garantie tient, aucune attaque ne casse la borne — mais le chemin le plus
 praticable passe par la composition des groupes, que VERA ne peut pas contrôler
 puisqu'il ne connaît pas vos membres.
 
-**La page d'accueil est servie par nginx, depuis `/root/vitrine/`.** Elle n'est
-pas dans l'application : c'est un fichier statique, copie du dépôt lors du
-déploiement.
+**La page d'accueil est servie par nginx, depuis `/var/www/vera/`.** Elle
+n'est pas dans l'application : c'est un fichier statique, copié du dépôt lors
+du déploiement — et c'est l'emplacement que `infra/nginx-vera-consultation.conf`
+désigne réellement (`root /var/www/vera;`). **Ce guide disait `/root/vitrine/`
+jusqu'au 13/10/2026** : suivre cette instruction mettait à jour un fichier que
+nginx ne lit jamais, laissant la page d'accueil réellement servie figée sur
+une ancienne copie sans qu'aucune erreur ne le signale — même classe de défaut
+que celle décrite dans `VERA_THREAT_MODEL_COMPLETE.md`, « Intégrité du
+déploiement ».
 
 ```bash
-mkdir -p /root/vitrine
-cp /root/repo-push/index.html /root/vitrine/
+mkdir -p /var/www/vera
+cp /root/repo-push/index.html /var/www/vera/
 ```
 
 Sans cela, la racine du domaine renvoie 404 — et c'est l'adresse que tapera
