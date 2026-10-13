@@ -289,7 +289,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# REPERE SUR LE FICHIER, PAS SUR LE DOSSIER DE TRAVAIL (audit cible du
+# 13/10/2026, suite au constat « integrite du deploiement » ci-dessus dans
+# VERA_THREAT_MODEL_COMPLETE.md). `StaticFiles(directory="static")` resolvait
+# ce chemin relativement au `cwd` du PROCESSUS -- c'est-a-dire au
+# `WorkingDirectory` de l'unite systemd, pas a l'emplacement de ce fichier.
+# Tant que les deux coincidaient cela passait inapercu ; le jour ou l'unite a
+# pointe vers un autre dossier, le service a servi une AUTRE copie de
+# `static/` sans qu'aucune erreur ne le signale. `Path(__file__).parent` rend
+# ce mount correct quel que soit le `WorkingDirectory` de l'unite -- ferme la
+# CLASSE, pas seulement l'instance deja corrigee cote systemd.
+_DOSSIER_ICI = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory=str(_DOSSIER_ICI / "static")), name="static")
 
 
 @app.get("/vote")
@@ -312,8 +323,11 @@ def page_vote():
     trompait. Releve par un audit externe le 03/09/2026.
 
     Sans cette route, le lien renvoyait 404 alors que le fichier existait sous
-    /static/vote.html : tout votant recevant son SMS tombait sur une erreur."""
-    return FileResponse("static/vote.html")
+    /static/vote.html : tout votant recevant son SMS tombait sur une erreur.
+
+    Chemin repere sur ce fichier, pas sur le `cwd` -- meme raison que le mount
+    `/static` ci-dessus (audit cible du 13/10/2026)."""
+    return FileResponse(str(_DOSSIER_ICI / "static" / "vote.html"))
 
 verrou = threading.Lock()
 

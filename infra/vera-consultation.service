@@ -4,7 +4,16 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root
+
+# `/root/repo-push`, PAS `/root` (audit cible du 13/10/2026, cf.
+# VERA_THREAT_MODEL_COMPLETE.md, « Integrite du deploiement »). Ce fichier
+# versionne disait encore `/root` le jour meme ou l'unite REELLE du serveur
+# avait deja ete corrigee a la main -- c'est-a-dire que reinstaller l'unite
+# depuis ce depot aurait reintroduit le defaut qu'on venait de fermer :
+# Python resout `import vera_consultation_api` et `StaticFiles` relativement
+# a ce dossier, pas au clone git. Toute reinstallation de cette unite doit
+# partir de CE fichier, jamais d'une copie gardee a la main sur le serveur.
+WorkingDirectory=/root/repo-push
 
 # SECRETS : valeurs reelles POSEES SUR LE SERVEUR UNIQUEMENT, jamais ici.
 #
