@@ -329,13 +329,36 @@ suivi git, jamais mises a jour depuis.
 aucune erreur, aucun avertissement -- mais ne changeait rien au code reellement
 execute. Decouvert par un effet de bord sans rapport (un bouton ajoute a
 `static/admin.html` n'apparaissait pas sur la page servie), puis confirme par
-`diff` direct entre les deux dossiers : **D1, D2, D3, D6, le correctif de la
-Porte 3 (canal temporel), l'echappement HTML du lien SMS et les corrections de
-texte n'avaient jamais ete deployes**, bien que chacun ait ete commite, pousse,
-et le redemarrage confirme « active (running) ». La base (`VERA_DB_PATH`,
-absolue, `/root/vera_state.db` par defaut) n'etait pas concernee : aucune
-donnee n'a ete affectee, et la rotation de `VERA_ADMIN_HASH` (variable
-d'environnement de l'unite, pas un fichier) fonctionnait deja normalement.
+`diff` systematique de tous les fichiers partages entre les deux dossiers.
+
+**Quatre fichiers Python divergeaient**, tous lies a l'audit cible 10/2026 :
+`vera_consultation_api.py`, `vera_dp_noise.py`, `vera_persistance.py`,
+`vera_signature_manager.py`. Trois autres **ne divergeaient PAS** --
+`vera_admin_auth.py`, `static/vote.html`, `static/blindrsa-bundle.js` (`diff`
+vide sur les deux derniers) : le protocole RSABSSA execute par le votant et
+l'empreinte publiee dans `VERIFICATION_CLIENT.md` n'ont jamais ete concernes.
+
+**Le plus consequent des quatre n'est pas la Porte 3.** `vera_consultation_api.py`
+et `vera_signature_manager.py` tenaient encore l'ORDRE ANTERIEUR au correctif
+D1 de perte de voix : `consommer_jeton_autorisation` avant la signature, au
+lieu d'apres. Concretement, en production jusqu'a ce correctif, un refus
+imprevu du module Rust pendant la signature (le "filet" dont la docstring
+actuelle dit explicitement qu'il "ne coute plus de voix, quelle que soit la
+raison du refus" -- depuis le correctif, donc PAS avant) consommait le jeton
+sans jamais renvoyer de signature : la voix etait perdue sans recours ni
+message d'erreur distinguable d'un autre 500. Rien n'indique que ce cas se
+soit produit -- il etait deja qualifie d'"inatteignable en pratique" au
+moment du correctif, pas de "deja observe" -- mais il etait bien EXPLOITABLE
+tant que cette version tournait, sur le chemin reel du vote, pas seulement
+sur un cas de laboratoire. S'y ajoutaient, moins graves : D2 (cle recreee de
+maniere isolee apres expiration), D3 (ordre question/groupes), D6 (collision
+de jeton silencieusement ignoree plutot que rejouee), et la couverture de
+preuve de la Porte 3.
+
+La base (`VERA_DB_PATH`, absolue, `/root/vera_state.db` par defaut) n'etait
+pas concernee : aucune donnee n'a ete affectee, et la rotation de
+`VERA_ADMIN_HASH` (variable d'environnement de l'unite, pas un fichier)
+fonctionnait deja normalement.
 
 **Depuis quand precisement :** indetermine. Les fichiers figes dans `/root`
 portaient des dates de fin aout a mi-septembre 2026 ; la duree exacte pendant
