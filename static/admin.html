@@ -111,6 +111,31 @@
 
   input:focus { outline: none; border-color: var(--ink); }
 
+  /* Bouton « Afficher/Masquer » le mot de passe de connexion. Ajoute apres
+     qu'un echec de connexion silencieux (rien ne se passe, aucun message)
+     se soit avere impossible a diagnostiquer a distance sans pouvoir
+     confirmer ce qui est reellement tape dans le champ. */
+  .pass-field-wrap { position: relative; margin-bottom: 16px; }
+
+  .pass-field-wrap input { margin-bottom: 0; padding-right: 76px; }
+
+  .toggle-pass-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-light);
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+
+  .toggle-pass-btn:hover { text-decoration: underline; }
+
   .btn-primary {
     width: 100%;
     padding: 14px;
@@ -307,7 +332,10 @@
         <input type="text" id="login-id" autocomplete="username" required>
 
         <label for="login-pass">Mot de passe</label>
-        <input type="password" id="login-pass" autocomplete="current-password" required>
+        <div class="pass-field-wrap">
+          <input type="password" id="login-pass" autocomplete="current-password" required>
+          <button type="button" class="toggle-pass-btn" id="toggle-pass-btn" aria-label="Afficher le mot de passe">Afficher</button>
+        </div>
 
         <button type="submit" class="btn-primary" id="login-btn">Se connecter</button>
       </form>
@@ -525,6 +553,8 @@
   const loginError = document.getElementById('login-error');
   const loginBtn = document.getElementById('login-btn');
   const logoutBtn = document.getElementById('logout-btn');
+  const togglePassBtn = document.getElementById('toggle-pass-btn');
+  const loginPassInput = document.getElementById('login-pass');
 
   const generateBtn = document.getElementById('generate-btn');
   const groupesInput = document.getElementById('groupes-input');
@@ -554,6 +584,13 @@
     rafraichirOuverture();
     rafraichirGroupes();
   }
+
+  togglePassBtn.addEventListener('click', () => {
+    const visible = loginPassInput.type === 'text';
+    loginPassInput.type = visible ? 'password' : 'text';
+    togglePassBtn.textContent = visible ? 'Afficher' : 'Masquer';
+    togglePassBtn.setAttribute('aria-label', visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
+  });
 
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
