@@ -38,7 +38,11 @@ else
     [ -z "$recents" ] && ok "processus demarre apres le dernier .py modifie" \
         || ko "non charges (redemarrer) : $recents"
     # 3. Module Rust : compile apres le dernier commit qui touche ses sources ?
-    so=$(grep -o '/[^ ]*vera_blind_sig[^ ]*\.so' "/proc/$PID/maps" | sort -u | head -1)
+    #    Ancre sur "/vera_blind_sig." (prefixe du .so compile), pas sur la
+    #    seule sous-chaine "vera_blind_sig" -- celle-ci apparait aussi dans le
+    #    nom du dossier du venv et matchait a tort un .so sans rapport, ex.
+    #    _cffi_backend.cpython-*.so (constat du 13/10/2026).
+    so=$(grep -o '/[^ ]*/vera_blind_sig\.[^ ]*\.so' "/proc/$PID/maps" | sort -u | head -1)
     commit_rs=$(git -C "$REPO" log -1 --format=%ct -- vera_blind_sig/src vera_blind_sig/Cargo.toml vera_blind_sig/Cargo.lock)
     if [ -z "$so" ]; then
         ko "module vera_blind_sig introuvable dans la memoire du processus"

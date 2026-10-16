@@ -54,8 +54,13 @@ if [ -n "$PID" ] && [ "$PID" != "0" ]; then
     [ -n "$(find "$REPO" -maxdepth 1 -name '*.py' -newer /proc/$PID 2>/dev/null)" ] \
         && ecart "des .py du clone sont plus recents que le processus : non charges."
     # Module natif reellement mappe en memoire, et sa date.
-    run "grep -o '/[^ ]*vera_blind_sig[^ ]*\\.so' /proc/$PID/maps | sort -u"
-    SO=$(grep -o '/[^ ]*vera_blind_sig[^ ]*\.so' /proc/"$PID"/maps | sort -u | head -1)
+    # NB : ancre sur le segment de chemin "/vera_blind_sig." (le prefixe du
+    # fichier compile, ex. vera_blind_sig.cpython-314-....so) et non sur la
+    # seule sous-chaine "vera_blind_sig", qui apparait aussi dans le nom du
+    # dossier du venv et matchait a tort des .so sans rapport (ex.
+    # _cffi_backend.cpython-*.so, constat du 13/10/2026).
+    run "grep -o '/[^ ]*/vera_blind_sig\\.[^ ]*\\.so' /proc/$PID/maps | sort -u"
+    SO=$(grep -o '/[^ ]*/vera_blind_sig\.[^ ]*\.so' /proc/"$PID"/maps | sort -u | head -1)
     [ -n "$SO" ] && run "stat -c '%y  %n' '$SO'"
 else
     ecart "aucun MainPID pour $UNITE."
