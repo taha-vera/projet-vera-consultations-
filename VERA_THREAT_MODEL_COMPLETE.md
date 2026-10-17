@@ -364,17 +364,45 @@ fonctionnait deja normalement.
 portaient des dates de fin aout a mi-septembre 2026 ; la duree exacte pendant
 laquelle les correctifs d'audit sont restes sans effet n'est pas reconstituee.
 
-**Correctif :** `WorkingDirectory` pointe desormais sur `/root/repo-push`. Le
-clone git devient l'unique source executee -- plus de copie parallele a tenir
-synchronisee a la main, et donc plus d'etape de synchronisation oubliable.
+**Correctif, en quatre couches (13 au 16/10/2026) :**
 
-**Ce que ce correctif ne garantit pas.** Rien n'empeche aujourd'hui qu'un
-redemarrage reussisse sans que le code servi corresponde a ce que ce document
-decrit -- seule une verification active (comparer un marqueur du fichier
-source a ce que renvoie une requete directe au service, comme cela a permis de
-detecter ce cas) le confirme. A faire systematiquement apres tout deploiement
-touchant un fichier servi directement (statique ou module importe), plutot que
-de se fier au seul statut `active (running)`.
+1. `WorkingDirectory` pointe sur `/root/repo-push` dans l'unite reelle du
+   serveur. Le clone git devient l'unique source executee.
+2. Le modele versionne `infra/vera-consultation.service` dit la meme chose
+   (il disait encore `/root` : reinstaller l'unite depuis le depot aurait
+   reintroduit le defaut).
+3. `vera_consultation_api.py` repere `static/` sur `Path(__file__)` et non sur
+   le dossier de travail du processus : le mecanisme qui a permis le defaut ne
+   depend plus de la configuration systemd.
+4. Les anciennes copies de `/root` (code, pages, dossiers de sauvegarde
+   anterieurs) ont ete deplacees le 16/10 dans une archive datee
+   (`archive_avant_nettoyage_*`), sans suppression : aucun processus lance
+   depuis `/root` ne peut plus les importer par erreur.
+
+**Module Rust : verifie le 16/10/2026.** Le doute laisse ouvert par le
+correctif precedent (le module `vera_blind_sig` est installe dans un venv, un
+`git push` suivi d'un redemarrage ne le recompile pas) est leve :
+`infra/verifier_deploiement.sh` confirme que le module charge en memoire a ete
+compile apres le dernier commit de ses sources. La premiere execution de ce
+script visait le mauvais fichier (motif trop large : il retenait un `.so` sans
+rapport du meme venv) et rendait cette verification inconcluante ; corrige le
+meme jour.
+
+**Verification systematique.** `infra/verifier_deploiement.sh` est a lancer
+apres CHAQUE deploiement : cwd reel du processus, fichiers plus recents que le
+demarrage, module Rust, fichiers statiques servis compares au depot, conf
+nginx sur disque et CSP effectivement servie, vitrine. Code de sortie 1 au
+moindre ecart. `infra/audit_integrite_deploiement.sh` en est la version
+detaillee, en lecture seule, secrets masques. Dernier resultat : CONFORME sur
+l'ensemble des controles (16/10/2026).
+
+**Ce qui reste hors de portee de ces controles.** Les sauvegardes et
+instantanes de la machine cote hebergeur (Hetzner) ne sont pas visibles depuis
+le serveur : un instantane ancien contient encore l'ancienne unite et les
+anciennes copies, et les restaurer reintroduirait le defaut. A verifier a la
+main dans la console de l'hebergeur, et a purger ou dater clairement. Le
+script ne remplace pas non plus la lecture du resultat : `active (running)`
+ne prouve rien, `CONFORME` apres un deploiement oui.
 
 ### Hors perimetre
 
