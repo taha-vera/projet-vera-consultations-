@@ -331,8 +331,9 @@ seraient contournables.
 
 ### Cycle d'une consultation
 
-1. L'organisateur définit la question, déclare ses groupes et fixe la date
-   d'ouverture des votes.
+1. L'organisateur définit la question, déclare ses groupes (avec le nombre de
+   personnes de chacun, qui plafonne le nombre de liens générables) et fixe la
+   date d'ouverture des votes.
 2. Il publie l'empreinte agrégée des clés hors du serveur — auprès des
    représentants du personnel — **avant** d'envoyer la moindre invitation.
 3. L'organisation diffuse les invitations depuis sa propre liste, jamais
@@ -572,7 +573,7 @@ n'existe ni `routes/`, ni `models/`, ni `auth/`. Le reste est rangé :
 ```
 vera_*.py              les 6 modules de l'application
 verifier_engagement.py outil du tiers vérificateur
-tests/                 38 tests, dont 7 gardes structurelles
+tests/                 39 tests, dont 7 gardes structurelles
                        et un parcours HTTP complet
 static/                page du votant, tableau de bord, bundle
 chantier_crypto/       tests JS, crash test, manifeste npm
@@ -636,7 +637,7 @@ installation en service.
 Le parcours complet a été validé de bout en bout dans un navigateur ; aucune
 consultation avec de vrais participants n'a encore eu lieu.
 
-**Version courante :** branche `main`, 17 octobre 2026 — 38 tests automatiques,
+**Version courante :** branche `main`, 19 octobre 2026 — 39 tests automatiques,
 plus un test de résistance au crash exercé sur le chemin HTTP réel.
 
 **Ce que `VERA_DB_KEY` chiffre, exactement.** Elle chiffre **la clé privée

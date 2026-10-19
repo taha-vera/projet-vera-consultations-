@@ -125,7 +125,7 @@ _SQL_TABLES = [
     # CONCURRENTS franchissant la garde ensemble, donc avec le meme horodatage.
     # Elle ne remplace pas l'idempotence de l'appelant, elle la complete.
     "CREATE TABLE IF NOT EXISTS historique_consultations (groupe TEXT NOT NULL, close_unix REAL NOT NULL, PRIMARY KEY (groupe, close_unix))",
-    "CREATE TABLE IF NOT EXISTS question_active (id INTEGER PRIMARY KEY CHECK (id = 1), intitule TEXT NOT NULL, ouverture_depots_unix REAL, groupes_declares TEXT)",
+    "CREATE TABLE IF NOT EXISTS question_active (id INTEGER PRIMARY KEY CHECK (id = 1), intitule TEXT NOT NULL, ouverture_depots_unix REAL, groupes_declares TEXT, plafonds_invitations TEXT)",
     "CREATE TABLE IF NOT EXISTS jetons_autorisation (jeton TEXT PRIMARY KEY, departement TEXT NOT NULL, utilise INTEGER NOT NULL DEFAULT 0)",
     "CREATE TABLE IF NOT EXISTS cle_rsa_active (departement TEXT PRIMARY KEY, cle_privee_hex TEXT NOT NULL, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL, salt_hex TEXT)",
 ]
@@ -366,6 +366,10 @@ def _migrer_ouverture_depots(conn):
         conn.execute("ALTER TABLE question_active ADD COLUMN groupes_declares TEXT")
         conn.commit()
         print("Migration : colonne groupes_declares ajoutee a question_active.")
+    if "plafonds_invitations" not in colonnes:
+        conn.execute("ALTER TABLE question_active ADD COLUMN plafonds_invitations TEXT")
+        conn.commit()
+        print("Migration : colonne plafonds_invitations ajoutee a question_active.")
 
 
 def _migrer_tokens_sans_rowid(conn):
@@ -606,6 +610,22 @@ def _empreinte_jeton(jeton):
     return hashlib.sha256(jeton.encode("utf-8")).hexdigest()
 
 
+class PlafondInvitationsErreur(Exception):
+    """Levee par persister_jetons_autorisation_lot quand le lot ferait depasser
+    le plafond d'invitations declare pour le groupe (D4, audit cible du
+    10/2026). Porte `deja` (jetons existants), `demande` (taille du lot) et
+    `plafond`, pour que l'appelant formule un message exact."""
+
+    def __init__(self, departement, deja, demande, plafond):
+        self.departement = departement
+        self.deja = deja
+        self.demande = demande
+        self.plafond = plafond
+        super().__init__(
+            f"plafond d'invitations depasse pour « {departement} » : "
+            f"{deja} deja generees + {demande} demandees > {plafond}")
+
+
 class CollisionJetonErreur(Exception):
     """Levee par persister_jetons_autorisation_lot si l'empreinte d'un jeton
     du lot coincide avec une empreinte deja en base (ou avec une autre
@@ -614,7 +634,7 @@ class CollisionJetonErreur(Exception):
     pass
 
 
-def persister_jetons_autorisation_lot(jetons, departement):
+def persister_jetons_autorisation_lot(jetons, departement, plafond=None):
     """Enregistre les empreintes de PLUSIEURS jetons en UNE transaction.
 
     L'appel unitaire persister_jeton_autorisation fait un commit par jeton, et
@@ -649,10 +669,25 @@ def persister_jetons_autorisation_lot(jetons, departement):
     jamais un lot partiel -- et CollisionJetonErreur est levee pour que
     l'appelant puisse re-essayer avec un tout nouveau lot plutot que de
     rendre une reponse qui semblerait reussie.
+
+    PLAFOND CUMULE (D4, audit cible du 10/2026). Si `plafond` est fourni, le
+    lot est refuse (PlafondInvitationsErreur, rien n'est ecrit) quand il
+    ferait depasser ce nombre de jetons POUR CE GROUPE, utilises ou non. Le
+    comptage et l'insertion se font sous le meme verrou et dans la meme
+    transaction : deux appels simultanes ne peuvent pas voir chacun la place
+    qui reste. Renvoie le nombre total de jetons du groupe apres l'insertion.
+    `plafond=None` desactive le controle (consultation declaree avant D4, ou
+    appel de test) : c'est l'appelant qui decide, pas cette fonction.
     """
     if not jetons:
-        return
+        return 0
     with _verrou_db:
+        deja = _conn.execute(
+            "SELECT COUNT(*) FROM jetons_autorisation WHERE departement = ?",
+            (departement,),
+        ).fetchone()[0]
+        if plafond is not None and deja + len(jetons) > plafond:
+            raise PlafondInvitationsErreur(departement, deja, len(jetons), plafond)
         try:
             _conn.executemany(
                 "INSERT INTO jetons_autorisation (jeton, departement, utilise) VALUES (?, ?, 0)",
@@ -665,6 +700,7 @@ def persister_jetons_autorisation_lot(jetons, departement):
                 f"« {departement} » : {e}"
             ) from e
         _conn.commit()
+        return deja + len(jetons)
 
 
 def persister_jeton_autorisation(jeton, departement):
@@ -921,6 +957,29 @@ def charger_groupes_declares():
     return _json.loads(row[0])
 
 
+def charger_plafonds_invitations():
+    """{groupe: nombre maximal d'invitations} declare avec les groupes, ou None.
+
+    None veut dire « aucun plafond » : consultation declaree avant D4, ou
+    declaration sans plafond (tests). declarer_groupes l'exige desormais pour
+    toute nouvelle declaration, donc None ne se produit en pratique que pour
+    une consultation deja en cours au moment de la mise a jour.
+
+    Le plafond n'est PAS un effectif verifie : VERA ne connait pas vos membres.
+    C'est le chiffre que l'organisateur a inscrit en declarant ses groupes,
+    fige comme eux. Il protege contre la double generation, un script fautif
+    ou une session volee APRES la declaration ; il ne protege pas contre un
+    organisateur qui declarerait d'emblee un chiffre gonfle."""
+    with _verrou_db:
+        row = _conn.execute(
+            "SELECT plafonds_invitations FROM question_active WHERE id = 1"
+        ).fetchone()
+    if not row or not row[0]:
+        return None
+    import json as _json
+    return _json.loads(row[0])
+
+
 def enregistrer_consultation_close(groupes):
     """Note la date de cloture pour chaque groupe consulte.
 
@@ -967,7 +1026,7 @@ def compter_consultations_recentes(groupe, fenetre_secondes=365 * 24 * 3600):
     return row[0] if row else 0
 
 
-def persister_groupes_declares(groupes):
+def persister_groupes_declares(groupes, plafonds=None):
     """Fige la liste des groupes. Ecrit sur la ligne de question_active,
     SEULEMENT si aucune liste n'y est deja inscrite.
 
@@ -987,15 +1046,22 @@ def persister_groupes_declares(groupes):
     -- pendant que l'agregat publie au RH continuait de couvrir les cles des
     DEUX appels. Audit cible du 10/2026 (D1), reproduit avec un vrai
     serveur. La clause WHERE ci-dessous rend cette ecriture refusee, et
-    verifiable, meme si le verrou amont etait un jour retire ou mal pose."""
+    verifiable, meme si le verrou amont etait un jour retire ou mal pose.
+
+    `plafonds` (D4) : {groupe: nombre maximal d'invitations}, ecrit dans la
+    MEME instruction que la liste, donc fige avec elle et jamais l'un sans
+    l'autre. None = pas de plafond (voir charger_plafonds_invitations)."""
     import json as _json
+    plafonds_json = (_json.dumps(plafonds, ensure_ascii=False, sort_keys=True)
+                     if plafonds is not None else None)
     with _verrou_db:
         curseur = _conn.execute(
-            "INSERT INTO question_active (id, intitule, groupes_declares) "
-            "VALUES (1, '', ?) "
-            "ON CONFLICT(id) DO UPDATE SET groupes_declares = excluded.groupes_declares "
+            "INSERT INTO question_active (id, intitule, groupes_declares, plafonds_invitations) "
+            "VALUES (1, '', ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET groupes_declares = excluded.groupes_declares, "
+            "plafonds_invitations = excluded.plafonds_invitations "
             "WHERE question_active.groupes_declares IS NULL",
-            (_json.dumps(groupes, ensure_ascii=False),),
+            (_json.dumps(groupes, ensure_ascii=False), plafonds_json),
         )
         if curseur.rowcount == 0:
             _conn.rollback()

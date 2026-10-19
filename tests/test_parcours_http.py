@@ -137,7 +137,7 @@ r = client.post("/api/rh/question",
 verifier(r.status_code == 200, "3a. question definie",
          f"recu {r.status_code} : {r.text[:150]}")
 
-r = client.post("/api/rh/declarer_groupes", json={"groupes": [GROUPE]})
+r = client.post("/api/rh/declarer_groupes", json={"groupes": [GROUPE], "effectifs": {GROUPE: 3}})
 verifier(r.status_code == 200, "3b. groupes declares",
          f"recu {r.status_code} : {r.text[:150]}")
 

@@ -212,7 +212,16 @@ invérifiables.
 ### 3. Déclarer les groupes consultés
 
 **En une seule fois, avant tout envoi.** Le tableau de bord vous demande la
-liste complète des groupes ; leurs clés sont créées ensemble.
+liste complète des groupes, chacun suivi de son nombre de personnes
+(« Atelier : 120, Direction : 15 ») ; leurs clés sont créées ensemble.
+
+**Ce nombre est un plafond.** Le serveur refusera de générer, pour ce groupe,
+plus de liens que ce nombre — tous lots confondus — et il ne pourra plus être
+modifié. Un lien perdu (page fermée avant la fin de l'envoi) compte toujours :
+si vous craignez d'en perdre quelques-uns, déclarez une petite réserve. Dans
+tous les cas, **publiez le chiffre tel quel**, avec l'empreinte de l'étape 4 : le
+serveur ne connaît pas vos membres et ne peut pas le vérifier, un tiers
+(représentants du personnel) peut le comparer à votre effectif réel.
 
 Cette déclaration est **irréversible**. En ajouter un ensuite changerait
 l'empreinte de sécurité inscrite dans chaque lien et rendrait inutilisables tous

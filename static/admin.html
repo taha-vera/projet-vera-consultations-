@@ -409,7 +409,14 @@
         <div id="groupes-bloc" style="margin-bottom:18px; padding:14px; background:#f5f7f6; border-left:3px solid #2D5240; border-radius:4px;">
           <p style="font-size:13px; color:#2D5240; line-height:1.55; margin:0 0 12px 0;">
             <strong>Déclarez tous les groupes que vous allez consulter, en une seule fois.</strong>
-            Séparez-les par des virgules. Leurs clés seront créées ensemble.
+            Séparez-les par des virgules, chacun suivi de son nombre de personnes
+            (« Atelier : 120, Direction : 15 »). Leurs clés seront créées ensemble.
+            <span style="display:block; margin-top:8px;"><strong>Ce nombre est aussi le plafond de
+            liens</strong> que vous pourrez générer pour ce groupe, tous lots confondus : au-delà,
+            le serveur refuse. C'est ce qui empêche, par erreur ou par malveillance, de créer plus
+            de liens que de membres. Il sera figé comme la liste. Si vous craignez de perdre
+            quelques liens en route (voir plus bas), ajoutez une petite réserve — et publiez le
+            chiffre tel quel : un tiers pourra le comparer à vos effectifs réels.</span>
             <span style="display:block; margin-top:8px;">Chaque lien de participation porte une
             empreinte de sécurité qui couvre l'ensemble des clés. Elle est donc identique pour tous
             vos membres, quel que soit leur groupe — deux collègues peuvent comparer leurs liens et
@@ -423,7 +430,7 @@
           <div class="field-row">
             <div style="flex:1;">
               <label for="groupes-input">Liste des groupes</label>
-              <input type="text" id="groupes-input" placeholder="Ex. Atelier, Direction, Administratif">
+              <input type="text" id="groupes-input" placeholder="Ex. Atelier : 120, Direction : 15, Administratif : 40">
             </div>
             <div style="display:flex; align-items:flex-end;">
               <button class="btn-primary" id="groupes-btn" style="margin:0;">Déclarer</button>
@@ -467,7 +474,9 @@
               que vous les envoyiez : si vous fermez cette page avant d'avoir
               terminé, les liens non encore envoyés sont perdus (ils ne sont
               stockés nulle part, c'est ce qui garantit l'anonymat). Vous pouvez
-              revenir en générer d'autres à tout moment.
+              revenir en générer d'autres, mais <strong>dans la limite du nombre
+              déclaré pour le groupe</strong> : un lien perdu compte toujours,
+              le serveur ne peut pas savoir qu'il n'a pas été envoyé.
             </p>
           </div>
         </div>
@@ -641,7 +650,8 @@
       if (!r.ok) return;
       const d = await r.json();
       if (d.declares) {
-        groupesInput.value = d.groupes.join(', ');
+        groupesInput.value = d.groupes.map(g =>
+          (d.effectifs && d.effectifs[g] !== undefined) ? g + ' : ' + d.effectifs[g] : g).join(', ');
         groupesInput.disabled = true;
         groupesBtn.disabled = true;
         groupesEtat.textContent = d.groupes.length + ' groupe(s) déclaré(s). La liste est figée pour cette consultation.';
@@ -658,17 +668,43 @@
   }
 
   groupesBtn.addEventListener('click', async () => {
-    const brut = groupesInput.value.split(',').map(s => s.trim()).filter(Boolean);
-    if (!brut.length) {
+    const entrees = groupesInput.value.split(',').map(s => s.trim()).filter(Boolean);
+    if (!entrees.length) {
       groupesEtat.textContent = "Saisissez au moins un groupe.";
       groupesEtat.style.color = '#a94442';
       return;
     }
+    // Chaque entree : « Nom : nombre ». Le nom d'un groupe ne peut pas contenir
+    // « : » (le serveur le refuse), donc le dernier « : » separe sans ambiguite.
+    const brut = [];
+    const effectifs = {};
+    for (const e of entrees) {
+      const m = e.match(/^(.*?)\s*:\s*(\d+)$/);
+      if (!m || !m[1].trim()) {
+        groupesEtat.textContent = "« " + e + " » : indiquez le nombre de personnes, sous la forme « Atelier : 120 ».";
+        groupesEtat.style.color = '#a94442';
+        return;
+      }
+      const nom = m[1].trim();
+      const n = parseInt(m[2], 10);
+      if (!(n >= 1)) {
+        groupesEtat.textContent = "« " + nom + " » : le nombre de personnes doit être au moins 1.";
+        groupesEtat.style.color = '#a94442';
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(effectifs, nom)) {
+        groupesEtat.textContent = "« " + nom + " » apparaît deux fois.";
+        groupesEtat.style.color = '#a94442';
+        return;
+      }
+      effectifs[nom] = n;
+      brut.push(nom);
+    }
     // Confirmation explicite : l'operation est irreversible et son cout, en cas
     // d'oubli, est de recommencer la consultation entiere.
-    const liste = brut.join('\n  · ');
+    const liste = brut.map(g => g + " : " + effectifs[g] + " liens au maximum").join('\n  · ');
     if (!confirm("Déclarer définitivement ces " + brut.length + " groupe(s) ?\n\n  · " + liste +
-                 "\n\nAprès validation, aucun groupe ne pourra être ajouté : il faudrait clôturer et recommencer.")) {
+                 "\n\nAprès validation, aucun groupe ne pourra être ajouté et ces nombres ne pourront plus changer : il faudrait clôturer et recommencer.")) {
       return;
     }
     groupesBtn.disabled = true;
@@ -676,7 +712,7 @@
       const r = await fetch(`${API_BASE}/rh/declarer_groupes`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupes: brut })
+        body: JSON.stringify({ groupes: brut, effectifs })
       });
       if (!r.ok) {
         let msg = "Cette déclaration n'a pas pu être enregistrée.";
@@ -694,6 +730,10 @@
         if (d && d.avertissements_frequence && d.avertissements_frequence.length) {
           alert("Attention :\n\n  · " + d.avertissements_frequence.join("\n  · ") +
                 "\n\nVoir la section « Fréquence des consultations » ci-dessous.");
+        }
+        // Effectif sous le seuil de publication : dit AVANT l'envoi des liens.
+        if (d && d.avertissements_effectif && d.avertissements_effectif.length) {
+          alert("Attention :\n\n  · " + d.avertissements_effectif.join("\n  · "));
         }
       } catch (e) { /* sans consequence */ }
       await rafraichirGroupes();

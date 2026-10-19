@@ -1194,10 +1194,12 @@ respect de ses conditions d'exploitation** (section 1) :
 
 Ce que VERA ne garantit PAS :
 
-- que les jetons émis correspondent a de vraies personnes distinctes. Le
-  système génère le nombre de jetons qu'on lui demande ; il n'a aucune liste
-  de reference, aucun annuaire, aucun moyen de savoir a qui un lien est envoye
-  (c'est précisément ce qui protège l'anonymat) ;
+- que les jetons émis correspondent a de vraies personnes distinctes. Depuis
+  le 19/10/2026 le système refuse de générer plus de liens que le nombre
+  déclaré avec les groupes (voir plus bas) ; mais ce nombre est celui de
+  l'organisateur, et le système n'a aucune liste de reference, aucun
+  annuaire, aucun moyen de savoir a qui un lien est envoye (c'est précisément
+  ce qui protège l'anonymat) ;
 - qu'aucun de ces jetons n'a été utilise par l'organisateur lui-même. Un
   organisateur qui génère 240 jetons et vote 240 fois obtient un resultat
   publié entierement fabrique, et rien dans les chiffres ne le trahit ;
@@ -1249,6 +1251,33 @@ fermerait cette porte rouvrirait la section 6.
 publiquement, sur `/api/engagement_cles`, le nombre d'invitations émises par
 groupe. Cela ne prouve rien. Cela rend le controle POSSIBLE par quelqu'un qui,
 lui, connait l'effectif réel.
+
+**Le plafond d'invitations (19/10/2026, audit cible D4).** Jusqu'a cette date,
+chaque appel de generation etait borne (1 000 liens) mais pas leur CUMUL : un
+clic en double, un script fautif ou une session volee pouvait produire plus de
+jetons que de membres, et chaque jeton est une voix. L'organisateur declare
+desormais, AVEC la liste des groupes, le nombre de personnes de chacun ; ce
+nombre est fige comme la liste et devient le plafond cumule des liens
+generes pour le groupe. Au-dela, le serveur refuse (409) et ne cree rien ; le
+controle est fait dans la transaction d'insertion, donc deux requetes
+simultanees ne peuvent pas le franchir ensemble.
+
+Ce que cela vaut, exactement : cela protege contre l'**erreur** et contre
+l'**abus apres la declaration** (session volee, script, double clic). Cela ne
+protege PAS contre un organisateur qui declarerait d'emblee un chiffre
+gonfle : le serveur ne connait pas les membres et ne peut pas verifier ce
+chiffre. C'est pourquoi la declaration demande de le PUBLIER hors du serveur,
+avec l'empreinte des cles, pour que le tiers de la condition ci-dessous le
+compare a l'effectif reel -- avant l'envoi des liens, et non apres.
+
+**Cout a connaitre : un lien perdu compte toujours.** Le serveur ne stocke que
+des empreintes et ne sait pas qu'un lien n'a pas ete envoye. Les liens non
+distribues d'un lot (page fermee avant la fin) restent donc comptes dans le
+plafond, et ne peuvent pas etre regeneres au-dela. L'organisateur qui craint
+d'en perdre declare une petite reserve -- et la publie telle quelle, ce qui
+la rend visible du tiers. Une consultation declaree avant cette date n'a pas
+de plafond en base : on ne peut pas en inventer un, son comportement est
+inchange.
 
 **La condition, a inscrire dans l'accord et non a recommander :**
 

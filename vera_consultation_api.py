@@ -18,7 +18,7 @@ import secrets
 from urllib.parse import quote
 import threading
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import FastAPI, HTTPException, Cookie, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -1419,8 +1419,31 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
     # nouvel appel tirera un lot entierement nouveau (secrets.token_urlsafe
     # neuf a chaque fois) ; la probabilite d'une seconde collision est alors
     # independante et tout aussi negligeable.
+    #
+    # PLAFOND CUMULE (D4, audit cible du 10/2026). Le nombre de liens generes
+    # pour un groupe, tous lots confondus, ne peut pas depasser l'effectif
+    # declare avec les groupes. Le controle est fait DANS la transaction
+    # d'insertion (voir persister_jetons_autorisation_lot) : deux requetes
+    # simultanees ne peuvent pas franchir le plafond ensemble.
+    #
+    # plafonds is None = consultation declaree avant ce correctif : on ne peut
+    # pas inventer un chiffre, le comportement d'avant est conserve. Aucune
+    # nouvelle declaration n'arrive la : declarer_groupes l'exige.
+    plafonds = persistance.charger_plafonds_invitations()
+    plafond = plafonds.get(payload.departement) if plafonds is not None else None
     try:
-        persistance.persister_jetons_autorisation_lot(jetons, payload.departement)
+        total_groupe = persistance.persister_jetons_autorisation_lot(
+            jetons, payload.departement, plafond=plafond)
+    except persistance.PlafondInvitationsErreur as e:
+        reste = max(e.plafond - e.deja, 0)
+        raise HTTPException(
+            status_code=409,
+            detail=f"Plafond atteint pour « {e.departement} » : {e.deja} lien(s) "
+                   f"deja genere(s) sur {e.plafond} declares, il n'en reste que "
+                   f"{reste} (vous en demandez {e.demande}). Aucun lien n'a ete "
+                   "cree. Le nombre de personnes est fige avec les groupes ; si "
+                   "il etait faux, cloturez et recommencez la consultation.",
+        )
     except persistance.CollisionJetonErreur:
         raise HTTPException(
             status_code=503,
@@ -1450,6 +1473,8 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
     return {
         "departement": payload.departement,
         "quantite": len(autorisations),
+        "plafond": plafond,
+        "restant": (plafond - total_groupe) if plafond is not None else None,
         "empreinte_cle": empreinte_cle,
         "autorisations": autorisations,
         "genere_par": compte,
@@ -1906,6 +1931,18 @@ def definir_question(payload: QuestionRequete, session_vera: Optional[str] = Coo
 
 class DeclarerGroupesRequete(BaseModel):
     groupes: list[str] = Field(min_length=1, max_length=200)
+    # NOMBRE DE PERSONNES PAR GROUPE (D4, audit cible du 10/2026). OBLIGATOIRE.
+    #
+    # Jusqu'ici rien ne bornait le nombre de liens generes : un clic en double,
+    # un script fautif ou une session volee pouvait produire plus de jetons que
+    # de membres -- et chaque jeton est une voix. Le chiffre inscrit ici est
+    # fige avec la liste des groupes et devient le plafond CUMULE des liens
+    # generes pour ce groupe (voir generer_autorisations).
+    #
+    # Strict : `true`, `"300"` ou 300.0 sont refuses plutot que convertis. Un
+    # chiffre qui se convertit en silence est un plafond que personne n'a
+    # vraiment choisi.
+    effectifs: dict[str, Annotated[int, Field(strict=True, ge=1, le=1_000_000)]]
 
 
 @app.post("/api/rh/declarer_groupes")
@@ -2013,6 +2050,32 @@ def declarer_groupes(payload: DeclarerGroupesRequete,
 
     groupes.sort()
 
+    # PLAFONDS : un nombre pour CHAQUE groupe, et pour aucun autre (D4).
+    # Les cles sont nettoyees comme les noms (espaces de bord), sinon
+    # « Atelier » et « Atelier  » ne se retrouveraient pas.
+    plafonds = {}
+    for cle, n in payload.effectifs.items():
+        nom = cle.strip()
+        if nom in plafonds:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Le groupe « {nom} » apparait deux fois dans les effectifs.")
+        plafonds[nom] = n
+    manquants = [g for g in groupes if g not in plafonds]
+    en_trop = sorted(set(plafonds) - set(groupes))
+    if manquants or en_trop:
+        morceaux = []
+        if manquants:
+            morceaux.append("effectif manquant pour : " + ", ".join(
+                f"« {g} »" for g in manquants))
+        if en_trop:
+            morceaux.append("effectif donne pour un groupe non declare : " +
+                            ", ".join(f"« {g} »" for g in en_trop))
+        raise HTTPException(
+            status_code=422,
+            detail="Chaque groupe doit avoir son nombre de personnes, et "
+                   "seulement ceux-la. " + " ; ".join(morceaux) + ".")
+
     # SEQUENCE CRITIQUE (D1, audit cible du 10/2026) : relire l'etat
     # "pas encore declare", creer toutes les cles, puis ecrire la liste
     # doivent s'executer comme une seule operation. Le controle fait plus
@@ -2043,7 +2106,7 @@ def declarer_groupes(payload: DeclarerGroupesRequete,
         # une liste deja presente -- UPDATE conditionnelle sur
         # groupes_declares IS NULL, voir sa docstring dans
         # vera_persistance.py -- et le signale par sa valeur de retour.
-        if not persistance.persister_groupes_declares(groupes):
+        if not persistance.persister_groupes_declares(groupes, plafonds):
             raise HTTPException(
                 status_code=409,
                 detail="Les groupes ont deja ete declares pour cette "
@@ -2075,12 +2138,25 @@ def declarer_groupes(payload: DeclarerGroupesRequete,
             avertissements.append(
                 f"« {nom} » a deja ete consulte {n} fois cette annee.")
 
+    # Un groupe dont l'effectif est sous K_MIN ne pourra jamais publier de
+    # resultat : le declarer ainsi est permis (c'est parfois voulu, pour une
+    # simple concertation), mais mieux vaut le dire AVANT que les liens partent.
+    avertissements_effectif = [
+        f"« {g} » : {plafonds[g]} personne(s), sous le seuil de {K_MIN} "
+        "reponses. Aucun resultat ne sera publie pour ce groupe."
+        for g in groupes if plafonds[g] < K_MIN
+    ]
+
     return {
         "groupes": groupes,
+        "effectifs": {g: plafonds[g] for g in groupes},
         "empreinte_ensemble": agregat,
         "message": "Publiez cette empreinte hors de ce serveur AVANT d'envoyer "
-                   "les liens : elle sera inscrite dans chacun d'eux.",
+                   "les liens : elle sera inscrite dans chacun d'eux. Publiez "
+                   "aussi les effectifs ci-dessus : ils plafonnent le nombre "
+                   "de liens, et un tiers peut les comparer a la realite.",
         "avertissements_frequence": avertissements,
+        "avertissements_effectif": avertissements_effectif,
     }
 
 
@@ -2092,6 +2168,7 @@ def obtenir_groupes_declares(session_vera: Optional[str] = Cookie(None)):
     return {
         "groupes": groupes,
         "declares": groupes is not None,
+        "effectifs": persistance.charger_plafonds_invitations(),
         "empreinte_ensemble": gestionnaire_signature.agregat_cles(),
     }
 
