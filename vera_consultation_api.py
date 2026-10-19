@@ -1722,9 +1722,24 @@ def cloturer_consultation(session_vera: Optional[str] = Cookie(None)):
     # groupe publiable", laissant croire que des reponses avaient ete jugees
     # insuffisantes alors qu'elles avaient deja ete affichees puis effacees.
     # On ne detruit/rouvre donc RIEN et on repond honnetement.
+    #
+    # LES GROUPES DECLARES COMPTENT COMME DE L'ETAT (constat du 17/10/2026).
+    # La garde ne regardait que les effectifs et les invitations : un
+    # organisateur ayant declare ses groupes mais pas encore genere de lien --
+    # donc exactement celui qui veut tout annuler apres une faute de frappe --
+    # recevait « rien a cloturer » et la cloture ne faisait rien : question et
+    # liste de groupes restaient figees, cles en base jusqu'a leur expiration.
+    # L'ecran lui promet pourtant « il faudrait cloturer et recommencer ». Une
+    # declaration de groupes est un etat a effacer, avec ou sans invitation.
+    # La garde de double-cloture reste valable : effacer_etat_consultation
+    # supprime la ligne de question_active, donc le second appel retrouve bien
+    # un etat vide.
     invitations_existantes = persistance.compter_jetons_par_departement()
+    groupes_declares = persistance.charger_groupes_declares()
     with verrou:
-        etat_vide = not effectif_par_departement and not invitations_existantes
+        etat_vide = (not effectif_par_departement
+                     and not invitations_existantes
+                     and not groupes_declares)
     if etat_vide:
         return {
             "statut": "rien_a_cloturer",
