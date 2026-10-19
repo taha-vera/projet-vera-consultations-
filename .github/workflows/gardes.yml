@@ -88,6 +88,13 @@ jobs:
       - name: Empreintes publiees a jour
         run: python3 tests/test_empreintes_publiees.py
 
+      # Les pages doivent etre REVALIDEES par le navigateur, et aucun `location`
+      # nginx ne doit poser d'add_header : il ecraserait CSP et HSTS sur sa
+      # route, sans erreur. Le 19/10/2026, un deploiement conforme restait
+      # invisible a l'ecran parce que le navigateur gardait l'ancienne page.
+      - name: En-tetes nginx, cache et heritage
+        run: python3 tests/test_cache_pages_statiques.py
+
       # AUCUN script du depot n'emprunte le repli en clair VERA_ADMIN_PASS.
       #
       # La premiere version de cette garde ne nommait que run_tests.sh. C'etait
