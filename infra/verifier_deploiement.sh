@@ -8,7 +8,7 @@
 #   bash infra/verifier_deploiement.sh
 
 set -u
-REPO="${REPO:-/root/repo-push}"
+REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 UNITE="${UNITE:-vera-consultation.service}"
 SITE_NGINX="${SITE_NGINX:-/etc/nginx/sites-enabled/vera-consultation}"
 VITRINE="${VITRINE:-/var/www/vera/index.html}"

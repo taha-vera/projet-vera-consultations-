@@ -15,7 +15,7 @@
 # absence ne vaut pas conformite -- lire les sorties.
 
 set -u
-REPO="${REPO:-/root/repo-push}"
+REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 UNITE="${UNITE:-vera-consultation.service}"
 SITE_NGINX="${SITE_NGINX:-/etc/nginx/sites-enabled/vera-consultation}"
 DOMAINE="${DOMAINE:-vera-consultation.fr}"
