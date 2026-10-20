@@ -149,8 +149,10 @@ protocole, distinct de l'organisation qui consulte.
 Ecrire « la condition est remplie » serait exact sur le principe et trompeur en
 pratique. Ce qui la tient aujourd'hui, c'est un individu : la cle de chiffrement
 de la base est detenue par lui seul, sans depot chez un tiers, et le service
-tourne sur un sous-domaine gratuit sans engagement contractuel (`LIMITS.md`
-§12bis). La separation des roles existe ; sa perennite ne repose sur aucune
+tourne sur un nom de domaine propre (`vera-consultation.fr`) et un serveur
+loues par une seule personne, sans engagement contractuel de continuite
+(`LIMITS.md` §12, « Deux autres tiers de la meme classe : le DNS et l'autorite
+de certification » ; l'ancien nom DuckDNS gratuit reste servi en parallele). La separation des roles existe ; sa perennite ne repose sur aucune
 structure.
 
 Pour une organisation qui evalue le dispositif, la question n'est donc pas « la
@@ -431,7 +433,7 @@ ne prouve rien, `CONFORME` apres un deploiement oui.
 | Bourrage de la REPONSE de `/api/signer_aveugle` | `LONGUEUR_PAD_REPONSE`, cote SERVEUR | **Troisieme etape, absente de ce tableau jusqu'au 03/09.** Le serveur compensait en CARACTERES : la reponse variait de 691 a 791 octets selon le nom du groupe, sur la seule requete du parcours qui porte le jeton. Corrige le 29/08 en octets, cible portee a 400 -- `max_length=100` borne des caracteres, qui valent jusqu'a quatre octets |
 | Chiffrement cle RSA | Fernet + PBKDF2-SHA256 | 100 000 iterations, sel aleatoire par enregistrement (derivation de la CLE DE BASE depuis `VERA_DB_KEY` -- a ne pas confondre avec les 200 000 iterations des mots de passe d'administration, Porte 22) |
 | Anti-bruteforce | 5 echecs / IP, blocage 5 min puis croissant jusqu'a 1 h | Sur la connexion RH. Le compteur par identifiant (20 echecs) **ne freine pas** une attaque repartie (le bon mot de passe passe pendant le blocage, par conception) : le frein reel est le debit nginx par adresse et l'entropie du mot de passe -- LIMITS.md §12 |
-| Rate-limit vote | 5 r/s, rafale 50 | Nginx, sur les 4 routes du parcours de vote |
+| Rate-limit vote | 5 r/s, rafale 50 | Nginx, zone `vera_vote` : les 9 routes publiques nommees (depot, signature, cle publique, question, pages et lectures publiques) et le `location /` generique |
 | Rate-limit connexion | 1 r/s, rafale 5 | Nginx, zone dediee |
 
 ---
@@ -710,18 +712,27 @@ preserver cette propriete : avec q questions par votant, L1 = 2q.
 
 ### Deux invariants structurels
 
-Ces deux proprietes ne sont garanties par aucun test, seulement par la
-structure du code. Toute modification qui les romprait retablirait la liaison
-entre une personne et sa reponse, sans qu'aucune alerte ne se declenche.
+Ces deux proprietes ne sont couvertes que PARTIELLEMENT par des tests ; le
+reste tient a la structure du code. Toute modification qui les romprait
+retablirait la liaison entre une personne et sa reponse, et pour la part non
+testee aucune alerte ne se declencherait. Ce qui est teste, et ce qui ne l'est
+pas, est dit sous chacune.
 
 **Les deux registres ne sont jamais joints.** Le jeton d'autorisation (emission)
 et l'empreinte du secret depense (anti-rejeu) sont deux tables distinctes,
 sans cle commune. Les joindre recreerait le lien identite vers vote que tout le
-protocole existe pour empecher.
+protocole existe pour empecher. *Teste :* `tests/test_registres_disjoints.py`
+verifie que les deux registres ne partagent aucun journal sur disque (le canal
+par lequel ils s'etaient retrouves joints). *Non teste :* l'absence de colonne
+commune entre les deux tables du schema.
 
 **Un jeton d'autorisation donne droit a une seule signature, dans une seule
 epoque.** C'est ce qui empeche un votant d'obtenir plusieurs credentials
-valides a partir d'une meme invitation.
+valides a partir d'une meme invitation. *Teste :* un jeton deja consomme
+n'est pas resigne (`tests/test_signer_aveugle.py`, et l'etape 7 de
+`tests/test_parcours_http.py` pour un autre message). *Non teste :* la limite
+« dans une seule epoque » (une cle d'une autre epoque n'est pas essayee pour le
+meme jeton).
 
 ---
 
@@ -739,6 +750,7 @@ valides a partir d'une meme invitation.
 
 - `README.md` — presentation et perimetre
 - `LIMITS.md` — limites detaillees, sections 13 (integrite) et 14 (composition)
-- `VERA_AUDIT_REFERENCE.md` — synthese des portes et parametres
+- `docs/archive/VERA_AUDIT_REFERENCE.md` — instantane du 31/07, **parametres perimes**
+  (trace historique ; deplace hors de la racine, voir README)
 - `vera_blind_sig/README.md` — primitive cryptographique et procedure de
   verification
