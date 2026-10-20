@@ -109,6 +109,11 @@ jobs:
       - name: Le client n'accepte que la cle de son groupe
         run: python3 tests/test_cle_liee_au_groupe.py
 
+      # Le lien de vote quitte l'URL sans casser la reprise d'un vote signe mais
+      # non depose (audit externe du 19/10/2026, F13). Execute lireLien() sous node.
+      - name: Le lien de vote ne reste pas dans l'URL
+        run: python3 tests/test_lien_hors_url.py
+
       # Les scripts qui disent « CONFORME » ne se trompent pas de temoin
       # (audit externe du 19/10/2026, F4) : heure de demarrage reelle, code non
       # suivi, unite systemd comparee au modele.

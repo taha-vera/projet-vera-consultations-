@@ -822,6 +822,24 @@ gain de sécurité de la valeur precedente était marginal, la clé etant chiffr
 au repos et l'operateur capable de la dechiffrer detenant VERA_DB_KEY de toute
 facon.
 
+### Le lien de vote dans l'historique du navigateur
+
+Le lien reçu par le votant porte son credential dans le fragment (`#a=...`),
+qui ne part jamais vers le serveur. Depuis le 20/10/2026 la page le retire de
+l'URL après lecture (`history.replaceState`) : il ne reste plus dans la barre
+d'adresse, l'onglet restauré ni la synchronisation d'onglets entre appareils.
+Une copie est gardée dans `sessionStorage` (propre à l'onglet, effacée à sa
+fermeture et au succès du dépôt) pour que le rechargement d'une page ne fasse
+pas perdre un vote signé mais non déposé.
+
+**Ce que cela ne fait pas.** L'entrée d'historique créée à l'arrivée sur la page
+peut subsister dans la base d'historique du navigateur, qu'une page web ne peut
+pas effacer. Le lien reste aussi dans le message qui l'a transporté (SMS,
+courriel) : c'est le transporteur, pas le navigateur, qui le détient (§12bis).
+Sur un appareil partagé ou non verrouillé, la règle reste : ne pas voter depuis
+un appareil dont on ne maîtrise pas l'historique. Vérifié par
+`tests/test_lien_hors_url.py`.
+
 ## 11. Une instance VERA = une organisation consultante
 
 VERA permet de creer plusieurs comptes administrateurs (endpoint protège par un

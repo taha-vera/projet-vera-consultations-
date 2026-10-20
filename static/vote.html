@@ -345,7 +345,39 @@
   // identite et instant de vote -- exactement le canal que la desactivation des
   // logs sur les POST cherchait a fermer, laisse ouvert par le GET.
   // Format du lien SMS : https://.../vote#a=JETON&d=DEPARTEMENT&k=EMPREINTE
-  const frag = new URLSearchParams(window.location.hash.slice(1));
+  //
+  // LE FRAGMENT N'EST PAS LAISSE DANS L'URL (audit externe du 19/10/2026, F13).
+  // Il ne part pas vers le serveur, mais il restait dans la barre d'adresse, dans
+  // l'onglet restaure apres un redemarrage et dans la synchronisation des onglets
+  // entre appareils -- donc lisible par quiconque a l'appareil ou l'epaule du
+  // votant. On le lit une fois, puis on le retire de l'URL (replaceState).
+  // ATTENTION, deux limites assumees (LIMITS.md) : (1) l'entree d'historique
+  // creee a l'arrivee sur la page peut subsister dans la base d'historique du
+  // navigateur, que la page ne peut pas effacer ; (2) retirer le fragment SANS
+  // precaution casserait la reprise d'un vote signe mais non depose : au
+  // rechargement, le lien aurait disparu. On en garde donc une copie dans
+  // sessionStorage, propre a cet onglet et effacee a sa fermeture, et au succes.
+  const CLE_LIEN_SESSION = 'vera_lien';
+  function lireLien(hash, stockage) {
+    let brut = String(hash || '').replace(/^#/, '');
+    try {
+      if (brut) {
+        if (stockage) stockage.setItem(CLE_LIEN_SESSION, brut);
+      } else if (stockage) {
+        brut = stockage.getItem(CLE_LIEN_SESSION) || '';
+      }
+    } catch (e) { /* stockage indisponible : on degrade, le lien reste lisible */ }
+    return new URLSearchParams(brut);
+  }
+  function stockageSession() {
+    try { return window.sessionStorage; } catch (e) { return null; }
+  }
+  const frag = lireLien(window.location.hash, stockageSession());
+  try {
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  } catch (e) { /* degrade : le fragment reste, comme avant */ }
   const jetonAutorisation = frag.get('a');
   const departementVote = frag.get('d');
   const empreinteCleAttendue = frag.get('k') || '';
@@ -467,6 +499,8 @@
   }
 
   function showSuccess() {
+    // Le vote est depose : la copie du lien n'a plus d'usage (F13).
+    try { sessionStorage.removeItem(CLE_LIEN_SESSION); } catch (e) { /* degrade */ }
     formScreen.classList.add('hidden');
     successScreen.classList.add('active');
   }
