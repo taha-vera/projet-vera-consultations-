@@ -905,7 +905,8 @@ _comptes_rh dans vera_admin_auth.py), sans aucune persistance. Un compte cree
 via /api/rh/creer_compte disparait donc au prochain redemarrage du service.
 
 Seul le compte principal survit : il est recree a chaque demarrage a partir de
-variables d'environnement definies dans l'unite systemd, par
+variables d'environnement : `VERA_ADMIN_USER` dans l'unite systemd,
+`VERA_ADMIN_HASH` dans `/etc/vera/vera.env` (depuis le 20/10/2026), par
 `vera_admin_auth.amorcer_compte_principal()`.
 
 **Une seule variante depuis le 23/08/2026.** `VERA_ADMIN_HASH` porte une
@@ -1152,6 +1153,26 @@ ce point.
 Cela ne se saura qu'au premier envoi reel. **Prevoir un canal de secours** --
 le parametre `c=` de contact independant existe pour cela -- et considerer
 qu'un groupe entier silencieux peut signifier un filtrage, pas un desinteret.
+
+### Où vivent les secrets du service
+
+Depuis le 20/10/2026 (audit externe du 19/10, F6), `VERA_DB_KEY`,
+`VERA_ADMIN_HASH` et `VERA_SECRET_CREATION_COMPTE` sont dans
+`/etc/vera/vera.env` (propriétaire root, mode 600, dossier 700) et non plus en
+`Environment=` dans l'unité systemd. `systemctl cat` et `systemctl show`
+n'affichent plus que le nom du fichier : une sortie de diagnostic collée dans un
+message, un ticket ou une conversation ne divulgue plus ces valeurs, ce qui est
+précisément le chemin de la fuite du 31/07/2026.
+
+**Ce que cela ne change pas.** Root lit toujours le fichier, et le processus
+garde ces valeurs dans son environnement (`/proc/<pid>/environ`, lisible par
+root). Quelqu'un qui obtient les droits root obtient donc les secrets, avant
+comme après. Et si le fichier est vide, absent ou aux mauvais droits, c'est le
+service qui ne démarre pas (absent) ou qui démarre sans secret valable
+(valeur vide) : `infra/verifier_deploiement.sh` contrôle l'existence, les
+droits (root, 600, dossier 700), les noms et l'absence de valeur vide ou
+`CHANGER_MOI`, sans lire aucune valeur à l'écran. Garde du dépôt :
+`tests/test_secrets_hors_unite.py`.
 
 ### Le plafond de connexions de la page RH
 

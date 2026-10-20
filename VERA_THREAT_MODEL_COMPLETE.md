@@ -291,7 +291,8 @@ ROLES, pas une fermeture des ancres temporelles. Voir `LIMITS.md` §9, « les
 canaux temporels forment une classe ».
 
 Chiffrer ces tables serait illusoire : l'operateur detient `VERA_DB_KEY`, elle
-est dans son unite systemd.
+est dans son fichier de secrets `/etc/vera/vera.env` (jusqu'au 20/10/2026 : dans
+son unite systemd).
 
 **Regle de deploiement :** ne pas decouper une consultation en departements
 dont l'effectif attendu approche ou passe sous K_MIN. Non seulement le resultat

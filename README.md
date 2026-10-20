@@ -296,7 +296,10 @@ volontaire de l'opérateur, pas une garde.
 
 ### Configuration
 
-Variables d'environnement de l'unité systemd :
+Variables d'environnement. **Les trois secrets** (`VERA_DB_KEY`, `VERA_ADMIN_HASH`,
+`VERA_SECRET_CREATION_COMPTE`) se posent dans `/etc/vera/vera.env` (root, mode 600 ;
+modèle : `infra/vera.env.exemple`) et non dans l'unité systemd, où `systemctl cat`
+les afficherait ; les autres restent dans l'unité :
 
 | Variable | Rôle | Défaut |
 |---|---|---|
@@ -574,7 +577,7 @@ n'existe ni `routes/`, ni `models/`, ni `auth/`. Le reste est rangé :
 ```
 vera_*.py              les 6 modules de l'application
 verifier_engagement.py outil du tiers vérificateur
-tests/                 48 tests, dont 12 gardes structurelles
+tests/                 49 tests, dont 13 gardes structurelles
                        et un parcours HTTP complet
 static/                page du votant, tableau de bord, bundle
 chantier_crypto/       tests JS, crash test, manifeste npm
@@ -638,7 +641,7 @@ installation en service.
 Le parcours complet a été validé de bout en bout dans un navigateur ; aucune
 consultation avec de vrais participants n'a encore eu lieu.
 
-**Version courante :** branche `main`, 19 octobre 2026 — 48 tests automatiques,
+**Version courante :** branche `main`, 19 octobre 2026 — 49 tests automatiques,
 plus un test de résistance au crash exercé sur le chemin HTTP réel.
 
 **Ce que `VERA_DB_KEY` chiffre, exactement.** Elle chiffre **la clé privée

@@ -92,16 +92,16 @@ else
 fi
 
 # 3b. L'unite systemd en service = le modele du depot, sur ce qui commande
-#     l'execution : repertoire, ligne de lancement, NOMS des variables (jamais
-#     leurs valeurs, qui sont des secrets). Une unite modifiee a la main --
-#     autre ExecStart, EnvironmentFile ajoute -- change ce qui tourne sans
-#     laisser de trace dans git (audit F4). `systemctl cat` inclut les drop-ins.
+#     l'execution : repertoire, ligne de lancement, fichier de secrets, NOMS des
+#     variables (jamais leurs valeurs). Une unite modifiee a la main -- autre
+#     ExecStart, autre EnvironmentFile -- change ce qui tourne sans laisser de
+#     trace dans git (audit F4). `systemctl cat` inclut les drop-ins.
 MODELE="$REPO/infra/vera-consultation.service"
 reel=$(systemctl cat "$UNITE" 2>/dev/null)
 if [ -z "$reel" ] || [ ! -f "$MODELE" ]; then
     ko "unite ou modele illisible : comparaison impossible"
 else
-    for cle in WorkingDirectory ExecStart; do
+    for cle in WorkingDirectory ExecStart EnvironmentFile; do
         a=$(grep -h "^$cle=" "$MODELE" | tail -1)
         b=$(printf '%s\n' "$reel" | grep "^$cle=" | tail -1)
         [ "$a" = "$b" ] && ok "unite : $cle conforme au modele" \
@@ -112,8 +112,33 @@ else
     na=$(noms < "$MODELE"); nb=$(printf '%s\n' "$reel" | noms)
     [ "$na" = "$nb" ] && ok "unite : memes noms de variables d'environnement que le modele" \
         || ko "unite : noms de variables differents du modele ($(diff <(echo "$na") <(echo "$nb") | grep '^[<>]' | tr '\n' ' '))"
-    printf '%s\n' "$reel" | grep -q '^EnvironmentFile=' \
-        && ko "unite : EnvironmentFile present, absent du modele"
+
+    # 3c. Le FICHIER DE SECRETS (audit F6) : les trois secrets ne sont plus dans
+    #     l'unite (le controle des noms ci-dessus le garantit : un `Environment=`
+    #     VERA_DB_KEY ferait apparaitre un nom de trop) mais dans un fichier
+    #     dont les droits comptent. On controle droits et NOMS, jamais valeurs :
+    #     rien de ce qui suit ne lit une valeur vers l'ecran.
+    FICHIER_SECRETS=$(grep -h '^EnvironmentFile=' "$MODELE" | tail -1 | sed 's/^EnvironmentFile=//; s/^-//')
+    EXEMPLE="$REPO/infra/vera.env.exemple"
+    if [ -z "$FICHIER_SECRETS" ] || [ ! -f "$EXEMPLE" ]; then
+        ko "fichier de secrets : chemin ou modele (infra/vera.env.exemple) introuvable"
+    elif [ ! -f "$FICHIER_SECRETS" ]; then
+        ko "fichier de secrets $FICHIER_SECRETS absent -- le service ne demarre pas sans lui"
+    else
+        [ "$(stat -c '%U:%G %a' "$FICHIER_SECRETS")" = "root:root 600" ] \
+            && ok "fichier de secrets : root:root, mode 600" \
+            || ko "fichier de secrets : droits $(stat -c '%U:%G %a' "$FICHIER_SECRETS") (attendu root:root 600)"
+        [ "$(stat -c '%U:%G %a' "$(dirname "$FICHIER_SECRETS")")" = "root:root 700" ] \
+            && ok "dossier des secrets : root:root, mode 700" \
+            || ko "dossier des secrets : droits $(stat -c '%U:%G %a' "$(dirname "$FICHIER_SECRETS")") (attendu root:root 700)"
+        lister() { grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$1" | cut -d= -f1 | sort -u; }
+        sa=$(lister "$EXEMPLE"); sb=$(lister "$FICHIER_SECRETS")
+        [ "$sa" = "$sb" ] && ok "fichier de secrets : memes noms que le modele (3 variables)" \
+            || ko "fichier de secrets : noms differents du modele ($(diff <(echo "$sa") <(echo "$sb") | grep '^[<>]' | tr '\n' ' '))"
+        vides=$(grep -cE '^[A-Za-z_][A-Za-z0-9_]*=(CHANGER_MOI)?$' "$FICHIER_SECRETS")
+        [ "$vides" = "0" ] && ok "fichier de secrets : aucune valeur vide ni « CHANGER_MOI »" \
+            || ko "fichier de secrets : $vides valeur(s) vide(s) ou « CHANGER_MOI »"
+    fi
 fi
 
 # 4. Fichiers servis par l'application = fichiers du depot.

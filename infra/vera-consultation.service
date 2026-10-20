@@ -15,34 +15,43 @@ Type=simple
 # partir de CE fichier, jamais d'une copie gardee a la main sur le serveur.
 WorkingDirectory=/root/repo-push
 
-# SECRETS : valeurs reelles POSEES SUR LE SERVEUR UNIQUEMENT, jamais ici.
+# SECRETS : DANS UN FICHIER A PART, PAS DANS CETTE UNITE (audit externe du
+# 19/10/2026, F6).
 #
 # Ce fichier a ete versionne pour la premiere fois le 10/09/2026 : jusque-la,
-# l'unite qui controle reellement l'execution -- ExecStart, variables
-# d'environnement -- n'existait que sur le serveur, editee a la main. Aucune
-# modification n'avait de trace git, de revue, ni de garantie que ce dossier
-# `infra/` documente ce qui tourne reellement. Releve indirectement en
-# recuperant l'unite reelle pour la versionner.
+# l'unite qui controle reellement l'execution n'existait que sur le serveur,
+# editee a la main. Les trois SECRETS y vivaient en `Environment=` : lisibles en
+# clair par `systemctl cat`, `systemctl show` et toute sortie de diagnostic
+# collee quelque part -- le chemin exact par lequel des secrets avaient fuite le
+# 31/07/2026 (LIMITS.md §12). Ils sont desormais dans /etc/vera/vera.env
+# (proprietaire root, mode 600, dossier 700), lu par systemd au demarrage :
+# `systemctl cat/show` n'en montre plus que le NOM du fichier.
 #
-# VERA_DOMAINE                  : le domaine public du service.
-# VERA_ADMIN_USER                : identifiant du compte d'amorcage.
-# VERA_ADMIN_HASH                : empreinte PBKDF2 (format sel_hex$hash_hex),
-#                                   jamais le mot de passe en clair -- voir
-#                                   LIMITS.md section 12 sur la fuite du 31/07.
-# VERA_SECRET_CREATION_COMPTE    : secret de /api/admin/creer_compte_rh.
-#                                   Au moins 32 caracteres aleatoires :
-#                                   openssl rand -base64 32
-# VERA_DB_KEY                    : chiffre la cle privee RSA au repos.
-#                                   64 caracteres hexadecimaux :
-#                                   openssl rand -hex 32
-#                                   Rotation : cloturer toute consultation
-#                                   active d'abord (purge les cles chiffrees),
-#                                   puis poser la nouvelle valeur.
+# Modele du fichier : infra/vera.env.exemple (noms seulement, jamais de valeur).
+# Creation : voir PROCEDURE_REPRISE_VERA.md, Partie 2, etape 5.
+#
+#   dans /etc/vera/vera.env (secrets) :
+#     VERA_ADMIN_HASH              : empreinte PBKDF2 (format sel_hex$hash_hex),
+#                                    jamais le mot de passe en clair.
+#     VERA_SECRET_CREATION_COMPTE  : secret de /api/admin/creer_compte_rh.
+#                                    Au moins 32 caracteres aleatoires :
+#                                    openssl rand -base64 32
+#     VERA_DB_KEY                  : chiffre la cle privee RSA au repos.
+#                                    64 caracteres hexadecimaux :
+#                                    openssl rand -hex 32
+#                                    Rotation : cloturer toute consultation
+#                                    active d'abord (purge les cles chiffrees),
+#                                    puis poser la nouvelle valeur.
+#   ci-dessous (pas des secrets) :
+#     VERA_DOMAINE                 : le domaine public du service.
+#     VERA_ADMIN_USER              : identifiant du compte d'amorcage.
+#
+# Syntaxe du fichier : NOM=valeur, une par ligne, SANS guillemets ni `export`.
+# systemd ne fait aucune expansion de `$` dans un EnvironmentFile : le `$` de
+# l'empreinte `sel$hash` est donc litteral, comme il doit l'etre.
+EnvironmentFile=/etc/vera/vera.env
 Environment="VERA_DOMAINE=https://vera-consultation.fr"
 Environment="VERA_ADMIN_USER=CHANGER_MOI"
-Environment="VERA_ADMIN_HASH=CHANGER_MOI"
-Environment="VERA_SECRET_CREATION_COMPTE=CHANGER_MOI"
-Environment="VERA_DB_KEY=CHANGER_MOI"
 
 ExecStart=/root/vera_blind_sig/.venv/bin/python3 -m uvicorn vera_consultation_api:app --no-access-log --host 127.0.0.1 --port 8001
 Restart=on-failure

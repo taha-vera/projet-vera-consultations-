@@ -57,6 +57,18 @@ l'étape 5 de la Partie 2 a changé ; et un contrôle de conformité
 (`infra/verifier_deploiement.sh`) est ajouté à la fin des Parties 1 et 2, car
 « le service est actif » ne prouve pas que le code servi est celui du dépôt.
 
+**Version 7** (20/10/2026) — les trois secrets de l'unité (`VERA_DB_KEY`,
+`VERA_ADMIN_HASH`, `VERA_SECRET_CREATION_COMPTE`) ne sont plus des lignes
+`Environment=` de l'unité systemd : ils sont dans **`/etc/vera/vera.env`**
+(propriétaire root, mode 600, dossier 700). Audit externe du 19/10/2026, F6 :
+`systemctl cat` et `systemctl show` les affichaient en clair, le chemin par
+lequel des secrets avaient déjà fuité le 31/07/2026. Conséquence pour ce
+document : toute étape qui disait « éditer l'unité et remplacer la ligne
+`Environment="VERA_..."` » dit maintenant « éditer `/etc/vera/vera.env` ». Les
+**valeurs** de l'enveloppe ne changent pas ; seul l'endroit où on les pose.
+`VERA_DOMAINE` et `VERA_ADMIN_USER` restent dans l'unité (ce ne sont pas des
+secrets).
+
 ---
 
 ## Ce que l'enveloppe doit contenir (six valeurs)
@@ -72,6 +84,10 @@ futur :
 5. `VERA_DOMAINE` — pas un secret, mais obligatoire au démarrage
 6. `VERA_BACKUP_KEY` — fichier (`/root/.vera_backup_key`), pas une variable
    d'environnement de l'unité systemd
+
+Où chacune se pose : les valeurs 1, 3 et 4 dans **`/etc/vera/vera.env`**, les
+valeurs 2 et 5 dans l'unité (`systemctl edit --full`), la valeur 6 dans son
+fichier à part.
 
 ---
 
@@ -156,17 +172,25 @@ façon sous la responsabilité de l'organisation, pas de VERA
    - `VERA_DB_KEY ne correspond pas a l'ensemble des cles stockees` → la
      valeur actuelle ne correspond pas à la base existante. Remplacer par la
      valeur de l'enveloppe (étape suivante).
-   - `VERA_DB_KEY non definie` → la variable est absente de l'unité.
+   - `VERA_DB_KEY non definie` → la variable est absente de
+     `/etc/vera/vera.env` (ou ce fichier n'existe pas : dans ce cas le service
+     ne démarre même pas, et `systemctl status` le dit).
    - `ni VERA_ADMIN_USER, ni VERA_ADMIN_HASH ne sont definis` → il manque un
      compte d'administration. Voir étape 5.
    - `VERA_DOMAINE vaut …` (sans `https://`) → corriger la variable
      `VERA_DOMAINE` dans l'unité, elle doit commencer par `https://`.
-4. Éditer l'unité réelle et poser la bonne valeur :
+4. Éditer le fichier de secrets et poser la bonne valeur :
    ```
-   sudo systemctl edit --full vera-consultation.service
+   sudo nano /etc/vera/vera.env
    ```
-   Repérer la ligne `Environment="VERA_DB_KEY=..."` et remplacer la valeur par
-   celle de l'enveloppe. Sauvegarder, quitter l'éditeur.
+   Repérer la ligne `VERA_DB_KEY=...` (sans guillemets, sans `export`) et
+   remplacer la valeur par celle de l'enveloppe. Sauvegarder, quitter
+   l'éditeur, puis vérifier que les droits n'ont pas changé :
+   ```
+   sudo ls -l /etc/vera/vera.env      # doit afficher -rw------- root root
+   ```
+   `VERA_DOMAINE`, lui, n'est pas dans ce fichier : il est dans l'unité
+   (`sudo systemctl edit --full vera-consultation.service`).
 5. **Se donner un accès RH, si celui de l'enveloppe ne suffit pas.**
    L'enveloppe contient `VERA_ADMIN_HASH`, pas le mot de passe en clair — elle
    permet au *service* de démarrer, pas de s'y connecter. C'est la situation
@@ -180,13 +204,13 @@ façon sous la responsabilité de l'organisation, pas de VERA
        -H "Content-Type: application/json" \
        -d '{"identifiant":"<nouvel_identifiant>","mot_de_passe":"<nouveau_mot_de_passe>","secret_admin":"<VERA_SECRET_CREATION_COMPTE de l'enveloppe>"}'
      ```
-   - **Ou remplacer directement `VERA_ADMIN_HASH`** dans l'unité, avec une
+   - **Ou remplacer directement `VERA_ADMIN_HASH`** dans `/etc/vera/vera.env`, avec une
      empreinte calculée depuis un clone du dépôt (voir Partie 2, étape 4) :
      ```
      python3 -c "from vera_admin_auth import generer_empreinte; print(generer_empreinte('nouveau-mot-de-passe'))"
      ```
-     puis coller le résultat dans `VERA_ADMIN_HASH` (étape 4 ci-dessus) et
-     redémarrer.
+     puis coller le résultat dans la ligne `VERA_ADMIN_HASH=` de
+     `/etc/vera/vera.env` (étape 4 ci-dessus) et redémarrer.
    Ceci ne touche à aucun vote déjà enregistré — uniquement à qui peut se
    connecter comme RH.
 6. Recharger et redémarrer :
@@ -283,7 +307,8 @@ chemin codé en dur.
 
 ### 4. Préparer les secrets
 
-Quatre viennent de l'enveloppe (à recopier tels quels, sans les modifier), et
+Quatre viennent de l'enveloppe (à recopier tels quels, sans les modifier ; trois
+iront dans `/etc/vera/vera.env`, un — l'identifiant — dans l'unité), et
 une cinquième valeur — pas un secret, mais obligatoire — dépend du nouveau
 domaine (liste complète des six valeurs de l'enveloppe en tête de document) :
 
@@ -367,9 +392,25 @@ Dans ce fichier :
   erreur (défaut du 13/10/2026).
 - Remplacer l'interpréteur dans `ExecStart` par le chemin noté à la fin de
   l'étape 3.
-- Remplacer les quatre `CHANGER_MOI` par les secrets de l'étape 4, et ajouter
-  une ligne `Environment="VERA_DOMAINE=..."` avec la cinquième valeur.
+- Remplacer le `CHANGER_MOI` de `VERA_ADMIN_USER` par l'identifiant de
+  l'étape 4, et remplacer la valeur de `VERA_DOMAINE` par le domaine du
+  nouveau serveur (`https://` + nom réel).
+- **Ne pas** mettre les trois secrets dans l'unité : ils vont dans le fichier
+  créé juste après.
 **Ne jamais** recommitter ce fichier avec des valeurs réelles dedans.
+
+Créer le fichier des trois secrets, **avant** de démarrer le service (sans lui,
+systemd refuse de le lancer) :
+```
+sudo install -d -m 700 /etc/vera
+sudo cp infra/vera.env.exemple /etc/vera/vera.env
+sudo chmod 600 /etc/vera/vera.env
+sudo nano /etc/vera/vera.env   # <<< À REMPLACER >>> les trois CHANGER_MOI par les valeurs de l'enveloppe
+sudo ls -l /etc/vera/vera.env  # doit afficher -rw------- root root
+```
+Format : `NOM=valeur`, une par ligne, **sans guillemets ni `export`**. Le `$`
+de `VERA_ADMIN_HASH` (`sel$hash`) se recopie tel quel : systemd ne développe
+aucun `$` dans ce type de fichier.
 
 ### 6. Démarrer et vérifier
 
@@ -496,6 +537,19 @@ Cette étape suppose que la nouvelle base (`/root/vera_state.db`) existe déjà
   tests hors d'une machine réelle — jamais par une reprise complète sur un
   vrai serveur neuf. Tant que ce test grandeur nature n'a pas eu lieu, la
   considérer comme sérieusement revue, pas comme une garantie.
+
+## Corrections apportées le 20/10/2026 (version 7)
+
+- **Les trois secrets quittent l'unité** pour `/etc/vera/vera.env` (audit F6).
+  Modifié : l'en-tête, la liste de l'enveloppe (où poser chaque valeur), le
+  diagnostic et les étapes 4 et 5 de la Partie 1, les étapes 4 et 5 de la
+  Partie 2 (création du fichier). Le contrôle de conformité vérifie désormais
+  l'existence du fichier, ses droits (root, 600, dossier 700) et ses noms, sans
+  jamais lire une valeur.
+- **Rotation d'un secret** (par exemple `VERA_SECRET_CREATION_COMPTE`) : éditer
+  `/etc/vera/vera.env`, puis `sudo systemctl restart vera-consultation.service`
+  — `daemon-reload` n'est pas nécessaire pour un `EnvironmentFile`, mais
+  inoffensif.
 
 ## Corrections apportées le 19/10/2026 (version 6)
 

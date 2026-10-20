@@ -119,6 +119,11 @@ jobs:
       - name: Les routes de connexion sont bornees contre le client lent
         run: python3 tests/test_connexion_nginx_bornes.py
 
+      # Les trois secrets ne sont pas dans l'unite systemd mais dans
+      # /etc/vera/vera.env (audit externe du 19/10/2026, F6).
+      - name: Les secrets ne sont pas dans l'unite systemd
+        run: python3 tests/test_secrets_hors_unite.py
+
       # Les scripts qui disent « CONFORME » ne se trompent pas de temoin
       # (audit externe du 19/10/2026, F4) : heure de demarrage reelle, code non
       # suivi, unite systemd comparee au modele.
