@@ -1196,12 +1196,22 @@ répétée. Le coût de l'attaque est relevé, pas annulé. Vérifié par
 `tests/test_connexion_nginx_bornes.py` (lecture de la configuration ; aucun essai
 de charge n'a été fait).
 
-**Voie de secours, à essayer avant d'en avoir besoin (non testée).** Le
+**Voie de secours (essayée une fois, le 20/10/2026, hors consultation).** Le
 plafond n'existe que dans nginx. L'application écoute sur `127.0.0.1:8001` : un
-tunnel SSH (`ssh -L 8001:127.0.0.1:8001 root@<serveur>`) permet d'atteindre la
-page d'administration sans passer par nginx. Le cookie de session est marqué
-`Secure` ; les navigateurs courants l'acceptent sur `localhost`, mais cela n'a pas
-été essayé ici. À valider une fois, hors consultation.
+tunnel SSH (`ssh -f -N -o ExitOnForwardFailure=yes -L 8001:127.0.0.1:8001
+root@<serveur>`, puis `http://localhost:8001/static/admin.html`) atteint la page
+d'administration sans passer par nginx. Essai fait depuis un téléphone Android
+(Termux + navigateur mobile) : la page s'affiche, la connexion de l'organisateur
+réussit et l'espace organisateur apparaît. Le cookie de session est marqué
+`Secure` ; le navigateur l'a accepté sur `localhost` pour la connexion.
+
+**Ce qui n'a pas été observé.** Si la session survit à un rechargement de la
+page en `http://localhost` n'a pas été relevé : si elle ne survit pas, il faudra
+se reconnecter à chaque chargement, ce qui reste utilisable. Un autre navigateur
+ou un autre système peut se comporter autrement. Sous Termux, activer
+`termux-wake-lock` avant d'ouvrir le tunnel (Android suspend sinon l'application),
+et fermer le tunnel après usage : `pkill -f "ssh.*8001:127.0.0.1:8001"`. Le
+navigateur propose d'enregistrer un mot de passe pour `localhost:8001` : refuser.
 
 ### Le blocage de compte ne freine pas une attaque répartie
 
