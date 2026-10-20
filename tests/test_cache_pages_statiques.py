@@ -12,7 +12,7 @@ pire : le votant n'a aucun moyen de voir que sa page est perimee.
 
 CE QUE CE TEST VERIFIE (infra/nginx-vera-consultation.conf, sans lancer nginx)
   1. `Cache-Control: no-cache` est pose au niveau `server` ;
-  2. AUCUN `add_header` n'est pose dans un `location` (ni dans un bloc
+  2. AUCUN `add_header` (ni `include`) n'est pose dans un `location` (ni dans un bloc
      imbrique) : nginx n'herite des en-tetes du `server` que si le `location`
      n'en ajoute aucun. Un seul add_header de location ferait disparaitre, sur
      cette route, la CSP, HSTS, X-Frame-Options et le reste -- sans erreur,
@@ -40,21 +40,46 @@ def verifier(condition, message, detail=""):
 
 
 def directives_par_profondeur(texte):
-    """Renvoie [(profondeur, ligne)] pour chaque directive `add_header`.
+    """Renvoie ([(profondeur, directive)], solde) pour chaque directive qui peut
+    poser ou inclure un en-tete : `add_header`, `more_set_headers`, `include`.
 
-    Profondeur 0 = hors de tout bloc ; 1 = dans `server` (ou `http`) ; 2 et plus
-    = dans un `location`, un `if`, etc. Les commentaires (# ...) sont retires
-    AVANT de compter les accolades : une accolade dans un commentaire ou dans
-    une chaine ne doit pas decaler le comptage.
+    Le texte est decoupe en DIRECTIVES (jusqu'a `;`, `{` ou `}`), pas en lignes
+    (audit externe du 19/10/2026, F10) : la version precedente cherchait
+    `add_header` en debut de LIGNE, donc `location /x { add_header ...; }` sur
+    une seule ligne, ou deux directives sur la meme ligne, lui echappaient --
+    alors que c'est exactement ce qui ferait disparaitre la CSP et HSTS sur la
+    route. `include` est suivi aussi : un fichier inclus dans un `location`
+    peut contenir un add_header que ce test ne verrait pas.
+
+    Profondeur 0 = hors de tout bloc ; 1 = dans `server` ; 2 et plus = dans un
+    `location`, un `if`, etc. Chaines et commentaires sont retires AVANT le
+    decoupage : une accolade ou un `;` dans l'un d'eux ne doit rien decaler.
     """
+    chaines = []
+
+    def mettre_de_cote(m):
+        chaines.append(m.group(0))
+        return f"\x00{len(chaines) - 1}\x00"
+
+    propre = []
+    for brut in texte.splitlines():
+        ligne = re.sub(r'"[^"]*"|\'[^\']*\'', mettre_de_cote, brut)
+        propre.append(ligne.split("#", 1)[0])
+    flux = " ".join(propre)
+
+    def restaurer(d):
+        return re.sub(r"\x00(\d+)\x00", lambda m: chaines[int(m.group(1))], d)
+
     profondeur = 0
     trouvees = []
-    for brut in texte.splitlines():
-        ligne = re.sub(r'"[^"]*"', '""', brut)      # chaines vides
-        ligne = ligne.split("#", 1)[0]               # commentaires
-        if re.match(r"\s*add_header\b", ligne):
-            trouvees.append((profondeur, brut.strip()))
-        profondeur += ligne.count("{") - ligne.count("}")
+    for m in re.finditer(r"([^;{}]*)([;{}])", flux):
+        directive, fin = m.group(1).strip(), m.group(2)
+        if re.match(r"(add_header|more_set_headers|include)\b", directive):
+            trouvees.append((profondeur, restaurer(directive)))
+        if fin == "{":
+            profondeur += 1
+        elif fin == "}":
+            profondeur -= 1
     return trouvees, profondeur
 
 
@@ -70,10 +95,11 @@ verifier(fin == 0, "0. les accolades de la conf sont equilibrees",
 
 # Le bloc `server` est a la profondeur 1 : dans ce fichier, la conf ne contient
 # pas de bloc `http {` englobant (c'est un fichier de site).
-niveau_server = [l for p, l in entetes if p == 1]
+# Le texte d'une directive est ici SANS son `;` final (decoupage par directive).
+niveau_server = [l for p, l in entetes if p == 1 and l.startswith("add_header")]
 dans_location = [l for p, l in entetes if p >= 2]
 
-verifier(any(re.search(r'Cache-Control\s+"no-cache"\s+always;', l)
+verifier(any(re.search(r'Cache-Control\s+"no-cache"\s+always$', l)
              for l in niveau_server),
          '1. « Cache-Control: no-cache » est pose au niveau server, avec always',
          "\n      ".join(niveau_server))
@@ -85,7 +111,7 @@ verifier(not dans_location,
 for nom in ("Content-Security-Policy", "X-Frame-Options",
             "X-Content-Type-Options", "Referrer-Policy",
             "Strict-Transport-Security"):
-    verifier(any(l.startswith(f'add_header {nom} ') and l.rstrip().endswith("always;")
+    verifier(any(l.startswith(f'add_header {nom} ') and l.rstrip().endswith("always")
                  for l in niveau_server),
              f"3. {nom} reste pose au niveau server, avec always")
 
