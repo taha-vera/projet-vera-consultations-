@@ -1426,14 +1426,24 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
     # d'insertion (voir persister_jetons_autorisation_lot) : deux requetes
     # simultanees ne peuvent pas franchir le plafond ensemble.
     #
-    # plafonds is None = consultation declaree avant ce correctif : on ne peut
-    # pas inventer un chiffre, le comportement d'avant est conserve. Aucune
-    # nouvelle declaration n'arrive la : declarer_groupes l'exige.
-    plafonds = persistance.charger_plafonds_invitations()
-    plafond = plafonds.get(payload.departement) if plafonds is not None else None
+    # Pas de plafond en base = consultation declaree avant ce correctif : on ne
+    # peut pas inventer un chiffre, le comportement d'avant est conserve (la
+    # fonction renvoie alors plafond=None). Aucune nouvelle declaration n'arrive
+    # la : declarer_groupes l'exige.
+    #
+    # La declaration ET le plafond sont relus DANS la transaction
+    # (controler_declaration=True) : les controles faits plus haut le sont hors
+    # verrou, et une cloture intercalee laissait des jetons orphelins (F8).
     try:
-        total_groupe = persistance.persister_jetons_autorisation_lot(
-            jetons, payload.departement, plafond=plafond)
+        total_groupe, plafond = persistance.persister_jetons_autorisation_lot(
+            jetons, payload.departement, controler_declaration=True)
+    except persistance.GroupeNonDeclareErreur:
+        raise HTTPException(
+            status_code=409,
+            detail="La consultation a ete cloturee (ou ses groupes ont change) "
+                   "pendant la generation. Aucun lien n'a ete cree. Recommencez "
+                   "depuis la declaration des groupes.",
+        )
     except persistance.PlafondInvitationsErreur as e:
         reste = max(e.plafond - e.deja, 0)
         raise HTTPException(

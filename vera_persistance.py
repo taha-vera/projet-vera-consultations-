@@ -626,6 +626,17 @@ class PlafondInvitationsErreur(Exception):
             f"{deja} deja generees + {demande} demandees > {plafond}")
 
 
+class GroupeNonDeclareErreur(Exception):
+    """Levee par persister_jetons_autorisation_lot quand, AU MOMENT de
+    l'insertion, le groupe n'est plus (ou n'est pas) declare : typiquement une
+    cloture intercalee entre les controles de l'appelant et l'ecriture
+    (audit externe du 19/10/2026, F8). Rien n'est ecrit."""
+
+    def __init__(self, departement):
+        self.departement = departement
+        super().__init__(f"groupe « {departement} » non declare au moment de l'ecriture")
+
+
 class CollisionJetonErreur(Exception):
     """Levee par persister_jetons_autorisation_lot si l'empreinte d'un jeton
     du lot coincide avec une empreinte deja en base (ou avec une autre
@@ -634,7 +645,8 @@ class CollisionJetonErreur(Exception):
     pass
 
 
-def persister_jetons_autorisation_lot(jetons, departement, plafond=None):
+def persister_jetons_autorisation_lot(jetons, departement, plafond=None,
+                                      controler_declaration=False):
     """Enregistre les empreintes de PLUSIEURS jetons en UNE transaction.
 
     L'appel unitaire persister_jeton_autorisation fait un commit par jeton, et
@@ -675,13 +687,34 @@ def persister_jetons_autorisation_lot(jetons, departement, plafond=None):
     ferait depasser ce nombre de jetons POUR CE GROUPE, utilises ou non. Le
     comptage et l'insertion se font sous le meme verrou et dans la meme
     transaction : deux appels simultanes ne peuvent pas voir chacun la place
-    qui reste. Renvoie le nombre total de jetons du groupe apres l'insertion.
-    `plafond=None` desactive le controle (consultation declaree avant D4, ou
-    appel de test) : c'est l'appelant qui decide, pas cette fonction.
+    qui reste. Renvoie (total de jetons du groupe apres l'insertion, plafond
+    applique ou None). `plafond=None` desactive le controle (consultation
+    declaree avant D4, ou appel de test) : c'est l'appelant qui decide.
+
+    DECLARATION RELUE DANS LA TRANSACTION (F8, audit externe du 19/10/2026).
+    Avec `controler_declaration=True`, la liste des groupes ET le plafond sont
+    relus ICI, sous le meme verrou que l'ecriture, et l'argument `plafond` est
+    ignore. L'appelant (generer_autorisations) verifie la declaration en
+    amont, hors verrou : une cloture intercalee entre ce controle et
+    l'insertion laissait des jetons orphelins -- 200 et N liens renvoyes, mais
+    plus de consultation -- qui faussaient le compteur d'invitations de la
+    consultation SUIVANTE, amputaient son plafond, et restaient valables pour
+    qui avait gardé les anciens liens. Meme defaut, et meme remede, que D1 : le
+    controle qui compte est celui qui est dans la transaction.
     """
     if not jetons:
-        return 0
+        return 0, plafond
     with _verrou_db:
+        if controler_declaration:
+            import json as _json
+            row = _conn.execute(
+                "SELECT groupes_declares, plafonds_invitations "
+                "FROM question_active WHERE id = 1").fetchone()
+            declares = _json.loads(row[0]) if row and row[0] else None
+            if declares is None or departement not in declares:
+                raise GroupeNonDeclareErreur(departement)
+            plafonds = _json.loads(row[1]) if row and row[1] else None
+            plafond = plafonds.get(departement) if plafonds is not None else None
         deja = _conn.execute(
             "SELECT COUNT(*) FROM jetons_autorisation WHERE departement = ?",
             (departement,),
@@ -700,7 +733,7 @@ def persister_jetons_autorisation_lot(jetons, departement, plafond=None):
                 f"« {departement} » : {e}"
             ) from e
         _conn.commit()
-        return deja + len(jetons)
+        return deja + len(jetons), plafond
 
 
 def persister_jeton_autorisation(jeton, departement):
