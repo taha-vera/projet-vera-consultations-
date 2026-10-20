@@ -498,9 +498,15 @@ DUREE_BLOCAGE_MAX = 3600          # 1 heure
 # Compteur PAR COMPTE, en plus de celui par IP.
 #
 # Le compteur par IP est contournable en distribuant les tentatives. Celui-ci
-# ne l'est pas : il suit l'identifiant vise, quelle que soit la provenance.
-# C'est la seule defense contre une attaque repartie, et elle protege le compte
-# plutot que le reseau.
+# suit l'identifiant vise, quelle que soit la provenance -- mais ATTENTION, il
+# ne RALENTIT PAS une attaque repartie (audit externe du 19/10/2026, F5) :
+# les identifiants sont verifies AVANT le blocage (voir connexion_rh, « le
+# blocage ne doit pas enfermer son proprietaire dehors »), donc le bon mot de
+# passe passe meme compte « bloque », et un mauvais recoit 429 au lieu de 401
+# sans que la cadence de devinettes baisse. Ce compteur sert de TEMOIN (le
+# journal montre une attaque repartie) et d'indice cote client, pas de frein.
+# Le frein reel est le debit nginx par adresse (1 r/s) ET l'entropie du mot de
+# passe : voir LIMITS.md §12, « Le blocage de compte ne freine pas ».
 _tentatives_par_compte: dict[str, dict] = {}
 SEUIL_ECHECS_PAR_COMPTE = 20
 DUREE_BLOCAGE_COMPTE = 900        # 15 minutes
@@ -602,8 +608,9 @@ def _enregistrer_echec(ip: str, compte: str = "") -> None:
 def _compte_bloque(compte: str) -> float:
     """Secondes restantes de blocage pour ce compte, 0 s'il est libre.
 
-    Independant de l'IP : c'est la defense contre une attaque repartie sur
-    plusieurs adresses, que le compteur par IP ne voit pas.
+    Independant de l'IP : il VOIT une attaque repartie sur plusieurs adresses,
+    que le compteur par IP ne voit pas. Il ne la FREINE pas : le bon mot de
+    passe passe pendant le blocage, par conception (cf. connexion_rh).
     """
     if not compte:
         return 0

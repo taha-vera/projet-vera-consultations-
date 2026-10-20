@@ -430,7 +430,7 @@ ne prouve rien, `CONFORME` apres un deploiement oui.
 | Bourrage de l'URL de `/api/cle_publique` | cible dans le code, cote client | Le nom du groupe est dans la query string : bourrer la reponse n'y ferait rien, c'est la REQUETE qui est portee a longueur fixe (parametre `pad=` ignore du serveur). Voir Porte 21 |
 | Bourrage de la REPONSE de `/api/signer_aveugle` | `LONGUEUR_PAD_REPONSE`, cote SERVEUR | **Troisieme etape, absente de ce tableau jusqu'au 03/09.** Le serveur compensait en CARACTERES : la reponse variait de 691 a 791 octets selon le nom du groupe, sur la seule requete du parcours qui porte le jeton. Corrige le 29/08 en octets, cible portee a 400 -- `max_length=100` borne des caracteres, qui valent jusqu'a quatre octets |
 | Chiffrement cle RSA | Fernet + PBKDF2-SHA256 | 100 000 iterations, sel aleatoire par enregistrement (derivation de la CLE DE BASE depuis `VERA_DB_KEY` -- a ne pas confondre avec les 200 000 iterations des mots de passe d'administration, Porte 22) |
-| Anti-bruteforce | 5 echecs / IP, blocage 5 min | Sur la connexion RH |
+| Anti-bruteforce | 5 echecs / IP, blocage 5 min puis croissant jusqu'a 1 h | Sur la connexion RH. Le compteur par identifiant (20 echecs) **ne freine pas** une attaque repartie (le bon mot de passe passe pendant le blocage, par conception) : le frein reel est le debit nginx par adresse et l'entropie du mot de passe -- LIMITS.md §12 |
 | Rate-limit vote | 5 r/s, rafale 50 | Nginx, sur les 4 routes du parcours de vote |
 | Rate-limit connexion | 1 r/s, rafale 5 | Nginx, zone dediee |
 

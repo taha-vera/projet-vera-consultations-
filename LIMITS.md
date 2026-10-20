@@ -1122,6 +1122,26 @@ Cela ne se saura qu'au premier envoi reel. **Prevoir un canal de secours** --
 le parametre `c=` de contact independant existe pour cela -- et considerer
 qu'un groupe entier silencieux peut signifier un filtrage, pas un desinteret.
 
+### Le blocage de compte ne freine pas une attaque répartie
+
+Le compte RH a deux compteurs d'échecs : par adresse (blocage croissant jusqu'à
+une heure) et par identifiant (20 échecs, 15 minutes). **Le second ne freine
+rien.** Les identifiants sont vérifiés *avant* le blocage, volontairement :
+sinon quiconque connaît l'identifiant le maintiendrait bloqué et empêcherait la
+clôture, donc l'effacement promis (voir le commentaire de `connexion_rh`). Le
+bon mot de passe passe donc même compte « bloqué » ; un mauvais reçoit 429 au
+lieu de 401, sans que la cadence de devinettes ne baisse.
+
+Ce que cela signifie : le seul frein à une attaque répartie sur plusieurs
+adresses est le débit nginx (1 requête par seconde et par adresse) et
+**l'entropie du mot de passe**. Le compteur par identifiant reste utile comme
+témoin (une rafale d'échecs sur un compte se voit au journal), pas comme
+défense. Conséquence pratique, à appliquer à l'amorçage : une phrase de passe
+longue et aléatoire (au moins 16 caractères tirés au hasard ou cinq mots ou
+plus), jamais un mot de passe mémorisable. Ce point n'est vérifié par aucun
+test : aucune longueur minimale n'est imposée au mot de passe du compte
+principal, dont l'empreinte est calculée hors ligne.
+
 ## 12bis. Le transporteur des invitations est un tiers de confiance non declare
 
 Chaque invitation part par SMS ou par courriel, donc par un prestataire. Ce
