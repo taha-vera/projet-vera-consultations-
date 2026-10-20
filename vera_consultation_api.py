@@ -1916,7 +1916,23 @@ def definir_question(payload: QuestionRequete, session_vera: Optional[str] = Coo
     Les options (oui / non / abstention) ne sont pas modifiables : la
     calibration DP les suppose au nombre de trois."""
     exiger_session(session_vera)
-    if gestionnaire_signature.temps_restant_secondes() is not None:
+    # LE GEL SE LIT DANS LA BASE, PAS SEULEMENT SUR L'HORLOGE DES CLES (audit
+    # externe du 19/10/2026, F2).
+    #
+    # temps_restant_secondes() repond None des qu'aucune cle n'est active :
+    # apres l'expiration des cles (7 jours) PUIS un redemarrage du processus
+    # (deploiement, Restart=on-failure), ouvrir_consultation() ne recharge rien
+    # et la reponse devient None. Compteurs, groupes declares et resultats
+    # publies, eux, survivent jusqu'a la cloture. Ce test seul laissait donc
+    # redefinir la question A COTE d'un resultat deja publie : des reponses
+    # recueillies sur Q1, presentees a cote de Q2 -- exactement la
+    # manipulation que ce gel existe pour interdire.
+    #
+    # La declaration des groupes est le moment ou la question se fige (elle
+    # cree toutes les cles) ET la ligne qui survit au redemarrage : c'est elle
+    # qui fait foi.
+    if (gestionnaire_signature.temps_restant_secondes() is not None
+            or persistance.charger_groupes_declares() is not None):
         raise HTTPException(
             status_code=409,
             detail=("La consultation a deja commence : la question ne peut plus "
@@ -1976,7 +1992,15 @@ def declarer_groupes(payload: DeclarerGroupesRequete,
     # consultation. Le texte d'aide de admin.html annoncait a tort que le gel
     # survenait « a la generation du premier lien » -- en realite, ici, des
     # la declaration.
-    if persistance.charger_question() is None:
+    #
+    # `not` et non `is None` (audit externe du 19/10/2026, F7) : fixer la date
+    # d'ouverture AVANT la question cree la ligne question_active avec un
+    # intitule VIDE (''), que `is None` laissait passer. Les groupes se
+    # declaraient alors, la question restait '' -- la page servait l'intitule
+    # par defaut -- et definir_question refusait ensuite : plus aucune issue
+    # que recommencer toute la consultation. Meme defaut que D3, par l'autre
+    # porte.
+    if not persistance.charger_question():
         raise HTTPException(
             status_code=409,
             detail="Definissez d'abord l'intitule de la consultation "
