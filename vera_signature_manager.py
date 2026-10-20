@@ -40,8 +40,10 @@ for _fonction in ("generer_cles", "signer_aveugle"):
         )
 
 # Duree de vie d'une consultation. Passe ce delai le timer detruit les cles
-# (memoire ET base) et plus aucun vote n'est accepte : les votants recoivent un
-# 503 "Aucune consultation active".
+# (memoire ET base) : plus aucune signature n'est emise, et les depots de votes
+# DEJA signes ne sont tolerees que pendant DELAI_GRACE_DEPOT_SECONDES (24 h,
+# voir plus bas). Ensuite les votants recoivent un 503 "Aucune consultation
+# active".
 #
 # Portee a 7 jours le 24/07/2026, contre 48h auparavant. Raison : la valeur
 # precedente entrait en contradiction avec K_MIN=240. Reunir 240 reponses en
@@ -55,6 +57,25 @@ for _fonction in ("generer_cles", "signer_aveugle"):
 # repos (Fernet), et l'operateur capable de la dechiffrer detient VERA_DB_KEY
 # de toute facon. Le cout d'usage, lui, etait majeur.
 DUREE_VIE_CLE_SECONDES = 7 * 24 * 3600
+
+# MARGE DE DEPOT APRES L'EXPIRATION (audit externe du 19/10/2026, F9).
+#
+# A l'expiration, la cle PRIVEE est detruite : plus aucune signature ne peut
+# etre emise. Les cles PUBLIQUES sont gardees pour que les votes DEJA signes
+# puissent encore etre deposes (voir _detruire_cle_privee) -- un votant qui a
+# obtenu sa signature a H-5 minutes ne doit pas perdre sa voix. Mais ce
+# registre n'avait aucune borne de temps : il vivait jusqu'a la cloture ou
+# jusqu'a un redemarrage, donc des depots restaient acceptes des jours apres
+# la fin annoncee des « 7 jours ». La documentation disait « plus aucun vote
+# n'est accepte » ; le code disait autre chose.
+#
+# Une marge COURTE et FIXE tranche : assez pour qu'un votant interrompu
+# termine son depot (la signature a ete obtenue avant l'echeance, le depot
+# suit en quelques secondes pour un client qui fonctionne), pas assez pour que
+# la consultation se prolonge. Au-dela, 503 « Aucune consultation active ».
+# Les votes deja recueillis ne sont pas touches ; seuls les NOUVEAUX depots
+# sont refuses.
+DELAI_GRACE_DEPOT_SECONDES = 24 * 3600
 
 try:
     import vera_persistance as _persistance
@@ -345,7 +366,14 @@ class GestionnaireSignature:
             if departement in self._cles:
                 _priv, pub = self._cles[departement]
                 return pub
-            # Consultation expiree : on peut encore verifier ce qui a ete signe.
+            # Consultation expiree : on peut encore verifier ce qui a ete signe,
+            # mais seulement pendant la marge (F9) ; passe ce delai le registre
+            # est vide et la requete retombe sur « aucune consultation active ».
+            if (self._cles_publiques_expirees
+                    and self._ouverture_ts is not None
+                    and time.time() > self._ouverture_ts + DUREE_VIE_CLE_SECONDES
+                                      + DELAI_GRACE_DEPOT_SECONDES):
+                self._cles_publiques_expirees = {}
             if departement in self._cles_publiques_expirees:
                 return self._cles_publiques_expirees[departement]
             if not self._consultation_ouverte:

@@ -787,8 +787,21 @@ principal -- pas de les persister en base.
 
 Une consultation VERA a une durée de vie DURE de 7 jours a compter de son
 ouverture. Passe ce delai, les clés de signature sont automatiquement detruites
-(en memoire et en base) et plus aucun vote n'est accepte : les votants qui
+(en memoire et en base) : plus aucune signature n'est emise. **Un vote deja
+signe peut encore etre depose pendant 24 heures** (marge de depot, voir
+ci-dessous) ; passe ce delai, plus aucun vote n'est accepte et les votants qui
 ouvrent leur lien recoivent une erreur "Aucune consultation active".
+
+**La marge de 24 h, et pourquoi.** A l'expiration, seule la cle PRIVEE est
+detruite ; les cles publiques restent pour que les votes deja signes puissent
+etre verifies. Un votant qui a obtenu sa signature a l'echeance ne doit pas
+perdre sa voix : son jeton est consomme, il ne peut pas recommencer. Jusqu'au
+19/10/2026 ce registre n'avait AUCUNE borne de temps (il vivait jusqu'a la
+cloture ou au prochain redemarrage) et la documentation affirmait pourtant
+« plus aucun vote n'est accepte » : audit externe, F9. La marge est desormais
+fixe (`DELAI_GRACE_DEPOT_SECONDES`), verifiee par
+`tests/test_marge_depot_expiration.py`. **Ce qu'elle ne change pas :** la
+fenetre de collecte reste 7 jours pour la SIGNATURE ; elle ne l'allonge pas.
 
 Ce n'est pas un paramètre de confort : la clé privee ne doit pas exister
 indefiniment, et sa destruction automatique garantit qu'une consultation

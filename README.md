@@ -66,7 +66,7 @@ les conditions de la garantie — énumérées et justifiées dans
 | Attestation de l'effectif | par un tiers mandaté (CSE, représentants du personnel) | Sans elle, l'organisation peut fabriquer une partie des réponses sans que rien ne le montre. |
 | Découpage en groupes | **sans recoupement** — chaque personne dans un seul groupe publié | Quelqu'un présent dans deux groupes subit ε = 1,0 en une seule consultation, alors que le barème le classe à 0,5. VERA ne peut pas le détecter : il ne connaît pas vos membres. |
 | Transporteur des invitations | **indépendant de l'hébergeur** | Le transporteur voit le couple (personne, invitation) ; l'hébergeur détient la base. Réunis, ils désanonymisent. |
-| Fenêtre de collecte | ≤ 7 jours | Les clés de signature sont détruites automatiquement à l'expiration. |
+| Fenêtre de collecte | ≤ 7 jours | Les clés de signature sont détruites automatiquement à l'expiration ; un vote déjà signé peut encore être déposé pendant 24 h, pas au-delà. |
 | Portée du résultat | consultatif | VERA ne garantit pas l'intégrité du corps électoral. |
 
 **240 réponses, pas 240 invitations.** L'effectif minimal d'un groupe vaut
@@ -574,7 +574,7 @@ n'existe ni `routes/`, ni `models/`, ni `auth/`. Le reste est rangé :
 ```
 vera_*.py              les 6 modules de l'application
 verifier_engagement.py outil du tiers vérificateur
-tests/                 45 tests, dont 11 gardes structurelles
+tests/                 46 tests, dont 11 gardes structurelles
                        et un parcours HTTP complet
 static/                page du votant, tableau de bord, bundle
 chantier_crypto/       tests JS, crash test, manifeste npm
@@ -638,7 +638,7 @@ installation en service.
 Le parcours complet a été validé de bout en bout dans un navigateur ; aucune
 consultation avec de vrais participants n'a encore eu lieu.
 
-**Version courante :** branche `main`, 19 octobre 2026 — 45 tests automatiques,
+**Version courante :** branche `main`, 19 octobre 2026 — 46 tests automatiques,
 plus un test de résistance au crash exercé sur le chemin HTTP réel.
 
 **Ce que `VERA_DB_KEY` chiffre, exactement.** Elle chiffre **la clé privée
