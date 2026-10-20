@@ -114,6 +114,11 @@ jobs:
       - name: Le lien de vote ne reste pas dans l'URL
         run: python3 tests/test_lien_hors_url.py
 
+      # Les routes de connexion sont bornees contre le client lent : plafond par
+      # adresse, corps court, delai court (audit externe du 19/10/2026, F11).
+      - name: Les routes de connexion sont bornees contre le client lent
+        run: python3 tests/test_connexion_nginx_bornes.py
+
       # Les scripts qui disent « CONFORME » ne se trompent pas de temoin
       # (audit externe du 19/10/2026, F4) : heure de demarrage reelle, code non
       # suivi, unite systemd comparee au modele.

@@ -1153,6 +1153,35 @@ Cela ne se saura qu'au premier envoi reel. **Prevoir un canal de secours** --
 le parametre `c=` de contact independant existe pour cela -- et considerer
 qu'un groupe entier silencieux peut signifier un filtrage, pas un desinteret.
 
+### Le plafond de connexions de la page RH
+
+nginx limite à 8 le nombre de requêtes de connexion simultanées, toutes adresses
+confondues (le pool de threads de l'application est de 40 : il faut en laisser
+aux votants). Ce plafond est **partagé**, et c'était son défaut : un seul client
+qui ouvrait huit connexions et envoyait son corps octet par octet pouvait toutes
+les occuper et empêcher l'organisateur de se connecter, donc de clôturer (audit
+externe du 19/10/2026, F11).
+
+Depuis le 20/10/2026, sur `/api/rh/connexion` et `/api/admin/creer_compte_rh` :
+au plus 2 connexions simultanées **par adresse**, un corps limité à 512 octets et
+2 secondes entre deux lectures. Une adresse seule ne remplit donc plus le
+plafond global ; il en faut au moins quatre.
+
+**Ce que cela ne ferme pas.** Le délai nginx mesure l'intervalle entre deux
+lectures, pas la durée totale : un client qui envoie un octet toutes les
+1,9 secondes garde sa place environ 17 minutes (512 octets × 2 s). Quelqu'un qui
+dispose de plusieurs adresses peut donc encore bloquer la connexion, de façon
+répétée. Le coût de l'attaque est relevé, pas annulé. Vérifié par
+`tests/test_connexion_nginx_bornes.py` (lecture de la configuration ; aucun essai
+de charge n'a été fait).
+
+**Voie de secours, à essayer avant d'en avoir besoin (non testée).** Le
+plafond n'existe que dans nginx. L'application écoute sur `127.0.0.1:8001` : un
+tunnel SSH (`ssh -L 8001:127.0.0.1:8001 root@<serveur>`) permet d'atteindre la
+page d'administration sans passer par nginx. Le cookie de session est marqué
+`Secure` ; les navigateurs courants l'acceptent sur `localhost`, mais cela n'a pas
+été essayé ici. À valider une fois, hors consultation.
+
 ### Le blocage de compte ne freine pas une attaque répartie
 
 Le compte RH a deux compteurs d'échecs : par adresse (blocage croissant jusqu'à
