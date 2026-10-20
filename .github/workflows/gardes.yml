@@ -102,6 +102,13 @@ jobs:
       - name: Un refus de voix ne s'affiche pas comme un succes
         run: python3 tests/test_client_refus_vote.py
 
+      # Le client n'accepte que la cle publiee pour le GROUPE du lien, pas
+      # n'importe quelle cle de la liste (audit externe du 19/10/2026, F3) :
+      # sinon un operateur actif signe une personne sous la cle d'un autre
+      # groupe et la designe au depot. Execute la fonction sous node.
+      - name: Le client n'accepte que la cle de son groupe
+        run: python3 tests/test_cle_liee_au_groupe.py
+
       # AUCUN script du depot n'emprunte le repli en clair VERA_ADMIN_PASS.
       #
       # La premiere version de cette garde ne nommait que run_tests.sh. C'etait

@@ -26,10 +26,10 @@ précisément celui que ces empreintes ferment.
 
 ## Empreintes de référence
 
-Version du 19 octobre 2026 (page de vote : un refus de voix ne s'affiche plus comme un succes ; le bundle est inchange depuis le 3 septembre) :
+Version du 19 octobre 2026 (page de vote : un refus de voix ne s'affiche plus comme un succes, et seule la cle publiee pour le groupe du lien est acceptee ; le bundle est inchange depuis le 3 septembre) :
 
 ```
-d220956094996e6b9dd21cabf69975be8da6f2029ec3619f1cd6fe166b8c1e3f  static/vote.html
+4340336ffccc18362da28deaf45b7e96350acd7859713e0340689dd88ce1c79b  static/vote.html
 08e678cc5d64e9996cfe3cf54eb1220a1bb032c54d0c4351651f8aee057baa66  static/blindrsa-bundle.js
 ```
 

@@ -365,6 +365,17 @@
   // simplement quoi faire, sans exiger de justification.
   const contactIndependant = frag.get('c') || '';
 
+  // La cle recue est-elle EXACTEMENT celle publiee pour ce groupe ?
+  // Fonction pure, extraite pour pouvoir etre testee sous node
+  // (tests/test_cle_liee_au_groupe.py) : l'erreur qu'elle previent -- accepter
+  // la cle d'un autre groupe parce qu'elle figure dans la liste -- ne se voit
+  // pas a la lecture, et ne se voit pas non plus a l'usage.
+  function cleAppartientAuGroupe(cles, groupe, cleHex) {
+    if (!Array.isArray(cles) || typeof groupe !== 'string' || !groupe) return false;
+    const attendue = cles.find(c => c && c.departement === groupe);
+    return !!attendue && attendue.cle_publique_hex === cleHex;
+  }
+
   function phraseRecours() {
     if (contactIndependant) {
       return " Un problème, un doute ? Écrivez à " + contactIndependant +
@@ -805,11 +816,17 @@
         return;
       }
 
-      // 3. La cle qu'on vient de recevoir figure-t-elle dans cet ensemble ?
-      //    Sans ce controle, le serveur pourrait servir une cle hors liste
-      //    tout en presentant un agregat correct.
-      if (!eng.cles.some(c => c.cle_publique_hex === cle_publique_hex)) {
-        showError("La clé utilisée pour votre vote ne figure pas parmi celles qui ont été publiées. Vote refusé par sécurité : signalez-le." + phraseRecours(), 'Erreur de sécurité');
+      // 3. La cle qu'on vient de recevoir est-elle CELLE DE VOTRE GROUPE dans
+      //    cet ensemble ? Pas seulement : figure-t-elle dans la liste.
+      //
+      //    Avec « figure dans la liste », un operateur actif repondait pour
+      //    « Atelier » avec la cle -- reelle, publiee -- de « Direction » : les
+      //    quatre controles passaient, l'agregat etant le meme pour tous, et
+      //    la signature de CETTE seule personne, sous une cle que personne
+      //    d'autre dans son groupe n'a recue, la designait au depot. Pas besoin
+      //    de segmenter les liens. Constat d'un audit externe du 19/10/2026 (F3).
+      if (!cleAppartientAuGroupe(eng.cles, departementVote, cle_publique_hex)) {
+        showError("La clé utilisée pour votre vote n'est pas celle qui a été publiée pour votre groupe. Vote refusé par sécurité : signalez-le." + phraseRecours(), 'Erreur de sécurité');
         return;
       }
 
