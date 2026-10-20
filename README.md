@@ -553,6 +553,7 @@ séparation des rôles, pas à un défaut d'implémentation.
 | [docs/archive/VERA_AUDIT_REFERENCE.md](docs/archive/VERA_AUDIT_REFERENCE.md) | Instantané daté du 31/07 — trace historique, **paramètres périmés** |
 | [VERIFICATION_CLIENT.md](VERIFICATION_CLIENT.md) | Vérifier que le serveur sert bien ce code |
 | [GUIDE_DEPLOIEMENT.md](GUIDE_DEPLOIEMENT.md) | Guide de l'organisation qui consulte, notice RGPD |
+| [PROCEDURE_REPRISE_VERA.md](PROCEDURE_REPRISE_VERA.md) | Reprise après perte du serveur ou de l'opérateur — à conserver avec l'enveloppe scellée ; **ne contient aucun secret** |
 
 ### Composants principaux
 
