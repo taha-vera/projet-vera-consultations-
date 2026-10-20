@@ -216,6 +216,31 @@ if jetons:
                      "6. rejeu du meme K refuse en 409",
                      f"recu {r.status_code} -- un votant comptait DEUX fois")
 
+            # --- 6b. DEPOT APRES PUBLICATION : 410, jamais 409 (F1) -------
+            # Le client de vote affiche « Reponse enregistree » sur tout 409.
+            # Un refus de voix doit donc porter un AUTRE statut, sinon le
+            # votant lit une confirmation fausse. On simule la publication du
+            # groupe en faussant la lecture du budget, sans publier pour de
+            # vrai (il faudrait 240 votes).
+            _etat_reel = api.budget_epsilon.etat
+            api.budget_epsilon.etat = lambda dep: {
+                **_etat_reel(dep), "nombre_publications": 1}
+            try:
+                r = client.post("/api/repondre", json=corps_vote)
+            finally:
+                api.budget_epsilon.etat = _etat_reel
+            verifier(r.status_code == 410,
+                     "6b. depot apres publication refuse en 410 (pas 409)",
+                     f"recu {r.status_code} -- le client l'afficherait "
+                     "« enregistre »")
+            verifier("PAS ete enregistree" in r.text,
+                     "6c. le refus dit que la voix n'est PAS enregistree",
+                     r.text[:150])
+            r = client.post("/api/repondre", json=corps_vote)
+            verifier(r.status_code == 409,
+                     "6d. une fois la simulation levee, le rejeu redonne 409",
+                     f"recu {r.status_code}")
+
         # --- 7. Le jeton consomme ne resigne pas un AUTRE message -------
         autre = os.urandom(32)
         aveugle2, _, _ = vbs.aveugler_message(list(pub), list(autre))

@@ -594,6 +594,14 @@
   // comptee => la voix EST enregistree : c'est un succes du point de vue de
   // l'electeur, pas une erreur (l'ancien code affichait un ecran rouge pour un
   // vote pourtant compte).
+  //
+  // 410 = le serveur REFUSE la voix (resultat deja publie, ou consultation
+  // close). Ce n'est PAS un succes : l'afficher comme tel serait mentir au
+  // votant. Avant le 19/10/2026 ce refus partait aussi en 409 et tombait dans
+  // la branche ci-dessus -- toute voix deposee apres la publication s'affichait
+  // « Reponse enregistree » alors qu'elle n'etait comptee nulle part (audit
+  // externe, F1). On n'ecrit PAS le marqueur local « a vote » : il empecherait
+  // toute nouvelle tentative, alors que la voix n'a pas ete prise.
   async function deposerVote(votePayload) {
     try {
       const rVote = await fetch(`${API_BASE}/repondre`, {
@@ -602,6 +610,12 @@
       });
       if (rVote.status === 425) {
         showError("La consultation n'a pas encore commencé. Votre lien reste valable : revenez à la date indiquée dans votre invitation.", "Ce n'est pas encore ouvert");
+        return;
+      }
+      if (rVote.status === 410) {
+        votePayloadEnAttente = null;
+        await effacerPendingLocal();
+        showError("Les réponses ne sont plus acceptées pour votre groupe : le résultat a déjà été publié, ou la consultation est close. Votre voix n'a PAS été enregistrée. Signalez-le à la personne qui vous a envoyé ce lien." + phraseRecours(), 'Voix non enregistrée');
         return;
       }
       if (rVote.status === 409) { votePayloadEnAttente = null; await effacerPendingLocal(); await marquerVoteLocal(); showSuccess(); return; }

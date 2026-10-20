@@ -95,6 +95,13 @@ jobs:
       - name: En-tetes nginx, cache et heritage
         run: python3 tests/test_cache_pages_statiques.py
 
+      # Un refus de voix ne doit jamais s'afficher « enregistre » chez le
+      # votant (audit externe du 19/10/2026, F1) : la page traitait tout 409
+      # comme un succes, y compris « resultat deja publie, votre voix n'a PAS
+      # ete enregistree ».
+      - name: Un refus de voix ne s'affiche pas comme un succes
+        run: python3 tests/test_client_refus_vote.py
+
       # AUCUN script du depot n'emprunte le repli en clair VERA_ADMIN_PASS.
       #
       # La premiere version de cette garde ne nommait que run_tests.sh. C'etait

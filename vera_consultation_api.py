@@ -2575,10 +2575,18 @@ def repondre(payload: ReponseModeleB):
     #
     # Placement : AVANT le verrou et avant toute ecriture, pour ne rien
     # consommer ni compter dans ce cas.
+    #
+    # 410 ET NON 409 (audit externe du 19/10/2026, F1). 409 veut dire ici, pour
+    # le client de vote, « deja vote : votre voix EST comptee » (rejeu du meme
+    # K) et il affiche « Reponse enregistree ». Reutiliser 409 pour « voix
+    # REFUSEE » annulait cote client tout ce que ce refus protege cote serveur :
+    # le votant lisait une confirmation fausse, exactement celle que ce
+    # controle existe pour empecher. 410 (Gone) est deja le statut que cette
+    # page traite comme « consultation terminee ».
     try:
         if budget_epsilon.etat(payload.departement)["nombre_publications"] > 0:
             raise HTTPException(
-                status_code=409,
+                status_code=410,
                 detail="Le resultat de votre groupe a deja ete publie : les "
                        "reponses ne sont plus comptabilisees. Votre voix n'a "
                        "PAS ete enregistree. Signalez-le a la personne qui "
@@ -2631,8 +2639,9 @@ def repondre(payload: ReponseModeleB):
         # ne depend pas de l'ordre d'arrivee des votes.
         if (budget_epsilon.etat(payload.departement)["nombre_publications"] > 0
                 or payload.departement not in (persistance.charger_groupes_declares() or [])):
+            # 410 et non 409 : voir le commentaire du premier refus ci-dessus.
             raise HTTPException(
-                status_code=409,
+                status_code=410,
                 detail="Le resultat de votre groupe a deja ete publie ou la "
                        "consultation a ete cloturee entre-temps : les "
                        "reponses ne sont plus comptabilisees. Votre voix "

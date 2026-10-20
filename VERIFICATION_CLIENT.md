@@ -26,10 +26,10 @@ précisément celui que ces empreintes ferment.
 
 ## Empreintes de référence
 
-Version du 3 septembre 2026 (formule du conseil sur l'appareil personnel) :
+Version du 19 octobre 2026 (page de vote : un refus de voix ne s'affiche plus comme un succes ; le bundle est inchange depuis le 3 septembre) :
 
 ```
-4dd923fd70bbaa3cc0ef5549d19978ca2a89af4b3c12ce1819823c9a6c6d5ea0  static/vote.html
+d220956094996e6b9dd21cabf69975be8da6f2029ec3619f1cd6fe166b8c1e3f  static/vote.html
 08e678cc5d64e9996cfe3cf54eb1220a1bb032c54d0c4351651f8aee057baa66  static/blindrsa-bundle.js
 ```
 
