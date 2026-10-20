@@ -69,6 +69,14 @@ document : toute étape qui disait « éditer l'unité et remplacer la ligne
 `VERA_DOMAINE` et `VERA_ADMIN_USER` restent dans l'unité (ce ne sont pas des
 secrets).
 
+**Version 8** (20/10/2026) — l'accès SSH au serveur se fait **par clé**, plus
+par mot de passe (`infra/sshd-durcissement.conf`). Conséquences pour ce
+document : l'étape « se connecter en SSH » de la Partie 1 dit avec quoi se
+connecter et que faire si la clé est perdue ; la Partie 2 dit comment poser la
+clé et couper le mot de passe sur un serveur neuf. Le mot de passe root existe
+toujours : il ne sert plus qu'à la **console web de l'hébergeur**, qui ne passe
+pas par SSH.
+
 ---
 
 ## Ce que l'enveloppe doit contenir (six valeurs)
@@ -153,7 +161,19 @@ façon sous la responsabilité de l'organisation, pas de VERA
 
 ## Partie 1 — Cas A : le serveur existe encore
 
-1. Se connecter en SSH au serveur.
+1. Se connecter en SSH au serveur, **avec la clé** (le mot de passe est refusé
+   depuis le 20/10/2026) :
+   ```
+   ssh root@<serveur>
+   ```
+   La phrase de passe demandée est celle de la clé, pas un mot de passe du
+   serveur. **Clé perdue ou téléphone perdu** : ouvrir la console web de
+   l'hébergeur (Hetzner Cloud, le serveur, « Console »), se connecter en root
+   avec le mot de passe root — la console locale ne passe pas par SSH, donc
+   n'est pas concernée par le refus du mot de passe — puis ajouter une nouvelle
+   clé publique à `/root/.ssh/authorized_keys` (une ligne par clé, à la suite
+   des autres). Ne jamais réactiver le mot de passe SSH pour dépanner : ajouter
+   une clé suffit.
 2. Vérifier l'état du service :
    ```
    sudo systemctl status vera-consultation.service
@@ -269,6 +289,20 @@ commandes suivantes échouent dès l'étape 2.
   Rust 1.85 ou plus récent est nécessaire — une version plus ancienne échoue à
   la compilation avec un message qui ne dit pas que la chaîne est trop
   ancienne.
+- **Accès SSH par clé seulement.** Déposer d'abord sa clé publique
+  (`ssh-copy-id` ou `cat ~/.ssh/id_ed25519.pub | ssh root@<serveur> "mkdir -p
+  ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600
+  ~/.ssh/authorized_keys"`), **vérifier** qu'une connexion par clé fonctionne,
+  puis, sur le serveur :
+  ```
+  printf 'PasswordAuthentication no\nPermitRootLogin prohibit-password\n' > /etc/ssh/sshd_config.d/10-vera-durcissement.conf
+  sshd -t && sshd -T | grep -E '^(passwordauthentication|permitrootlogin) '
+  systemctl reload ssh
+  ```
+  Le nom en `10-` compte : `50-cloud-init.conf` réactive le mot de passe et
+  gagne s'il est lu en premier (voir l'en-tête de
+  `infra/sshd-durcissement.conf`). Garder la session ouverte et tester une
+  seconde connexion avant de la fermer.
 - **Un hébergeur différent de toute organisation qui utiliserait VERA pour
   elle-même** — condition documentée de la garantie du projet, pas un détail
   technique.
@@ -537,6 +571,16 @@ Cette étape suppose que la nouvelle base (`/root/vera_state.db`) existe déjà
   tests hors d'une machine réelle — jamais par une reprise complète sur un
   vrai serveur neuf. Tant que ce test grandeur nature n'a pas eu lieu, la
   considérer comme sérieusement revue, pas comme une garantie.
+
+## Corrections apportées le 20/10/2026 (version 8)
+
+- **Accès SSH par clé uniquement.** Le mot de passe root, qui avait fuité dans
+  une conversation, n'est plus acceptable par SSH. Modifié : l'en-tête, l'étape 1
+  de la Partie 1 (avec le cas « clé perdue » : console web de l'hébergeur), l'étape
+  1 de la Partie 2 (pose de la clé et du fichier de durcissement).
+- Vérifié sur le serveur de production : `sshd -T` donne
+  `passwordauthentication no`, la connexion par mot de passe est refusée
+  (`Permission denied (publickey)`) et celle par clé fonctionne.
 
 ## Corrections apportées le 20/10/2026 (version 7)
 

@@ -1174,6 +1174,30 @@ droits (root, 600, dossier 700), les noms et l'absence de valeur vide ou
 `CHANGER_MOI`, sans lire aucune valeur à l'écran. Garde du dépôt :
 `tests/test_secrets_hors_unite.py`.
 
+### L'accès SSH au serveur
+
+Depuis le 20/10/2026, SSH n'accepte que la clé (`infra/sshd-durcissement.conf`,
+posé en `/etc/ssh/sshd_config.d/10-vera-durcissement.conf`). Le mot de passe root
+avait fuité dans une conversation ; il n'ouvre plus rien par SSH. Vérifié : le
+mot de passe est refusé, la clé fonctionne.
+
+**Ce que cela ne ferme pas.**
+- **Une seule clé est installée**, sur un seul téléphone. Perdu ou cassé, ce
+  téléphone rend l'accès SSH impossible. Le recours est la console web de
+  l'hébergeur, qui demande le mot de passe root (toujours valable, mais seulement
+  là) : il faut donc le conserver, hors de tout fichier du dépôt. Une seconde clé
+  sur un autre appareil serait préférable ; elle n'est pas posée.
+- La clé privée est protégée par une phrase de passe, mais celui qui aurait accès
+  au téléphone **déverrouillé** et à cette phrase aurait accès au serveur.
+- Root reste accessible par clé (`prohibit-password`) : il n'y a pas d'utilisateur
+  non privilégié avec `sudo`. C'est un choix de simplicité, pas une protection.
+- Aucune limitation des essais (type fail2ban) : le mot de passe étant refusé,
+  les tentatives ne peuvent plus aboutir, mais elles remplissent le journal.
+- `50-cloud-init.conf` existe toujours avec `PasswordAuthentication yes` ; seul
+  l'ordre alphabétique du fichier « 10- » l'emporte. Un fichier annexe nommé
+  avant `10-` changerait le résultat : `sshd -T` est la vérification à refaire
+  après toute modification de `/etc/ssh/`.
+
 ### Le plafond de connexions de la page RH
 
 nginx limite à 8 le nombre de requêtes de connexion simultanées, toutes adresses
