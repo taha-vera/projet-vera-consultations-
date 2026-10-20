@@ -50,9 +50,20 @@ if [ -n "$PID" ] && [ "$PID" != "0" ]; then
     run "ps -o pid,lstart,cmd -p $PID"
     # Fichiers Python plus recents que le demarrage du processus = code commite
     # mais PAS charge (redemarrage oublie).
-    run "find $REPO -maxdepth 1 -name '*.py' -newer /proc/$PID -printf '%TY-%Tm-%Td %TH:%TM  %p\\n'"
-    [ -n "$(find "$REPO" -maxdepth 1 -name '*.py' -newer /proc/$PID 2>/dev/null)" ] \
-        && ecart "des .py du clone sont plus recents que le processus : non charges."
+    # Comparaison a l'heure de DEMARRAGE reelle (ps lstart), pas au mtime de
+    # /proc/PID : celui-ci date la creation d'un inode virtuel, pas le
+    # lancement du processus (audit externe du 19/10/2026, F4).
+    DEBUT=$(date -d "$(ps -o lstart= -p "$PID")" +%s 2>/dev/null)
+    if [ -z "$DEBUT" ]; then
+        ecart "heure de demarrage du processus illisible (ps)."
+    else
+        RECENTS=""
+        for f in "$REPO"/*.py; do
+            [ "$(stat -c %Y "$f")" -gt "$DEBUT" ] && RECENTS="$RECENTS $(basename "$f")"
+        done
+        run "echo 'py plus recents que le demarrage :${RECENTS:- aucun}'"
+        [ -n "$RECENTS" ] && ecart "des .py du clone sont plus recents que le processus : non charges ($RECENTS)."
+    fi
     # Module natif reellement mappe en memoire, et sa date.
     # NB : ancre sur le segment de chemin "/vera_blind_sig." (le prefixe du
     # fichier compile, ex. vera_blind_sig.cpython-314-....so) et non sur la

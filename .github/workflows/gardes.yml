@@ -109,6 +109,12 @@ jobs:
       - name: Le client n'accepte que la cle de son groupe
         run: python3 tests/test_cle_liee_au_groupe.py
 
+      # Les scripts qui disent « CONFORME » ne se trompent pas de temoin
+      # (audit externe du 19/10/2026, F4) : heure de demarrage reelle, code non
+      # suivi, unite systemd comparee au modele.
+      - name: Les scripts de verification du deploiement gardent leurs temoins
+        run: python3 tests/test_verifier_deploiement_garde.py
+
       # AUCUN script du depot n'emprunte le repli en clair VERA_ADMIN_PASS.
       #
       # La premiere version de cette garde ne nommait que run_tests.sh. C'etait

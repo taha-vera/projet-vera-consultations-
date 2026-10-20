@@ -573,7 +573,7 @@ n'existe ni `routes/`, ni `models/`, ni `auth/`. Le reste est rangé :
 ```
 vera_*.py              les 6 modules de l'application
 verifier_engagement.py outil du tiers vérificateur
-tests/                 44 tests, dont 10 gardes structurelles
+tests/                 45 tests, dont 11 gardes structurelles
                        et un parcours HTTP complet
 static/                page du votant, tableau de bord, bundle
 chantier_crypto/       tests JS, crash test, manifeste npm
@@ -637,7 +637,7 @@ installation en service.
 Le parcours complet a été validé de bout en bout dans un navigateur ; aucune
 consultation avec de vrais participants n'a encore eu lieu.
 
-**Version courante :** branche `main`, 19 octobre 2026 — 44 tests automatiques,
+**Version courante :** branche `main`, 19 octobre 2026 — 45 tests automatiques,
 plus un test de résistance au crash exercé sur le chemin HTTP réel.
 
 **Ce que `VERA_DB_KEY` chiffre, exactement.** Elle chiffre **la clé privée

@@ -18,6 +18,7 @@ API="http://127.0.0.1:8001"
 echecs=0
 ok()  { printf '  OK     %s\n' "$*"; }
 ko()  { printf '  ECART  %s\n' "$*"; echecs=$((echecs + 1)); }
+att() { printf '  ATTENTION  %s\n' "$*"; }      # information, ne fait pas echouer
 h()   { sha256sum | cut -d' ' -f1; }
 
 echo "Commit : $(git -C "$REPO" log -1 --format='%h %ci %s')"
@@ -25,6 +26,31 @@ echo "Commit : $(git -C "$REPO" log -1 --format='%h %ci %s')"
 # 1. Le clone est un commit, pas un etat bricole.
 [ -z "$(git -C "$REPO" status --porcelain --untracked-files=no)" ] \
     && ok "clone propre" || ko "modifications locales non commitees dans $REPO"
+
+# 1b. Aucun code NON SUIVI que Python chargerait. `status --untracked-files=no`
+#     (ci-dessus) ignore ces fichiers : un .py depose a cote de l'application,
+#     ou un module compile (.so) non commite, serait importe sans que le
+#     depot n'en porte trace (audit externe du 19/10/2026, F4). On liste aussi
+#     les fichiers ignores (pas de --exclude-standard), a la racine seulement :
+#     c'est la que le processus cherche ses modules.
+inconnus=$(git -C "$REPO" ls-files --others -- ':(top,glob)*.py' ':(top,glob)*.so' \
+    ':(top,glob)*.pth' 2>/dev/null)
+[ -z "$inconnus" ] && ok "aucun .py / .so / .pth non suivi a la racine" \
+    || ko "code non suivi par git, importable par le processus : $(echo $inconnus)"
+
+# 1c. Le commit en service est-il publie ? Information seulement : le flux
+#     documente est « verifier, PUIS git push », donc HEAD en avance sur
+#     origin est normal juste apres un deploiement. Ce qui est signale, c'est
+#     un serveur qui tourne sur un code que personne d'autre ne peut relire.
+tete=$(git -C "$REPO" rev-parse HEAD)
+distant=$(timeout 15 git -C "$REPO" ls-remote origin refs/heads/main 2>/dev/null | cut -f1)
+if [ -z "$distant" ]; then
+    att "depot distant injoignable : on ne sait pas si ce commit est publie"
+elif [ "$distant" = "$tete" ]; then
+    ok "HEAD = origin/main (code publie)"
+else
+    att "HEAD != origin/main : ce code tourne mais n'est PAS publie -- git push apres verification"
+fi
 
 # 2. Le processus tourne bien depuis le clone, et a ete redemarre apres
 #    le dernier changement de code.
@@ -34,9 +60,21 @@ if [ -z "$PID" ] || [ "$PID" = "0" ]; then
 else
     cwd=$(readlink "/proc/$PID/cwd")
     [ "$cwd" = "$REPO" ] && ok "cwd du processus = $REPO" || ko "cwd du processus = $cwd"
-    recents=$(find "$REPO" -maxdepth 1 -name '*.py' -newer "/proc/$PID")
-    [ -z "$recents" ] && ok "processus demarre apres le dernier .py modifie" \
-        || ko "non charges (redemarrer) : $recents"
+    # Heure de DEMARRAGE du processus : `ps -o lstart=`. Le mtime de /proc/PID,
+    # utilise avant, est celui d'un inode du systeme de fichiers virtuel, cree
+    # a la premiere consultation du repertoire et non au lancement du
+    # processus : il pouvait donner un faux « demarre apres » (audit F4).
+    debut=$(date -d "$(ps -o lstart= -p "$PID")" +%s 2>/dev/null)
+    if [ -z "$debut" ]; then
+        ko "heure de demarrage du processus $PID illisible (ps)"
+    else
+        recents=""
+        for f in "$REPO"/*.py; do
+            [ "$(stat -c %Y "$f")" -gt "$debut" ] && recents="$recents $(basename "$f")"
+        done
+        [ -z "$recents" ] && ok "processus demarre apres le dernier .py modifie" \
+            || ko "non charges (redemarrer) :$recents"
+    fi
     # 3. Module Rust : compile apres le dernier commit qui touche ses sources ?
     #    Ancre sur "/vera_blind_sig." (prefixe du .so compile), pas sur la
     #    seule sous-chaine "vera_blind_sig" -- celle-ci apparait aussi dans le
@@ -51,6 +89,31 @@ else
     else
         ko "module Rust ($so, $(stat -c %y "$so")) PLUS ANCIEN que le dernier commit de vera_blind_sig/ -- recompiler (maturin build + pip install)"
     fi
+fi
+
+# 3b. L'unite systemd en service = le modele du depot, sur ce qui commande
+#     l'execution : repertoire, ligne de lancement, NOMS des variables (jamais
+#     leurs valeurs, qui sont des secrets). Une unite modifiee a la main --
+#     autre ExecStart, EnvironmentFile ajoute -- change ce qui tourne sans
+#     laisser de trace dans git (audit F4). `systemctl cat` inclut les drop-ins.
+MODELE="$REPO/infra/vera-consultation.service"
+reel=$(systemctl cat "$UNITE" 2>/dev/null)
+if [ -z "$reel" ] || [ ! -f "$MODELE" ]; then
+    ko "unite ou modele illisible : comparaison impossible"
+else
+    for cle in WorkingDirectory ExecStart; do
+        a=$(grep -h "^$cle=" "$MODELE" | tail -1)
+        b=$(printf '%s\n' "$reel" | grep "^$cle=" | tail -1)
+        [ "$a" = "$b" ] && ok "unite : $cle conforme au modele" \
+            || ko "unite : $cle differe du modele (modele : ${a:-absent} / en service : ${b:-absent})"
+    done
+    # Une variable par ligne Environment= (c'est la forme du modele).
+    noms() { grep -h '^Environment=' | sed 's/^Environment=//; s/^"//; s/=.*//' | sort -u; }
+    na=$(noms < "$MODELE"); nb=$(printf '%s\n' "$reel" | noms)
+    [ "$na" = "$nb" ] && ok "unite : memes noms de variables d'environnement que le modele" \
+        || ko "unite : noms de variables differents du modele ($(diff <(echo "$na") <(echo "$nb") | grep '^[<>]' | tr '\n' ' '))"
+    printf '%s\n' "$reel" | grep -q '^EnvironmentFile=' \
+        && ko "unite : EnvironmentFile present, absent du modele"
 fi
 
 # 4. Fichiers servis par l'application = fichiers du depot.
