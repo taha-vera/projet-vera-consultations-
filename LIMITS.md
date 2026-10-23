@@ -262,6 +262,25 @@ negociable, et pourquoi une organisation qui s'auto-heberge perd bien plus que
 ce qu'elle croit : elle obtient la liste de participation nominative de ses
 propres salaries.
 
+**Cette phrase etait incomplete jusqu'au 22/10/2026 : l'acces a la base n'etait
+pas le seul chemin.** L'organisateur detient tous les jetons, et la route
+publique `/api/signer_aveugle` repondait differemment selon qu'un jeton avait
+deja servi (403) ou non (422, pour un message aveugle trop grand). Apres
+l'ouverture, il envoyait `ff` x 256 pour chaque jeton et lisait la liste de
+participation nominative, avec l'heure de chaque signature, **a distance, sans
+base, sans journal, sans rien consommer** (audit externe du 20/10/2026, A1,
+reproduit sur un serveur local). Les reponses etaient protegees ; la
+participation ne l'etait pas du tout face a l'organisateur.
+
+Corrige : jeton inconnu, jeton utilise, second message sur un jeton qui vient
+de signer, message >= n et consultation expiree recoivent le meme statut et le
+meme texte (`tests/test_signer_aveugle_indistinguable.py`, qui appelle la
+route). **Ce qui reste** : un ecart de duree entre un jeton utilise (refus apres
+deux lectures) et un jeton libre (chargement de la cle, comparaison a n), de
+l'ordre de quelques microsecondes, derriere 5 requetes par seconde et par
+adresse. Il n'a pas ete mesure ; une moyenne sur un tres grand nombre
+d'essais le ferait peut-etre apparaitre.
+
 Relevee le 03/09/2026 par un audit externe. Elle etait mentionnee ailleurs dans
 ce document -- le cache de signatures y renvoie -- mais ne figurait pas dans
 cette liste, qui est celle qu'on lit pour savoir ce qui subsiste.

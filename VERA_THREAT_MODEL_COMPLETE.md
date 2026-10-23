@@ -525,6 +525,22 @@ Le meme raisonnement vaut pour l'ecart de timing entre les deux chemins : il
 existe, il est noye dans la variance reseau, et il n'apprend a l'attaquant que
 ce qu'il sait deja puisque c'est lui qui a forge la requete.
 
+
+### Distinction entre jeton utilise et jeton libre sur la signature aveugle
+
+**Ce point ne suit pas le raisonnement ci-dessus, et il a ete traite comme une
+faille.** Sur `/api/signer_aveugle`, il n'y a pas de signature a presenter : la
+route est ouverte a quiconque detient un jeton, et l'organisateur les detient
+tous. Un message aveugle volontairement invalide (256 octets a `0xff`, toujours
+superieur au module) recevait 403 pour un jeton deja utilise et 422 pour un jeton
+libre, sans rien consommer : liste nominative de participation, avec l'heure de
+chaque signature, lue a distance (audit externe du 20/10/2026, A1, reproduit).
+
+Corrige le 22/10/2026 : meme statut et meme texte pour tous les cas ou un jeton
+ne peut pas signer, y compris la consultation expiree (voir
+`tests/test_signer_aveugle_indistinguable.py`). Reste l'ecart de duree, non
+mesure (LIMITS.md, section sur la table `jetons_autorisation`).
+
 ### Ordre d'insertion en base
 
 L'ordre des votes ne fuit plus : la table anti-rejeu est en `WITHOUT ROWID`,

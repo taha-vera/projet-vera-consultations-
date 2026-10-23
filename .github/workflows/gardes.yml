@@ -342,7 +342,8 @@ jobs:
 
           for t in test_signer_aveugle test_signature_production \
                    test_parcours_http test_cycle_vie_cle \
-                   test_antirejeu_persistant test_non_regression_correctifs; do
+                   test_antirejeu_persistant test_non_regression_correctifs \
+                   test_signer_aveugle_indistinguable; do
             base_jetable=$(mktemp -u /tmp/vera_ci_XXXXXX.db)
             VERA_DB_PATH="$base_jetable" PYTHONPATH=. .venv/bin/python3 "tests/$t.py"
             rm -f "$base_jetable" "$base_jetable"-wal "$base_jetable"-shm

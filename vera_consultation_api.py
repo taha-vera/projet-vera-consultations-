@@ -967,6 +967,31 @@ class SignerAveugleRequete(BaseModel):
     message_aveugle_hex: str = Field(min_length=1, max_length=2000)
 
 
+# UNE SEULE REPONSE POUR TOUT JETON QUI NE PEUT PAS SIGNER (audit du 20/10/2026, A1).
+#
+# Jeton inconnu, jeton deja utilise, signature deja emise pour un autre message,
+# message aveugle >= n : le serveur renvoie le MEME statut et le MEME texte.
+#
+# POURQUOI. Cette route est publique, sans journal, et l'organisateur detient
+# tous les jetons (il les a generes). Avec deux reponses distinctes -- 403 pour
+# un jeton utilise, 422 pour un message trop grand sur un jeton libre -- il
+# envoyait pour chaque jeton un message aveugle volontairement invalide
+# (256 octets a 0xff, toujours >= n) et lisait qui avait vote, et a quelle
+# heure : une liste NOMINATIVE de participation, sans acces a la base, sans
+# rien consommer. C'est exactement ce que la separation des roles est censee
+# interdire (LIMITS.md section 1).
+#
+# CE QUE CELA COUTE AU VOTANT HONNETE : rien. Il n'envoie jamais un message
+# >= n, et static/vote.html affiche son propre texte sur tout 403 sans lire le
+# detail.
+#
+# CE QUI RESTE : un ecart de DUREE entre un jeton utilise (refus apres deux
+# lectures) et un jeton libre (chargement de la cle, comparaison a n). Quelques
+# microsecondes, noyees dans la gigue du reseau, derriere 5 requetes par seconde
+# et par adresse (nginx) -- mais pas nul. Voir LIMITS.md.
+_DETAIL_JETON_INUTILISABLE = "Jeton d'autorisation invalide ou deja utilise."
+
+
 @app.post("/api/signer_aveugle")
 def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     import hashlib
@@ -982,6 +1007,13 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
             detail="La consultation n'a pas encore commence. Votre lien reste "
                    "valable : revenez a la date indiquee dans votre invitation.",
         )
+
+    # Consultation expiree : meme reponse pour TOUT jeton, utilise ou non. Ce
+    # controle etait plus bas, apres la lecture du departement du jeton : un
+    # jeton utilise recevait alors 403 et un jeton libre 503, soit le meme
+    # oracle de participation qu'ailleurs sur cette route (audit A1).
+    if not gestionnaire_signature.consultation_active():
+        raise HTTPException(status_code=503, detail="Aucune consultation active.")
 
     # 1. Consommer le jeton d'autorisation (registre 1, ATOMIQUE). Renvoie le
     #    departement si valide et non utilise, sinon None. On consomme AVANT de
@@ -1076,19 +1108,13 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
         return {"signature_aveugle_hex": sig_hex, "departement": dep, "pad": pad}
 
     # Meme jeton, message different : refus. C'est la garantie anti-double-vote.
+    # MEME reponse qu'un jeton inconnu ou deja consomme (A1) : un texte plus
+    # bavard sur ce cas-la distinguait un jeton qui vient de signer d'un jeton
+    # libre. Le rattrapage d'un rejeu IDENTIQUE se fait plus haut
+    # (signature_deja_emise), sans passer par ici ; le votant, lui, voit le
+    # texte de vote.html, pas ce detail.
     if persistance.jeton_a_deja_signe(emp_jeton):
-        raise HTTPException(
-            status_code=403,
-            # Le rattrapage promis ici depend du cache memoire : il fonctionne
-            # dans l'heure ET si le service n'a pas redemarre entre-temps.
-            # Apres un redemarrage, l'appelant tombe sur l'autre 403 (jeton
-            # deja utilise), dont le message oriente correctement vers une
-            # nouvelle invitation. On ne promet donc pas plus que ce qui tient.
-            detail="Ce lien a deja servi a obtenir une signature. Si votre vote "
-                   "n'a pas abouti, rouvrez-le tel quel : votre signature vous "
-                   "sera renvoyee si la demande est recente. Sinon, demandez "
-                   "une nouvelle invitation.",
-        )
+        raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
 
     # Lecture SEULE du departement, AVANT de consommer le jeton -- pour
     # connaitre n (le modulus RSA de ce departement) et signer avant de
@@ -1102,7 +1128,7 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     # 24-25/09/2026 sur vera_blind_sig/src/lib.rs.
     departement = persistance.lire_departement_jeton(payload.jeton_autorisation)
     if departement is None:
-        raise HTTPException(status_code=403, detail="Jeton d'autorisation invalide ou deja utilise.")
+        raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
 
     # cle_publique_si_existe, PAS cle_publique : lecture seule, ne demarre
     # pas le minuteur d'expiration de la consultation au premier appel
@@ -1114,7 +1140,7 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     except RuntimeError:
         raise HTTPException(status_code=503, detail="Aucune consultation active.")
     except KeyError:
-        raise HTTPException(status_code=403, detail="Jeton d'autorisation invalide ou deja utilise.")
+        raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
 
     # RSABSSA opere modulo n : un message aveugle valide verifie m < n. La
     # validation de longueur ci-dessus ne couvre pas ce cas -- un message de
@@ -1123,11 +1149,12 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     # la signature (voir plus bas) : la voix etait perdue sans recours.
     # Erreur du CLIENT : 422, pas 503 -- reessayer ne changerait rien.
     n = serialization.load_der_public_key(cle_pub_der).public_numbers().n
+    #
+    # 403 et le MEME detail que « jeton inutilisable », PAS 422 (audit A1) : un
+    # 422 ici n'etait renvoye que pour un jeton libre, et signait donc la
+    # non-participation. Le client honnete n'envoie jamais m >= n.
     if int.from_bytes(message_aveugle, "big") >= n:
-        raise HTTPException(
-            status_code=422,
-            detail="message_aveugle_hex ne represente pas une valeur valide pour cette cle publique.",
-        )
+        raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
 
     # 3. Signer a l'aveugle (seule etape serveur du protocole RSABSSA) --
     # AVANT de consommer le jeton. Tout refus d'ici, prevu ou non, laisse
@@ -1167,7 +1194,7 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     # comportait deja avant ce correctif.
     departement_consomme = persistance.consommer_jeton_autorisation(payload.jeton_autorisation)
     if departement_consomme is None:
-        raise HTTPException(status_code=403, detail="Jeton d'autorisation invalide ou deja utilise.")
+        raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
     if departement_consomme != departement:
         # PAS un assert : ce code tourne avec `python -O` sur le serveur
         # (aucune garantie explicite du contraire), qui supprime purement et
