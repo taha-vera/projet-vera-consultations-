@@ -135,6 +135,7 @@ class GestionnaireSignature:
             # Une nouvelle consultation ne doit rien heriter de la precedente.
             self._cles_publiques_expirees = {}
             ts_recharge = None
+            restaure_en_marge = False
             if _PERSISTANCE_DISPONIBLE:
                 toutes = _persistance.charger_toutes_cles_chiffrees()
                 for dep, (priv, pub, ouv) in toutes.items():
@@ -143,10 +144,29 @@ class GestionnaireSignature:
                         if ts_recharge is None or ouv < ts_recharge:
                             ts_recharge = ouv
                     else:
+                        # Cles expirees pendant que le service etait arrete :
+                        # les privees sont detruites, mais les publiques
+                        # survivent a la marge de depot (audit A6).
+                        publiques = {d: (p_, o_) for d, (_pr, p_, o_) in toutes.items()}
+                        _persistance.persister_cles_publiques_expirees(publiques)
                         _persistance.effacer_cle_rsa()
                         self._cles = {}
                         ts_recharge = None
                         break
+                if not self._cles:
+                    # Aucune cle vivante : une marge de depot est-elle en cours ?
+                    # (expiration pendant que le service tournait, ou ci-dessus.)
+                    en_marge = _persistance.charger_cles_publiques_expirees()
+                    if en_marge:
+                        debut = min(o for (_p, o) in en_marge.values())
+                        fin_marge = debut + DUREE_VIE_CLE_SECONDES + DELAI_GRACE_DEPOT_SECONDES
+                        if time.time() < fin_marge:
+                            self._cles_publiques_expirees = {
+                                d: p_ for d, (p_, _o) in en_marge.items()}
+                            ts_recharge = debut
+                            restaure_en_marge = True
+                        else:
+                            _persistance.effacer_cles_publiques_expirees()
             # L'horloge des 7 jours part de la PREMIERE CLE, pas du demarrage
             # du serveur. Avant le 26/07, _ouverture_ts valait time.time() des
             # le lancement du service : un serveur en ligne depuis six jours ne
@@ -157,8 +177,11 @@ class GestionnaireSignature:
             # rien. Le timer est arme a la creation de la premiere cle (voir
             # _armer_expiration, appele depuis _obtenir_ou_creer_cle).
             self._ouverture_ts = ts_recharge
-            self._consultation_ouverte = True
-        if self._ouverture_ts is not None:
+            # En marge de depot : meme etat qu'apres l'expiration par le timer
+            # (voir _detruire_cle_privee) -- plus de signature, depots verifies
+            # avec les cles publiques, jusqu'a la fin de la marge.
+            self._consultation_ouverte = not restaure_en_marge
+        if self._ouverture_ts is not None and not restaure_en_marge:
             self._armer_expiration()
 
     def _armer_expiration(self):
@@ -191,6 +214,7 @@ class GestionnaireSignature:
             self._cles_publiques_expirees = {}
         if _PERSISTANCE_DISPONIBLE:
             _persistance.effacer_cle_rsa()
+            _persistance.effacer_cles_publiques_expirees()
 
     def _expirer_cle(self):
         """Appelee par le TIMER a l'echeance des 48h. Detruit la cle en memoire
@@ -210,6 +234,15 @@ class GestionnaireSignature:
         separement."""
         self._detruire_cle_privee()
         if _PERSISTANCE_DISPONIBLE:
+            # Les cles PUBLIQUES d'abord, puis l'effacement des privees : un
+            # arret entre les deux laisse les privees (expirees) en base, que
+            # ouvrir_consultation detruit au demarrage suivant, publiques
+            # conservees. L'ordre inverse perdrait les publiques (audit A6).
+            with self._verrou:
+                publiques = {d: (p, self._ouverture_ts)
+                             for d, p in self._cles_publiques_expirees.items()}
+            if publiques and self._ouverture_ts is not None:
+                _persistance.persister_cles_publiques_expirees(publiques)
             _persistance.effacer_cle_rsa()
 
     def _detruire_cle_privee(self):
@@ -374,6 +407,8 @@ class GestionnaireSignature:
                     and time.time() > self._ouverture_ts + DUREE_VIE_CLE_SECONDES
                                       + DELAI_GRACE_DEPOT_SECONDES):
                 self._cles_publiques_expirees = {}
+                if _PERSISTANCE_DISPONIBLE:
+                    _persistance.effacer_cles_publiques_expirees()
             if departement in self._cles_publiques_expirees:
                 return self._cles_publiques_expirees[departement]
             if not self._consultation_ouverte:

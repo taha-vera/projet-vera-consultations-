@@ -822,6 +822,20 @@ fixe (`DELAI_GRACE_DEPOT_SECONDES`), verifiee par
 `tests/test_marge_depot_expiration.py`. **Ce qu'elle ne change pas :** la
 fenetre de collecte reste 7 jours pour la SIGNATURE ; elle ne l'allonge pas.
 
+**La marge survit a un redemarrage (depuis le 22/10/2026).** Jusque-la, les cles
+publiques de la marge n'existaient qu'en memoire : un redemarrage pendant les
+24 h (un deploiement en fin de consultation, `Restart=on-failure`) les perdait,
+et le vote d'un membre qui avait obtenu sa signature avant l'echeance recevait
+404 -- la voix etait perdue, le jeton consomme, et le README promettait 24 h
+sans condition (audit externe du 20/10/2026, A6). Elles sont maintenant ecrites
+dans la table `cles_publiques_expirees`, **sans aucune cle privee**, videe a la
+fin de la marge et a la cloture. Verifie par
+`tests/test_marge_survit_redemarrage.py` (expiration pendant que le service
+tourne, expiration pendant qu'il est arrete, fin de marge, cloture). **Ce que
+cela ne couvre pas :** un service arrete pendant TOUTE la marge, ou une base
+perdue, ne rend rien ; et un votant dont l'onglet est reste ouvert apres la
+marge recoit le meme refus que les autres.
+
 Ce n'est pas un paramètre de confort : la clé privee ne doit pas exister
 indefiniment, et sa destruction automatique garantit qu'une consultation
 oubliee ne laisse pas de materiel cryptographique actif sur le serveur.

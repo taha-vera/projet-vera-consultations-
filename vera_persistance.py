@@ -128,6 +128,11 @@ _SQL_TABLES = [
     "CREATE TABLE IF NOT EXISTS question_active (id INTEGER PRIMARY KEY CHECK (id = 1), intitule TEXT NOT NULL, ouverture_depots_unix REAL, groupes_declares TEXT, plafonds_invitations TEXT)",
     "CREATE TABLE IF NOT EXISTS jetons_autorisation (jeton TEXT PRIMARY KEY, departement TEXT NOT NULL, utilise INTEGER NOT NULL DEFAULT 0)",
     "CREATE TABLE IF NOT EXISTS cle_rsa_active (departement TEXT PRIMARY KEY, cle_privee_hex TEXT NOT NULL, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL, salt_hex TEXT)",
+    # Cles PUBLIQUES d'une consultation dont les cles privees ont expire, gardees
+    # pendant la marge de depot seulement (audit du 20/10/2026, A6). Aucun
+    # secret : ces cles sont dans chaque lien de vote. Voir
+    # persister_cles_publiques_expirees.
+    "CREATE TABLE IF NOT EXISTS cles_publiques_expirees (departement TEXT PRIMARY KEY, cle_publique_hex TEXT NOT NULL, ouverture_unix REAL NOT NULL)",
 ]
 
 
@@ -1235,6 +1240,47 @@ def effacer_cle_rsa():
     departement d'une consultation meurent ensemble a la cloture)."""
     with _verrou_db:
         _conn.execute("DELETE FROM cle_rsa_active")
+        _conn.commit()
+
+
+def persister_cles_publiques_expirees(cles: dict) -> None:
+    """Ecrit {departement: (cle_publique_der, ouverture_unix)}.
+
+    POURQUOI (audit externe du 20/10/2026, A6). A l'expiration des sept jours, la
+    cle privee est detruite et effacee de la base, et les cles publiques ne
+    restaient qu'en MEMOIRE, pour la marge de depot de 24 h (F9). Un
+    redemarrage pendant cette marge -- un deploiement en fin de consultation,
+    `Restart=on-failure` -- les perdait : le vote d'un membre qui avait obtenu
+    sa signature avant l'echeance recevait 404, et vote.html proposait
+    « Reessayer » sans fin. La voix etait perdue, le jeton consomme.
+
+    Ce que cette table contient : des cles PUBLIQUES, jamais de cle privee. Elle
+    est videe a la cloture, et a la fin de la marge. Elle ne conserve rien de
+    plus que ce qui est deja distribue dans chaque lien de vote."""
+    with _verrou_db:
+        for dep, (pub, ouv) in cles.items():
+            _conn.execute(
+                "INSERT INTO cles_publiques_expirees (departement, cle_publique_hex, ouverture_unix) "
+                "VALUES (?, ?, ?) ON CONFLICT(departement) DO UPDATE SET "
+                "cle_publique_hex = excluded.cle_publique_hex, ouverture_unix = excluded.ouverture_unix",
+                (dep, bytes(pub).hex(), ouv),
+            )
+        _conn.commit()
+
+
+def charger_cles_publiques_expirees() -> dict:
+    """Renvoie {departement: (cle_publique_der, ouverture_unix)}."""
+    with _verrou_db:
+        rows = _conn.execute(
+            "SELECT departement, cle_publique_hex, ouverture_unix FROM cles_publiques_expirees"
+        ).fetchall()
+    return {r[0]: (bytes.fromhex(r[1]), r[2]) for r in rows}
+
+
+def effacer_cles_publiques_expirees() -> None:
+    """Vide la table : cloture, ou fin de la marge de depot."""
+    with _verrou_db:
+        _conn.execute("DELETE FROM cles_publiques_expirees")
         _conn.commit()
 
 
