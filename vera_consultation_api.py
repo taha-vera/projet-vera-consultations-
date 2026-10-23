@@ -77,21 +77,39 @@ def _verifier_ecoute_loopback():
     if os.environ.get("VERA_ECOUTE_PUBLIQUE") == "1":
         return
 
+    # uvicorn lit AUSSI ses options dans l'environnement (auto_envvar_prefix
+    # "UVICORN") : UVICORN_HOST=0.0.0.0 suffit a ouvrir le port au monde sans
+    # qu'aucun argument ne le dise (audit du 20/10/2026, A5, reproduit). La
+    # ligne de commande l'emporte sur l'environnement, comme dans uvicorn.
+    hote = os.environ.get("UVICORN_HOST") or None
     argv = sys.argv
-    hote = None
+    descripteur = os.environ.get("UVICORN_FD") or None
     for i, a in enumerate(argv):
         if a in ("--host",) and i + 1 < len(argv):
             hote = argv[i + 1]
         elif a.startswith("--host="):
             hote = a.split("=", 1)[1]
+        elif a in ("--fd",) or a.startswith("--fd="):
+            descripteur = a
 
-    # Pas de --host : uvicorn ecoute sur 127.0.0.1 par defaut. Rien a signaler.
+    # Un descripteur herite (--fd / UVICORN_FD, socket activation) : l'adresse
+    # reellement liee n'est pas visible d'ici. On refuse plutot que supposer.
+    if descripteur is not None:
+        raise RuntimeError(
+            "REFUS : uvicorn est lance avec un descripteur de socket herite "
+            "(--fd / UVICORN_FD). L'adresse d'ecoute ne peut pas etre verifiee.\n"
+            "Lancer avec --host 127.0.0.1, ou poser VERA_ECOUTE_PUBLIQUE=1 si "
+            "c'est delibere."
+        )
+
+    # Pas d'hote (ni option ni variable) : uvicorn ecoute sur 127.0.0.1 par
+    # defaut. Rien a signaler.
     if hote is None:
         return
 
     if hote not in ("127.0.0.1", "::1", "localhost"):
         raise RuntimeError(
-            f"REFUS : uvicorn est lance avec --host {hote}.\n"
+            f"REFUS : uvicorn est lance avec l'hote {hote} (--host ou UVICORN_HOST).\n"
             "Le service doit ecouter sur la boucle locale et n'etre atteint que "
             "par nginx.\n"
             "Sinon un client joint directement le port et contourne TOUTE la "

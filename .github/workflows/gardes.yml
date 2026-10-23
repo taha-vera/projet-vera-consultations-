@@ -346,7 +346,7 @@ jobs:
                    test_signer_aveugle_indistinguable \
                    test_resultats_http_ne_publie_pas \
                    test_blocage_adresse_http test_marge_survit_redemarrage \
-                   test_ouverture_obligatoire; do
+                   test_ouverture_obligatoire test_garde_ecoute_environnement; do
             base_jetable=$(mktemp -u /tmp/vera_ci_XXXXXX.db)
             VERA_DB_PATH="$base_jetable" PYTHONPATH=. .venv/bin/python3 "tests/$t.py"
             rm -f "$base_jetable" "$base_jetable"-wal "$base_jetable"-shm

@@ -531,6 +531,13 @@ boucle locale, sur le modele de la garde worker unique : inspection de
 en developpement -- il faut la poser volontairement, ce qui distingue un choix
 d'un oubli.
 
+*Complement (audit du 20/10/2026, A5, reproduit) : uvicorn lit aussi ses options
+dans l'environnement ; `UVICORN_HOST=0.0.0.0` ouvrait le port sans qu'aucun
+argument ne le dise. La garde lit maintenant `UVICORN_HOST` (la ligne de commande
+l'emporte, comme dans uvicorn) et refuse un descripteur herite (`--fd` /
+`UVICORN_FD`), dont l'adresse n'est pas verifiable. Garde :
+`tests/test_garde_ecoute_environnement.py`.*
+
 *Deux durcissements de la CI au passage : `opendp` est epingle sur la version de
 production (les portes 2 et 3 etaient validees sur une version quelconque), et
 le workflow declare `permissions: contents: read` -- il ne fait que lire, un
