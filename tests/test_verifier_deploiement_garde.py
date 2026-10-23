@@ -46,6 +46,8 @@ verifier("ls-files --others" in v and "*.so" in v and "*.py" in v,
 verifier(all(k in v for k in ("WorkingDirectory", "ExecStart", "EnvironmentFile",
                               "vera-consultation.service")),
          "verifier_deploiement.sh : compare l'unite en service au modele infra/")
+verifier("vera_state_*.db.enc" in v and "find /root" in v,
+         "verifier_deploiement.sh : cherche les anciennes sauvegardes V1 (F12)")
 
 print()
 if echecs:

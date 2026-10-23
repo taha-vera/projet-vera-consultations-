@@ -166,6 +166,20 @@ fi
     && ok "vitrine servie = index.html du depot" \
     || ko "vitrine servie != index.html du depot (cp $REPO/index.html $VITRINE)"
 
+# 7. Aucune sauvegarde de la V1 (vera_state_*.db.enc). La V1 de
+#    sauvegarder_base.sh ecrivait la base ENTIERE (jetons, compteurs) ; la V2 ne
+#    sauvegarde que l'historique et ne purge que vera_historique_*. Un fichier V1
+#    oublie reforme la paire de lectures (jetons + compteurs a deux instants) que
+#    l'abandon du mode WAL a fermee (audit externe du 20/10/2026, F12). Ne
+#    regarde que CE serveur ; une copie envoyee sur un telephone ou un autre
+#    support doit etre supprimee a la main (LIMITS.md, section 15).
+v1=$(find /root /home /tmp /var /srv /opt -xdev -name 'vera_state_*.db.enc' 2>/dev/null)
+if [ -z "$v1" ]; then
+    ok "aucune ancienne sauvegarde V1 (vera_state_*.db.enc) sur ce serveur"
+else
+    ko "sauvegarde(s) V1 contenant la base entiere : $(echo $v1) -- shred -u <fichier>"
+fi
+
 echo
 [ "$echecs" -eq 0 ] && echo "CONFORME." || echo "$echecs ECART(S). Le deploiement n'est PAS effectif."
 exit $(( echecs > 0 ))

@@ -1793,6 +1793,17 @@ l'audit du 20/10/2026 (A11) :
   automatisé ; la clé de sauvegarde `/root/.vera_backup_key` doit aller dans
   l'enveloppe de séquestre.
 
+- **Les sauvegardes de la version 1 ne sont jamais purgées par la version 2.**
+  La V1 écrivait la base **entière** (`vera_state_*.db.enc` : jetons et
+  compteurs) et conseillait d'en garder une copie sur un téléphone ; la V2 ne
+  sauvegarde que l'historique et ne purge que `vera_historique_*`. Un fichier V1
+  oublié reforme la paire de lectures que l'abandon du mode WAL a fermée (deux
+  états des jetons et des compteurs, lus ensemble, reconstituent qui a voté
+  quoi). `infra/verifier_deploiement.sh` signale maintenant tout fichier de ce
+  nom sur le serveur (audit du 20/10/2026, F12). **Il ne voit pas les copies
+  hors serveur** : celles envoyées sur un téléphone ou un autre support doivent
+  être supprimées à la main.
+
 Corrigé dans le même audit : le chemin de la base n'est plus inséré dans le
 source Python du script (il passe par `sys.argv`). Un `VERA_DB_PATH` contenant une
 apostrophe cassait la sauvegarde, et c'était une injection de code possible pour
