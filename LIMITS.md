@@ -826,10 +826,12 @@ elle ne se modifie plus une fois passée. Avant, elle était facultative et
   porte à nouveau la corrélation entre l'ordre d'envoi et l'ordre de vote, pour
   les quelques personnes concernées. À grouper et à envoyer tard, pas au fil de
   l'eau.
-- L'interface affiche encore « Aucune date fixée : les votes sont acceptés dès
-  maintenant » tant que la date manque ; le texte est devenu trompeur (rien ne se
-  génère sans date), la page n'a pas été modifiée pour ne pas changer l'empreinte
-  de sécurité qui la protège.
+- Le texte de l'interface qui disait « les votes sont acceptés dès maintenant »
+  tant que la date manquait est corrigé : il indique désormais qu'aucun lien ne
+  peut être généré sans date. Ce changement modifie le script de la page
+  d'administration, donc son empreinte dans la politique CSP
+  (`infra/nginx-vera-consultation.conf`) : la conf nginx doit être recopiée et
+  rechargée au déploiement, sinon la page d'administration reste inerte.
 
 ## 10. Duree maximale d'une consultation : 7 jours
 

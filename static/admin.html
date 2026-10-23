@@ -767,7 +767,7 @@
       if (!r.ok) return;
       const d = await r.json();
       if (!d.date_fixee) {
-        ouvertureEtat.textContent = "Aucune date fixée : les votes sont acceptés dès maintenant. Fixez une date pour protéger vos membres.";
+        ouvertureEtat.textContent = "Aucune date fixée : vous ne pouvez pas encore générer de liens. Fixez d'abord une date (au moins une heure dans le futur) pour protéger vos membres.";
         ouvertureEtat.style.color = '#8a6d3b';
         // Proposition par defaut : demain a 9h, apres un envoi termine la veille.
         const demain = new Date();
@@ -1080,7 +1080,13 @@
   function echapperHtml(valeur) {
     const d = document.createElement('div');
     d.textContent = String(valeur == null ? '' : valeur);
-    return d.innerHTML;
+    // innerHTML d'un noeud TEXTE n'echappe que & < > : jamais les guillemets
+    // (audit du 20/10/2026, A8). La valeur sert aussi dans des attributs
+    // (data-dep="${...}") ; sans ces deux remplacements, un guillemet ferme
+    // l'attribut. Aujourd'hui le motif serveur interdit " dans un nom de groupe
+    // et la CSP bloque les gestionnaires en ligne : rien d'exploitable, mais un
+    // piege des que le motif s'elargit.
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   // Publication explicite d un departement (POST). La lecture du tableau de
