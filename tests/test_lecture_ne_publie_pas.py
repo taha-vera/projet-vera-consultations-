@@ -23,8 +23,11 @@ etait declenchable par simple navigation cross-site.
 
 Ce test exerce la logique de publication au niveau du module, sans serveur
 HTTP : il verifie l'invariant lui-meme (le budget epsilon ne bouge pas a la
-lecture), qui est ce qui compte. Un test HTTP complementaire existe en
-JavaScript dans chantier_crypto/.
+lecture), mais PAS que la ROUTE ne publie pas. Remettre l'appel a
+`_publier_departement` dans GET /api/rh/resultats ne le fait pas echouer
+(mutation executee par l'audit du 20/10/2026, A2 : 49 reussis, 0 echec). Le
+controle de la route est dans tests/test_resultats_http_ne_publie_pas.py, qui
+l'appelle pour de vrai.
 """
 
 import sys
