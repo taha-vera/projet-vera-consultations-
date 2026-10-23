@@ -34,6 +34,7 @@ import os
 import pathlib
 import sys
 import threading
+import time
 
 RACINE = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE))
@@ -86,6 +87,9 @@ def verifier(condition, message, detail=""):
 
 
 def gen(client, groupe, quantite):
+    # La date d'ouverture est un prealable a toute generation (audit A4). Idempotent
+    # tant qu'elle n'est pas passee.
+    client.post("/api/rh/ouverture", json={"ouverture_unix": time.time() + 7200})
     return client.post("/api/rh/generer_autorisations",
                        json={"departement": groupe, "quantite": quantite})
 

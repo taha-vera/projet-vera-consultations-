@@ -1417,6 +1417,25 @@ def generer_autorisations(payload: GenererAutorisationsRequete, session_vera: Op
                    "maintenant invaliderait les liens deja distribues.",
         )
 
+    # LA DATE D'OUVERTURE DOIT ETRE FIXEE AVANT TOUT LIEN (audit externe du
+    # 20/10/2026, A4).
+    #
+    # Elle est la seule chose qui separe l'ORDRE DES ENVOIS de l'ORDRE DES VOTES :
+    # sans elle, chacun vote dans la foulee de sa reception, et l'ordre des
+    # votes reproduit l'ordre dans lequel l'organisateur a envoye ses
+    # invitations -- ce qui suffit a attribuer des reponses dans un petit
+    # groupe. La rendre facultative la laissait dependre du bon vouloir de celui
+    # contre qui elle protege en partie, alors que l'interface la presente comme
+    # une etape du cycle. Un lien de remplacement reste possible APRES
+    # l'ouverture : le membre qui a perdu le sien doit pouvoir voter.
+    if persistance.charger_ouverture_depots() is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Fixez d'abord la date d'ouverture des votes (rubrique « Ouverture "
+                   "du vote »). Sans elle, l'ordre des votes reproduirait l'ordre de "
+                   "vos envois : c'est ce qu'elle empeche. Aucun lien n'a ete cree.",
+        )
+
     # NE CREE JAMAIS DE CLE ICI (D2, audit cible du 10/2026).
     #
     # Avant ce correctif, cette ligne appelait cle_publique() -- CREATRICE si
@@ -2422,6 +2441,18 @@ def engagement_cles():
     }
 
 
+# ECART MINIMAL ENTRE LE MOMENT OU LA DATE EST FIXEE ET LA DATE FIXEE (audit A4).
+#
+# Avant le 22/10/2026, « dans le futur » suffisait : maintenant + 1 seconde etait
+# accepte, ce qui ne separe rien. Une heure est un plancher, pas une garantie : la
+# protection tient a l'ecart entre le DERNIER envoi d'invitations et l'ouverture,
+# que le serveur ne peut pas connaitre -- il ne sait pas quand l'organisateur
+# envoie. Cet ecart evite seulement le cas d'une date posee « pour la forme ».
+# Une constante de MODULE, pas une variable d'environnement : un reglage
+# d'exploitation ne doit pas pouvoir la supprimer sans passer par le depot.
+ECART_MINIMAL_OUVERTURE_SECONDES = 3600
+
+
 class OuvertureRequete(BaseModel):
     # Instant Unix a partir duquel les votes sont acceptes. Le client envoie
     # une date choisie dans le tableau de bord.
@@ -2463,11 +2494,12 @@ def definir_ouverture(payload: OuvertureRequete, session_vera: Optional[str] = C
                    "La repousser invaliderait les voix deja deposees.",
         )
 
-    if payload.ouverture_unix <= maintenant:
+    if payload.ouverture_unix < maintenant + ECART_MINIMAL_OUVERTURE_SECONDES:
         raise HTTPException(
             status_code=422,
-            detail="La date d'ouverture doit etre dans le futur. Une ouverture "
-                   "immediate ne separerait pas l'emission des depots.",
+            detail="La date d'ouverture doit etre au moins "
+                   f"{int(ECART_MINIMAL_OUVERTURE_SECONDES // 60)} minutes dans le futur. "
+                   "Une ouverture immediate ne separerait pas l'emission des depots.",
         )
 
     persistance.persister_ouverture_depots(payload.ouverture_unix)

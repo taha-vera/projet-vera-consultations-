@@ -94,7 +94,7 @@ def declarer():
 
 # --- 1. Ouverture fixee d'abord : la question est VIDE ---------------------
 
-r = client.post("/api/rh/ouverture", json={"ouverture_unix": time.time() + 3600})
+r = client.post("/api/rh/ouverture", json={"ouverture_unix": time.time() + 7200})
 verifier(r.status_code == 200, "1a. ouverture fixee avant la question",
          f"recu {r.status_code} : {r.text[:120]}")
 verifier(persistance.charger_question() == "",

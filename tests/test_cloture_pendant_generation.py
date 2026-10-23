@@ -26,6 +26,7 @@ EXIGE le module Rust compile (l'API refuse de demarrer sans lui).
 import os
 import pathlib
 import sys
+import time
 
 RACINE = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE))
@@ -88,6 +89,8 @@ def preparer(effectif):
 
 
 def generer(n):
+    # La date d'ouverture est un prealable a toute generation (audit A4).
+    client.post("/api/rh/ouverture", json={"ouverture_unix": time.time() + 7200})
     return client.post("/api/rh/generer_autorisations",
                        json={"departement": GROUPE, "quantite": n})
 

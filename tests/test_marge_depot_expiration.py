@@ -57,6 +57,10 @@ os.environ["VERA_ADMIN_USER"] = "rh_marge"
 os.environ["VERA_ADMIN_HASH"] = auth.generer_empreinte(MDP)
 
 import vera_consultation_api as api  # noqa: E402
+
+# Ce test fixe l'ouverture a quelques secondes pour ne pas attendre ; l'ecart
+# minimal de production (une heure, audit A4) n'a pas a le ralentir.
+api.ECART_MINIMAL_OUVERTURE_SECONDES = 0
 import vera_persistance as persistance  # noqa: E402
 import vera_signature_manager as sm  # noqa: E402
 

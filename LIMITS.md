@@ -802,6 +802,35 @@ Si un jour plusieurs administrateurs permanents devenaient necessaires, la voie
 propre serait de les declarer dans l'unite systemd au même titre que le compte
 principal -- pas de les persister en base.
 
+## 9bis. La date d'ouverture des votes : obligatoire, mais le serveur ne voit pas vos envois
+
+Elle est la seule chose qui sépare l'ordre de vos envois de l'ordre des votes :
+sans elle, chacun vote dans la foulée de sa réception, et l'ordre des votes
+reproduit l'ordre dans lequel vous avez envoyé vos invitations — ce qui suffit à
+attribuer des réponses dans un petit groupe.
+
+**Ce que VERA impose depuis le 22/10/2026** (audit externe du 20/10/2026, A4,
+décision du mainteneur) : aucun lien ne se génère tant que la date n'est pas
+fixée ; elle doit être au moins **une heure** dans le futur quand on la fixe ; et
+elle ne se modifie plus une fois passée. Avant, elle était facultative et
+« maintenant + 1 seconde » était accepté. Vérifié par
+`tests/test_ouverture_obligatoire.py`.
+
+**Ce que cela ne garantit pas.**
+- Le serveur ne sait pas **quand vous envoyez** : il ne peut pas vérifier que la
+  date est postérieure à votre dernier envoi. Une date à une heure, avec des
+  envois qui s'étalent sur trois jours, ne sépare rien. L'écart d'une heure
+  évite la date posée « pour la forme », pas la date mal choisie.
+- Un **lien de remplacement** se génère encore après l'ouverture (un membre qui
+  a perdu le sien doit pouvoir voter). Celui-là est envoyé après l'ouverture : il
+  porte à nouveau la corrélation entre l'ordre d'envoi et l'ordre de vote, pour
+  les quelques personnes concernées. À grouper et à envoyer tard, pas au fil de
+  l'eau.
+- L'interface affiche encore « Aucune date fixée : les votes sont acceptés dès
+  maintenant » tant que la date manque ; le texte est devenu trompeur (rien ne se
+  génère sans date), la page n'a pas été modifiée pour ne pas changer l'empreinte
+  de sécurité qui la protège.
+
 ## 10. Duree maximale d'une consultation : 7 jours
 
 Une consultation VERA a une durée de vie DURE de 7 jours a compter de son

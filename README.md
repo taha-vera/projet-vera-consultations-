@@ -336,7 +336,8 @@ seraient contournables.
 
 1. L'organisateur définit la question, déclare ses groupes (avec le nombre de
    personnes de chacun, qui plafonne le nombre de liens générables) et fixe la
-   date d'ouverture des votes.
+   date d'ouverture des votes — **obligatoire avant le premier lien**, à au moins
+   une heure dans le futur (voir [LIMITS.md](LIMITS.md) §9bis).
 2. Il publie l'empreinte agrégée des clés hors du serveur — auprès des
    représentants du personnel — **avant** d'envoyer la moindre invitation.
 3. L'organisation diffuse les invitations depuis sa propre liste, jamais
