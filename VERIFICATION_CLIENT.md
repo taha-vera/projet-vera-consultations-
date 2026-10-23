@@ -98,9 +98,13 @@ groupe — deux collègues de services différents peuvent comparer leurs liens 
 constater qu'ils portent la même valeur. Publiée par l'organisation avant l'envoi
 des invitations, elle devient un engagement daté.
 
-**La clé reçue figure bien dans cet ensemble.** Sans quoi le serveur pourrait
-présenter une empreinte correcte tout en servant une clé qui n'en fait pas
-partie.
+**La clé reçue est celle publiée pour le groupe du lien.** Il ne suffit pas
+qu'elle figure quelque part dans l'ensemble : une clé d'un autre groupe y figure
+aussi. Le client compare la clé reçue à la seule entrée de l'ensemble qui porte
+le nom du groupe du lien, et refuse le vote si elles diffèrent (constat F3 de
+l'audit du 19/10/2026). Sans quoi le serveur pourrait présenter une empreinte
+correcte tout en servant à un participant une clé qui n'est pas celle de son
+groupe, et le dépouillement le désignerait.
 
 **Un groupe n'a qu'une seule clé.** C'est le contrôle décisif, et il est
 contre-intuitif : un serveur qui publierait cinq cents clés pour un même groupe
