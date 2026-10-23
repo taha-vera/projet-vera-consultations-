@@ -1798,6 +1798,28 @@ source Python du script (il passe par `sys.argv`). Un `VERA_DB_PATH` contenant u
 apostrophe cassait la sauvegarde, et c'était une injection de code possible pour
 qui contrôle cette variable — root seul, donc sans élévation de privilège.
 
+## 16. Dépendances : une pré-version cryptographique et une alerte hors chemin
+
+Deux choix à connaître, audit du 20/10/2026 (A12) :
+
+- **Le crate `rsa` est en pré-version (0.10.0-rc.18)**, tiré par
+  `blind-rsa-signatures` 0.17 et figé par `vera_blind_sig/Cargo.lock`, qui est
+  versionné. Ne jamais lancer `cargo update` sur ce dossier sans refaire la suite
+  de tests complète (`run_tests.sh`) : une autre version peut changer le
+  comportement de l'aveuglement ou des contrôles de signature. Compiler avec
+  `maturin develop --release --locked` pour que cargo refuse de s'écarter du
+  fichier. Ce que cet audit ne peut pas établir : la sûreté de cette
+  pré-version elle-même.
+- **`npm audit` signale `sjcl` (GHSA-2w8x-224x-785m, validation de point sur
+  courbe elliptique)**, tiré par `@cloudflare/blindrsa-ts` 0.4.4. Hors chemin :
+  VERA n'utilise que la partie RSA de cette bibliothèque (`sjcl.bn`, codec,
+  aléa). Le bundle servi aux votants (`static/blindrsa-bundle.js`) ne définit
+  pas `sjcl.ecc` : ses deux seules mentions sont des tests `sjcl.ecc &&` qui
+  restent faux. Le code signalé n'est donc pas livré. La correction proposée par npm (0.4.6, hors de
+  la plage épinglée) change le bundle servi aux votants, donc ses empreintes
+  (SRI, `VERIFICATION_CLIENT.md`) : elle n'est pas appliquée sans nécessité. À
+  réévaluer si l'usage de la bibliothèque s'élargit.
+
 ---
 
 ## 20. Journal des audits externes
