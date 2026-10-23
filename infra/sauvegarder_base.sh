@@ -78,10 +78,15 @@ trap 'shred -u "$copie_temporaire" 2>/dev/null || rm -f "$copie_temporaire"' EXI
 # Export d'UNE SEULE table, pas une copie de la base entiere. Pas
 # d'API .backup() ici : elle copierait tout, y compris ce qu'on a
 # precisement decide de ne plus jamais sortir de la base vivante.
-"$PYTHON" -c "
-import sqlite3
-src = sqlite3.connect('$BASE_SOURCE')
-dst = sqlite3.connect('$copie_temporaire')
+#
+# Les deux chemins passent par sys.argv, JAMAIS interpoles dans le source Python
+# (audit du 20/10/2026, A11) : un VERA_DB_PATH contenant une apostrophe aurait
+# cassé le script, ou pire, injecté du code. Le delimiteur 'PY' entre guillemets
+# empeche l'interpolation par le shell.
+"$PYTHON" - "$BASE_SOURCE" "$copie_temporaire" <<'PY'
+import sqlite3, sys
+src = sqlite3.connect(sys.argv[1])
+dst = sqlite3.connect(sys.argv[2])
 dst.execute(
     'CREATE TABLE historique_consultations '
     '(groupe TEXT NOT NULL, close_unix REAL NOT NULL, '
@@ -95,7 +100,7 @@ dst.executemany(
 dst.commit()
 dst.close()
 src.close()
-"
+PY
 
 # ECRITURE ATOMIQUE : chiffrer vers un fichier .tmp, verifier qu'il se
 # dechiffre, puis renommer seulement en cas de succes. Une interruption

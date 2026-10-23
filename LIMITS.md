@@ -1773,6 +1773,33 @@ consultation.
 
 ---
 
+## 15. La copie de sauvegarde n'est ni authentifiée ni hors du serveur
+
+`infra/sauvegarder_base.sh` copie **une seule table**, `historique_consultations`
+(noms de groupe et dates de clôture), pour faire respecter la règle des 4
+consultations sur 12 mois après une perte du serveur. Deux limites, relevées par
+l'audit du 20/10/2026 (A11) :
+
+- **Chiffrée, pas authentifiée.** Le fichier est chiffré en AES-256-CBC
+  (`openssl enc`), sans code d'authentification. Quelqu'un qui peut écrire dans
+  `/root/sauvegardes_vera/` peut modifier la copie sans que le déchiffrement le
+  signale toujours. Conséquence : une copie falsifiée pourrait effacer ou
+  inventer une clôture passée et fausser la règle des 4/12 mois. Elle ne contient
+  ni compteur, ni jeton, ni clé : aucune donnée de vote n'est en jeu.
+- **Sur le même disque.** Les copies sont dans `/root` du serveur qu'elles sont
+  censées sauver. Elles ne protègent pas d'une perte du disque ni du serveur ;
+  elles protègent d'une erreur de manipulation. Une copie hors du serveur
+  (support de l'opérateur, jamais dans le dépôt) est un geste manuel, non
+  automatisé ; la clé de sauvegarde `/root/.vera_backup_key` doit aller dans
+  l'enveloppe de séquestre.
+
+Corrigé dans le même audit : le chemin de la base n'est plus inséré dans le
+source Python du script (il passe par `sys.argv`). Un `VERA_DB_PATH` contenant une
+apostrophe cassait la sauvegarde, et c'était une injection de code possible pour
+qui contrôle cette variable — root seul, donc sans élévation de privilège.
+
+---
+
 ## 20. Journal des audits externes
 
 Deplace dans [AUDITS.md](AUDITS.md) le 09/09/2026, pour la seule raison de sa
