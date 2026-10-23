@@ -566,7 +566,7 @@ séparation des rôles, pas à un défaut d'implémentation.
 | `vera_consultation_api.py` | Tous les endpoints HTTP |
 | `vera_dp_noise.py` | Mécanisme de bruit (OpenDP, Δ₁ = 2 sous adjacence par substitution, scale = 4, ε = 0,5) |
 | `vera_signature_manager.py`, `vera_blind_sig/` | Signature aveugle RSABSSA (RFC 9474). L'aveuglement et la finalisation ont lieu dans le navigateur du votant : le serveur ne voit ni le secret ni la signature finale. |
-| `vera_persistance.py` | Persistance chiffrée de l'état — portes 11 et 14 (SQLite en `journal_mode=DELETE`, Fernet/AES-128) |
+| `vera_persistance.py` | Persistance SQLite — portes 11 et 14 (`journal_mode=DELETE`). Seule la clé privée RSA est chiffrée (Fernet/AES-128) ; le reste du fichier est en clair, voir plus bas |
 | `vera_epsilon_budget.py` | Budget de confidentialité |
 | `vera_admin_auth.py` | Authentification de l'organisateur |
 | `static/vote.html`, `static/admin.html` | Page du votant, tableau de bord |
@@ -578,7 +578,7 @@ n'existe ni `routes/`, ni `models/`, ni `auth/`. Le reste est rangé :
 ```
 vera_*.py              les 6 modules de l'application
 verifier_engagement.py outil du tiers vérificateur
-tests/                 49 tests, dont 13 gardes structurelles
+tests/                 55 tests, dont 13 gardes structurelles
                        et un parcours HTTP complet
 static/                page du votant, tableau de bord, bundle
 chantier_crypto/       tests JS, crash test, manifeste npm
@@ -642,7 +642,7 @@ installation en service.
 Le parcours complet a été validé de bout en bout dans un navigateur ; aucune
 consultation avec de vrais participants n'a encore eu lieu.
 
-**Version courante :** branche `main`, 19 octobre 2026 — 49 tests automatiques,
+**Version courante :** branche `main`, 22 octobre 2026 — 55 tests automatiques,
 plus un test de résistance au crash exercé sur le chemin HTTP réel.
 
 **Ce que `VERA_DB_KEY` chiffre, exactement.** Elle chiffre **la clé privée
