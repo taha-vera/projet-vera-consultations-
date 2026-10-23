@@ -654,7 +654,7 @@ def persister_jetons_autorisation_lot(jetons, departement, plafond=None,
                                       controler_declaration=False):
     """Enregistre les empreintes de PLUSIEURS jetons en UNE transaction.
 
-    L'appel unitaire persister_jeton_autorisation fait un commit par jeton, et
+    Un appel unitaire (un commit par jeton) coutait cher :
     PRAGMA synchronous=FULL impose un fsync par commit. Generer 1000 jetons
     signifiait donc 1000 fsync -- de une a dix secondes pendant lesquelles
     l'appelant tenait le verrou global de l'API : tous les votes en cours
@@ -742,18 +742,20 @@ def persister_jetons_autorisation_lot(jetons, departement, plafond=None,
 
 
 def persister_jeton_autorisation(jeton, departement):
-    """Enregistre l'EMPREINTE d'un jeton d'autorisation a sa generation.
+    """Enregistre l'EMPREINTE d'UN jeton d'autorisation. Reserve aux tests.
 
-    Conserve pour les appels unitaires et les tests. Pour un lot, utiliser
-    persister_jetons_autorisation_lot (un seul commit au lieu de N).
+    Le service n'appelle JAMAIS cette fonction : generer_autorisations passe par
+    persister_jetons_autorisation_lot(controler_declaration=True), qui relit
+    la declaration des groupes et le plafond d'invitations dans la transaction.
+
+    Cette fonction avait sa propre requete, avec `ON CONFLICT DO NOTHING`
+    et sans plafond -- exactement ce que D4 et D6 avaient retire du chemin reel
+    (audit du 20/10/2026, A10) : un futur appelant l'aurait reintroduit sans le
+    voir. Elle delegue donc au lot, sans controle de declaration (les tests
+    posent des jetons dans des groupes qu'ils ne declarent pas) : une collision
+    d'empreinte leve CollisionJetonErreur au lieu d'etre ignoree.
     """
-    with _verrou_db:
-        _conn.execute(
-            "INSERT INTO jetons_autorisation (jeton, departement, utilise) VALUES (?, ?, 0) "
-            "ON CONFLICT(jeton) DO NOTHING",
-            (_empreinte_jeton(jeton), departement),
-        )
-        _conn.commit()
+    persister_jetons_autorisation_lot([jeton], departement)
 
 
 def lire_departement_jeton(jeton):
