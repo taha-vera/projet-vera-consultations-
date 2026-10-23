@@ -524,15 +524,63 @@ def _ip_client(request) -> str:
     return ip_directe
 
 
-def _verifier_anti_bruteforce(ip: str) -> None:
-    """Leve une exception si l'IP a depasse le seuil d'echecs recents."""
+# UNE VERIFICATION DES IDENTIFIANTS PAR PERIODE, MEME SUR UNE ADRESSE BLOQUEE.
+#
+# Audit externe du 20/10/2026, A3. Le blocage par adresse etait verifie AVANT les
+# identifiants : derriere une adresse partagee (reseau d'entreprise, ou une
+# connexion mobile dont l'adresse est commune a beaucoup d'abonnes), un seul
+# voisin qui envoyait cinq mauvais mots de passe bloquait l'organisateur, meme
+# avec le BON mot de passe, de 5 minutes a une heure, entretenu par cinq requetes
+# par heure. Pas de cloture depuis ce reseau, donc pas d'effacement promis
+# (menace 6). Le meme raisonnement avait ete applique au blocage PAR COMPTE
+# (voir connexion_rh) ; il manquait ici.
+#
+# POURQUOI PAS « IDENTIFIANTS TOUJOURS VERIFIES D'ABORD ». Le blocage par
+# adresse est aussi ce qui evite de payer 200 000 iterations de PBKDF2 par
+# requete : le service est mono-processus, il sert aussi les votants. Si une
+# adresse bloquee payait le PBKDF2 a chaque requete, une dizaine d'adresses a
+# 1 requete par seconde (la limite nginx) occuperaient un coeur en continu.
+#
+# COMPROMIS. Une adresse bloquee obtient UNE verification des identifiants par
+# periode ; les autres requetes recoivent 429 sans calcul. Le cout par adresse
+# passe de zero a un PBKDF2 toutes les 30 secondes (environ 0,3 % d'un coeur),
+# et l'organisateur derriere une adresse partagee peut se connecter au plus tard
+# 30 secondes apres sa premiere tentative refusee. Une verification qui echoue
+# pendant un blocage ne l'allonge pas et n'est pas comptee.
+INTERVALLE_VERIFICATION_IP_BLOQUEE = 30  # secondes
+
+# Ce que lit l'organisateur bloque par l'echec d'un voisin : qu'il peut
+# reessayer dans une trentaine de secondes, pas dans « quelques minutes ».
+_DETAIL_429_CONNEXION = (
+    "Trop de tentatives depuis cette adresse. Reessayez dans une minute : "
+    "si vos identifiants sont corrects, la connexion sera acceptee."
+)
+
+
+def _verifier_anti_bruteforce(ip: str, verification_espacee: bool = False) -> bool:
+    """Leve 429 si l'adresse est bloquee ; renvoie False sinon.
+
+    Avec `verification_espacee=True` (connexion RH seulement), une adresse
+    bloquee n'est PAS refusee d'emblee si sa derniere verification date de plus
+    de INTERVALLE_VERIFICATION_IP_BLOQUEE secondes : la fonction renvoie True
+    (« bloquee, mais cette requete peut faire verifier les identifiants ») et
+    memorise l'instant. L'appelant doit alors refuser en 429 si les
+    identifiants sont faux, sans les compter comme un echec de plus."""
     with verrou:
         info = _tentatives_par_ip.get(ip)
-        if info and info.get("bloque_jusqu_a", 0) > time.time():
+        maintenant = time.time()
+        if info and info.get("bloque_jusqu_a", 0) > maintenant:
+            if (verification_espacee
+                    and maintenant - info.get("derniere_verif_bloquee", 0)
+                    >= INTERVALLE_VERIFICATION_IP_BLOQUEE):
+                info["derniere_verif_bloquee"] = maintenant
+                return True
             raise HTTPException(
                 status_code=429,
-                detail="Trop de tentatives. Réessayez dans quelques minutes.",
+                detail=(_DETAIL_429_CONNEXION if verification_espacee
+                        else "Trop de tentatives. Réessayez dans quelques minutes."),
             )
+    return False
 
 
 # Duree apres laquelle une entree IP inactive est purgee (aucun echec recent
@@ -775,7 +823,10 @@ def connexion_rh(payload: IdentifiantsRH, response: Response, request: Request):
     # Le mecanisme existait mais n'etait cable que sur le circuit code court,
     # devenu du code mort : plus aucun endpoint n'etait protege.
     ip_client = _ip_client(request)
-    _verifier_anti_bruteforce(ip_client)
+    # Adresse bloquee : 429 sans calcul, SAUF une verification par periode
+    # (audit A3, voir _verifier_anti_bruteforce). `ip_bloquee` vaut True quand
+    # cette requete est cette verification.
+    ip_bloquee = _verifier_anti_bruteforce(ip_client, verification_espacee=True)
 
     # BLOCAGE PAR COMPTE, verifie AVANT le PBKDF2.
     #
@@ -809,6 +860,12 @@ def connexion_rh(payload: IdentifiantsRH, response: Response, request: Request):
         payload.identifiant, payload.mot_de_passe)
 
     if not identifiants_valides:
+        if ip_bloquee:
+            # Verification accordee a une adresse deja bloquee : refusee, mais ni
+            # comptee ni allongeante -- l'adresse est deja bloquee, et un
+            # voisin qui se trompe ne doit pas rallonger le blocage de
+            # l'organisateur.
+            raise HTTPException(status_code=429, detail=_DETAIL_429_CONNEXION)
         _enregistrer_echec(ip_client, payload.identifiant)
         restant = _compte_bloque(payload.identifiant)
         if restant > 0:

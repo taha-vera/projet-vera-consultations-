@@ -1276,6 +1276,32 @@ plus), jamais un mot de passe mémorisable. Ce point n'est vérifié par aucun
 test : aucune longueur minimale n'est imposée au mot de passe du compte
 principal, dont l'empreinte est calculée hors ligne.
 
+### Le blocage par adresse laisse passer une vérification par tranche de 30 secondes
+
+Jusqu'au 22/10/2026, le blocage par **adresse** était vérifié *avant* les
+identifiants : derrière une adresse partagée (réseau d'entreprise, connexion
+mobile dont l'adresse est commune à beaucoup d'abonnés), un voisin qui envoyait
+cinq mauvais mots de passe bloquait l'organisateur, même avec le bon, de 5
+minutes à une heure — donc pas de clôture, donc pas d'effacement (audit externe
+du 20/10/2026, A3).
+
+Corrigé sans retirer la protection de calcul : une adresse bloquée obtient
+**une** vérification des identifiants par tranche de 30 secondes
+(`INTERVALLE_VERIFICATION_IP_BLOQUEE`) ; les autres requêtes reçoivent 429 sans
+aucun calcul. Un bon mot de passe passe donc au plus tard 30 secondes après la
+première tentative refusée ; une vérification qui échoue pendant le blocage ne
+l'allonge pas. Vérifié par `tests/test_blocage_adresse_http.py`, qui compte les
+calculs de vérification payés.
+
+**Ce que cela coûte.** Chaque adresse bloquée coûte désormais un calcul PBKDF2
+toutes les 30 secondes au lieu de zéro (environ 0,3 % d'un cœur). Cent adresses
+bloquées en continu coûteraient donc environ un tiers de cœur : c'est le prix de
+ne pas enfermer l'organisateur. Et une adresse bloquée obtient une devinette de
+mot de passe de plus par tranche : sans effet sur une attaque répartie (voir
+plus haut), qui ne dépend pas de ce blocage. La route de création de compte
+(`/api/admin/creer_compte_rh`) garde l'ancien comportement : elle compare un
+secret à temps constant, sans PBKDF2, et n'est pas utilisée par l'organisateur.
+
 ## 12bis. Le transporteur des invitations est un tiers de confiance non declare
 
 Chaque invitation part par SMS ou par courriel, donc par un prestataire. Ce
