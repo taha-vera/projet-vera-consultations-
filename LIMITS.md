@@ -1948,7 +1948,14 @@ Deux choix à connaître, audit du 20/10/2026 (A12) :
   comportement de l'aveuglement ou des contrôles de signature. Compiler avec
   `maturin develop --release --locked` pour que cargo refuse de s'écarter du
   fichier. Ce que cet audit ne peut pas établir : la sûreté de cette
-  pré-version elle-même.
+  pré-version elle-même. **Ce qui est vérifié depuis le 24/10/2026** : le module
+  reproduit exactement les résultats de la RFC 9474, annexe A.1 (variante
+  RSABSSA-SHA384-PSS-Randomized, la seule utilisée) : signature aveugle, signature
+  finale, et refus après altération d'un octet
+  (`tests/test_vecteurs_rfc9474.py`). Limites : la clé des vecteurs fait
+  4096 bits, celle de VERA 2048 ; l'aveuglement tire ses propres aléas et n'est
+  pas rejoué ; et un vecteur ne prouve ni la non-liaison ni la sûreté de la
+  construction, qui relèvent d'une relecture cryptographique.
 - **`npm audit` signale `sjcl` (GHSA-2w8x-224x-785m, validation de point sur
   courbe elliptique)**, tiré par `@cloudflare/blindrsa-ts` 0.4.4. Hors chemin :
   VERA n'utilise que la partie RSA de cette bibliothèque (`sjcl.bn`, codec,
