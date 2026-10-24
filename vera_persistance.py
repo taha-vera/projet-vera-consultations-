@@ -1185,7 +1185,7 @@ def compter_jetons_par_departement():
 def effacer_etat_consultation():
     """Efface TOUT l'etat brut d'une consultation : compteurs, effectifs,
     codes courts, tokens consommes, budget epsilon, resultats publies,
-    jetons d'autorisation.
+    jetons d'autorisation, cles publiques de la marge de depot.
     NE touche PAS a la cle RSA (infrastructure, pas donnee de consultation).
 
     Apres cet appel, le serveur ne conserve plus AUCUNE donnee de la
@@ -1196,7 +1196,7 @@ def effacer_etat_consultation():
     with _verrou_db:
         for table in ("compteurs_votes", "effectifs",
                       "tokens_consommes", "budget_epsilon", "resultats_publies", "question_active",
-                      "jetons_autorisation"):
+                      "jetons_autorisation", "cles_publiques_expirees"):
             _conn.execute(f"DELETE FROM {table}")
 
         _conn.commit()

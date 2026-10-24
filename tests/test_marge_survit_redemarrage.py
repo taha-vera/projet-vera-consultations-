@@ -168,6 +168,15 @@ g2.fermer_consultation()
 verifier(tables_cles() == (0, 0), "4. la cloture explicite vide les deux tables",
          str(tables_cles()))
 
+# --- 4bis. effacer_etat_consultation vide AUSSI la table, a elle seule -----
+# (filet de securite : la cloture ne doit pas dependre de l'ordre des appels).
+persistance.persister_cles_publiques_expirees({D: (b"\x01" * 8, 1.0)})
+verifier(tables_cles()[1] == 1, "4bis-a. (preparation) une cle publique est en base")
+persistance.effacer_etat_consultation()
+verifier(tables_cles()[1] == 0,
+         "4bis-b. effacer_etat_consultation vide la table des cles publiques",
+         str(tables_cles()))
+
 # --- 6. controle negatif : sans persistance, le scenario 1 echoue ----------
 repartir_de_zero()
 g1 = nouvelle_instance()
