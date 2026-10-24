@@ -846,8 +846,9 @@ elle ne se modifie plus une fois passée. Avant, elle était facultative et
 
 ## 10. Duree maximale d'une consultation : 7 jours
 
-Une consultation VERA a une durée de vie DURE de 7 jours a compter de son
-ouverture. Passe ce delai, les clés de signature sont automatiquement detruites
+Une consultation VERA a une durée de vie DURE de 7 jours a compter de la
+**declaration des groupes** (creation des cles) : ni la generation des liens, ni
+la date d'ouverture des votes ne demarrent l'horloge. Passe ce delai, les clés de signature sont automatiquement detruites
 (en memoire et en base) : plus aucune signature n'est emise. **Un vote deja
 signe peut encore etre depose pendant 24 heures** (marge de depot, voir
 ci-dessous) ; passe ce delai, plus aucun vote n'est accepte et les votants qui
@@ -863,6 +864,17 @@ cloture ou au prochain redemarrage) et la documentation affirmait pourtant
 fixe (`DELAI_GRACE_DEPOT_SECONDES`), verifiee par
 `tests/test_marge_depot_expiration.py`. **Ce qu'elle ne change pas :** la
 fenetre de collecte reste 7 jours pour la SIGNATURE ; elle ne l'allonge pas.
+
+**La date d'ouverture est bornee (depuis le 24/10/2026, audit externe, N1).**
+Les sept jours partant de la declaration, une date d'ouverture trop tardive
+laissait une consultation sans aucune fenetre de vote (ouverture a J+8 : cles
+detruites a J+7, tout depot recevait 425, sans qu'aucun message ne le dise).
+`definir_ouverture` refuse desormais (422) toute date qui laisserait moins de
+`COLLECTE_MINIMALE_SECONDES` (72 h) avant l'expiration des cles, en comptant
+sur l'echeance reelle des cles si elles existent, sur sept jours pleins sinon.
+Verifie par `tests/test_ouverture_bornee.py`. **Ce que cela ne garantit pas :**
+72 h est un minimum technique, pas une duree suffisante pour votre
+organisation ; la borne ne dit rien de la participation.
 
 **La marge survit a un redemarrage (depuis le 22/10/2026).** Jusque-la, les cles
 publiques de la marge n'existaient qu'en memoire : un redemarrage pendant les

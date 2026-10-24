@@ -342,7 +342,8 @@ seraient contournables.
    représentants du personnel — **avant** d'envoyer la moindre invitation.
 3. L'organisation diffuse les invitations depuis sa propre liste, jamais
    transmise à l'hébergeur.
-4. Collecte, sept jours au maximum.
+4. Collecte, sept jours au maximum à compter de la déclaration des groupes
+   (la date d'ouverture doit laisser au moins 72 h avant l'expiration).
 5. `POST /api/rh/cloturer` renvoie les résultats une dernière fois — à
    sauvegarder — puis efface définitivement compteurs, effectifs, jetons,
    secrets consommés, budget ε, résultats publiés et clé de signature.

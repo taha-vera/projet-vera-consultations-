@@ -2489,6 +2489,20 @@ def engagement_cles():
 # d'exploitation ne doit pas pouvoir la supprimer sans passer par le depot.
 ECART_MINIMAL_OUVERTURE_SECONDES = 3600
 
+# DUREE MINIMALE DE COLLECTE ENTRE L'OUVERTURE ET L'EXPIRATION DES CLES (audit du
+# 24/10/2026, N1).
+#
+# Les sept jours de vie des cles de signature partent de la CREATION DES CLES, donc
+# de la declaration des groupes -- pas de l'ouverture des votes. Sans borne haute,
+# une date d'ouverture a J+8 etait acceptee : liens generes, 200 partout, et plus
+# personne ne pouvait voter, la cle privee etant detruite a J+7 (avant l'ouverture,
+# tout depot recevait 425). Plus courant et plus discret : une ouverture a J+5 ne
+# laisse que deux jours de collecte, et rend K_MIN = 240 inatteignable sans que
+# rien ne le signale. Trois jours est un plancher, pas une garantie de
+# participation. Constante de module, comme l'ecart minimal : pas de reglage
+# d'exploitation qui la supprime.
+COLLECTE_MINIMALE_SECONDES = 72 * 3600
+
 
 class OuvertureRequete(BaseModel):
     # Instant Unix a partir duquel les votes sont acceptes. Le client envoie
@@ -2539,6 +2553,34 @@ def definir_ouverture(payload: OuvertureRequete, session_vera: Optional[str] = C
                    "Une ouverture immediate ne separerait pas l'emission des depots.",
         )
 
+    # BORNE HAUTE (N1) : l'ouverture doit laisser au moins COLLECTE_MINIMALE_SECONDES
+    # avant l'expiration des cles. Si les cles existent deja, on lit leur vraie
+    # echeance ; sinon elles seront creees a la declaration des groupes, au plus tot
+    # maintenant : on prend ce cas, le plus strict, qui ne refuse jamais a tort (une
+    # declaration plus tardive ne fait que repousser l'echeance).
+    from vera_signature_manager import DUREE_VIE_CLE_SECONDES
+    restant = gestionnaire_signature.temps_restant_secondes()
+    duree_avant_expiration = DUREE_VIE_CLE_SECONDES if restant is None else restant
+    derniere_ouverture = maintenant + duree_avant_expiration - COLLECTE_MINIMALE_SECONDES
+    if payload.ouverture_unix > derniere_ouverture:
+        heures_max = int(max(0.0, derniere_ouverture - maintenant) // 3600)
+        collecte_h = int(COLLECTE_MINIMALE_SECONDES // 3600)
+        if restant is None:
+            cause = ("Les cles de signature durent sept jours a partir de la "
+                     "declaration des groupes")
+        else:
+            cause = ("Les cles de signature expirent dans "
+                     f"{int(restant // 3600)} heures")
+        raise HTTPException(
+            status_code=422,
+            detail=f"{cause}, et il faut laisser au moins {collecte_h} heures de collecte "
+                   "avant leur expiration : sans cela personne ne pourrait voter. "
+                   + (f"Choisissez une date d'ouverture dans les {heures_max} heures qui viennent."
+                      if heures_max >= 1 else
+                      "Il n'est plus possible de fixer une date d'ouverture utile : "
+                      "cloturez et recommencez."),
+        )
+
     persistance.persister_ouverture_depots(payload.ouverture_unix)
     return {
         "ouverture_unix": payload.ouverture_unix,
@@ -2571,14 +2613,15 @@ def echeance_consultation(session_vera: Optional[str] = Cookie(None)):
     erreur technique sans jamais apprendre que la consultation etait terminee.
 
     Renvoie ouverte=False si aucune cle n'existe encore : la consultation n'a
-    pas commence, l'horloge des 7 jours ne demarre qu'a la premiere generation
-    de liens."""
+    pas commence, l'horloge des 7 jours ne demarre qu'a la creation des cles,
+    c'est-a-dire a la declaration des groupes (et non a la generation des
+    premiers liens, ni a l'ouverture des votes -- audit du 24/10/2026, N1)."""
     exiger_session(session_vera)
     restant = gestionnaire_signature.temps_restant_secondes()
     if restant is None:
         return {
             "ouverte": False,
-            "message": "Aucune consultation ouverte. Elle demarrera a la generation des premiers liens.",
+            "message": "Aucune consultation ouverte. Les sept jours demarrent a la declaration des groupes.",
         }
     fin = datetime.utcnow() + timedelta(seconds=restant)
     return {
