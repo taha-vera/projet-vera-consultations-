@@ -135,6 +135,17 @@ jobs:
       - name: Les scripts de verification du deploiement gardent leurs temoins
         run: python3 tests/test_verifier_deploiement_garde.py
 
+      # Le service ne doit plus tourner en root (audit externe du 24/10/2026, N7).
+      # Deux gardes : l'unite cible garde ses durcissements et colle au script de
+      # migration (systemd-analyze la relit, present sur le runner) ; et la migration
+      # elle-meme est EXECUTEE dans un faux systeme de fichiers, chemin nominal,
+      # refus et retours arriere compris. Aucune des deux ne remplace l'essai sur un
+      # serveur neuf (PROCEDURE_REPRISE_VERA.md, partie 4).
+      - name: L'unite cible (compte dedie) garde ses durcissements
+        run: python3 tests/test_unite_durcie.py
+      - name: La migration vers un compte dedie est executee, retours arriere compris
+        run: python3 tests/test_migration_utilisateur_dedie.py
+
       # AUCUN script du depot n'emprunte le repli en clair VERA_ADMIN_PASS.
       #
       # La premiere version de cette garde ne nommait que run_tests.sh. C'etait

@@ -1,0 +1,139 @@
+[Unit]
+Description=VERA Consultation API (FastAPI/uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+
+# CE SERVICE NE TOURNE PLUS EN ROOT (audit externe du 24/10/2026, N7).
+#
+# Jusque-la le processus expose au reseau -- FastAPI, pydantic, uvicorn et le
+# module Rust -- etait root, avec pour seul durcissement NoNewPrivileges. Une
+# faille d'execution de code dans l'une de ces dependances donnait la machine :
+# reecriture de static/vote.html et du bundle servis aux votants, donc la
+# verification du client (VERIFICATION_CLIENT.md) defaite pour tous ceux qui
+# ouvrent ensuite un lien. Avec ce fichier, une faille donne CE PROCESSUS, pour
+# la duree de son execution : un redemarrage efface une compromission qui ne
+# vit qu'en memoire. LIMITS.md §12 dit ce que cela ne ferme pas.
+User=vera
+Group=vera
+
+# DISPOSITION DES FICHIERS (a connaitre avant de toucher a ce fichier).
+#
+#   /opt/vera          le code, un clone git, proprietaire ROOT, en lecture seule
+#                      pour `vera` : c'est ce qui l'empeche de reecrire
+#                      static/vote.html. Mis a jour par `git pull --ff-only`
+#                      depuis le clone de travail, jamais edite a la main.
+#   /opt/vera-venv     l'environnement Python et le module Rust, proprietaire
+#                      root. HORS du depot : un .venv a la racine du clone
+#                      apparaitrait dans `git status`.
+#   /var/lib/vera      la base SQLite et son fichier verrou (StateDirectory, mode
+#                      0700, proprietaire vera) : SEUL endroit du disque ou le
+#                      processus peut ecrire, avec le journal ci-dessous.
+#   /var/log/vera      le journal applicatif (LogsDirectory).
+#   /etc/vera/vera.env les secrets, root:root 600, lus par systemd (en root)
+#                      AVANT l'abaissement des droits : vera ne peut pas les lire.
+#
+# Python resout `import vera_consultation_api` et StaticFiles relativement a
+# WorkingDirectory, pas au clone git (audit cible du 13/10/2026). Toute
+# reinstallation de cette unite part de CE fichier, jamais d'une copie gardee a
+# la main sur le serveur : infra/verifier_deploiement.sh le controle.
+WorkingDirectory=/opt/vera
+
+# SECRETS : DANS UN FICHIER A PART, PAS DANS CETTE UNITE (audit externe du
+# 19/10/2026, F6). Lisibles en clair par `systemctl cat`, ils avaient deja fuite
+# le 31/07/2026 (LIMITS.md §12). Modele du fichier : infra/vera.env.exemple
+# (noms seulement, jamais de valeur). Creation : PROCEDURE_REPRISE_VERA.md.
+#
+#   dans /etc/vera/vera.env (secrets) :
+#     VERA_ADMIN_HASH              : empreinte PBKDF2 (format sel_hex$hash_hex),
+#                                    jamais le mot de passe en clair.
+#     VERA_SECRET_CREATION_COMPTE  : secret de /api/admin/creer_compte_rh.
+#                                    Au moins 32 caracteres aleatoires :
+#                                    openssl rand -base64 32
+#     VERA_DB_KEY                  : chiffre la cle privee RSA au repos.
+#                                    64 caracteres hexadecimaux :
+#                                    openssl rand -hex 32
+#                                    Rotation : cloturer toute consultation
+#                                    active d'abord (purge les cles chiffrees),
+#                                    puis poser la nouvelle valeur.
+#   ci-dessous (pas des secrets) :
+#     VERA_DOMAINE                 : le domaine public du service.
+#     VERA_ADMIN_USER              : identifiant du compte d'amorcage.
+#     VERA_DB_PATH                 : la base. Elle n'etait pas posee avant la
+#                                    migration (le code retombait sur
+#                                    /root/vera_state.db) ; elle l'est
+#                                    maintenant, parce que ProtectHome=yes
+#                                    rend /root invisible au processus.
+#     PYTHONDONTWRITEBYTECODE      : le code est en lecture seule ; sans cela
+#                                    Python tente d'ecrire __pycache__ et echoue
+#                                    en silence a chaque import.
+#
+# Syntaxe du fichier de secrets : NOM=valeur, une par ligne, SANS guillemets ni
+# `export`. systemd ne fait aucune expansion de `$` dans un EnvironmentFile : le
+# `$` de l'empreinte `sel$hash` est donc litteral, comme il doit l'etre.
+EnvironmentFile=/etc/vera/vera.env
+Environment="VERA_DOMAINE=https://vera-consultation.fr"
+Environment="VERA_ADMIN_USER=CHANGER_MOI"
+Environment="VERA_DB_PATH=/var/lib/vera/vera_state.db"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+
+ExecStart=/opt/vera-venv/bin/python3 -m uvicorn vera_consultation_api:app --no-access-log --host 127.0.0.1 --port 8001
+Restart=on-failure
+RestartSec=5
+
+# systemd cree ces deux dossiers pour `vera` au demarrage, avec ces modes.
+StateDirectory=vera
+StateDirectoryMode=0700
+LogsDirectory=vera
+LogsDirectoryMode=0750
+StandardOutput=append:/var/log/vera/consultation.log
+StandardError=append:/var/log/vera/consultation.log
+
+# Ce que le processus cree n'est lisible que par lui : la base contient les
+# jetons et les compteurs.
+UMask=0077
+
+# DURCISSEMENT. Chaque ligne retire une capacite dont le service n'a pas
+# besoin ; aucune ne change ce qu'il fait. A l'ESSAI sur un serveur neuf avant
+# la machine en service (voir PROCEDURE_REPRISE_VERA.md, essai de migration).
+NoNewPrivileges=true
+# Tout le systeme de fichiers en lecture seule, sauf /var/lib/vera et
+# /var/log/vera (ouverts par StateDirectory/LogsDirectory) et /tmp prive.
+ProtectSystem=strict
+# /root, /home et /run/user invisibles : rien ne doit y etre lu ni ecrit.
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# Aucune capacite : le port 8001 est au-dessus de 1024, rien ne demande de
+# privilege.
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Uniquement TCP/IP et sockets locales (asyncio en utilise en interne).
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+# CE QUI N'EST PAS POSE, ET POURQUOI.
+#
+#  - MemoryDenyWriteExecute : la bibliotheque `cryptography` passe par cffi, qui
+#    peut avoir besoin de memoire executable ; un refus ferait echouer le service
+#    au premier import, sans avertissement.
+#  - SystemCallFilter=~@privileged @resources : @system-service suffit pour
+#    commencer ; resserrer apres avoir observe un fonctionnement reel
+#    (`journalctl -u vera-consultation` et la ligne `SYSCALL` d'audit), pas avant.
+#  - IPAddressDeny : nginx est sur la meme machine, l'ecoute est deja bornee a
+#    127.0.0.1 par la garde de demarrage.
+
+[Install]
+WantedBy=multi-user.target
