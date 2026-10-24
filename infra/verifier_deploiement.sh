@@ -14,6 +14,10 @@ SITE_NGINX="${SITE_NGINX:-/etc/nginx/sites-enabled/vera-consultation}"
 VITRINE="${VITRINE:-/var/www/vera/index.html}"
 DOMAINE="${DOMAINE:-vera-consultation.fr}"
 API="http://127.0.0.1:8001"
+# Le modele d'unite auquel comparer l'unite en service. Par defaut celui du depot ;
+# surchargeable pour verifier une migration en cours (migrer_vers_utilisateur_dedie.sh
+# l'utilise pour comparer a infra/vera-consultation-durci.service).
+MODELE="${MODELE_UNITE_FICHIER:-$REPO/infra/vera-consultation.service}"
 
 echecs=0
 ok()  { printf '  OK     %s\n' "$*"; }
@@ -59,7 +63,32 @@ if [ -z "$PID" ] || [ "$PID" = "0" ]; then
     ko "$UNITE n'a pas de processus"
 else
     cwd=$(readlink "/proc/$PID/cwd")
-    [ "$cwd" = "$REPO" ] && ok "cwd du processus = $REPO" || ko "cwd du processus = $cwd"
+    [ "$cwd" = "$REPO" ] && ok "cwd du processus = $REPO" \
+        || ko "cwd du processus = $cwd, pas $REPO (lancer ce script depuis le dossier du service : bash $cwd/infra/verifier_deploiement.sh)"
+    # 2b. Le COMPTE du processus (audit externe du 24/10/2026, N7). Le modele
+    #     d'unite dit sous quel compte il doit tourner ; sans `User=` il tourne en
+    #     root. Un service « conforme » qui tourne en root alors que le modele
+    #     demande `vera` ne l'est pas.
+    attendu=$(grep -h '^User=' "$MODELE" 2>/dev/null | tail -1 | sed 's/^User=//')
+    attendu="${attendu:-root}"
+    reel_user=$(ps -o user= -p "$PID" 2>/dev/null | tr -d ' ')
+    [ "$reel_user" = "$attendu" ] && ok "processus sous le compte $attendu" \
+        || ko "processus sous le compte « $reel_user » (le modele d'unite demande « $attendu »)"
+    # 2c. Ce compte ne peut PAS reecrire le code servi : c'est ce que le compte
+    #     dedie protege (static/vote.html, le bundle, le Python). Test par
+    #     `runuser`, donc seulement en root ; hors root on le dit, on ne le saute pas en silence.
+    if [ "$attendu" != "root" ]; then
+        if [ "$(id -u)" != "0" ]; then
+            att "pas root : impossible de verifier que $attendu ne peut pas ecrire dans $REPO"
+        else
+            ecrivables=""
+            for f in "$REPO" "$REPO/static/vote.html" "$REPO/static/blindrsa-bundle.js" "$REPO/vera_consultation_api.py"; do
+                runuser -u "$attendu" -- test -w "$f" 2>/dev/null && ecrivables="$ecrivables $(basename "$f")"
+            done
+            [ -z "$ecrivables" ] && ok "le compte $attendu ne peut pas ecrire dans le code servi" \
+                || ko "le compte $attendu PEUT ecrire :$ecrivables (chown -R root:root $REPO && chmod -R go-w $REPO)"
+        fi
+    fi
     # Heure de DEMARRAGE du processus : `ps -o lstart=`. Le mtime de /proc/PID,
     # utilise avant, est celui d'un inode du systeme de fichiers virtuel, cree
     # a la premiere consultation du repertoire et non au lancement du
@@ -96,12 +125,11 @@ fi
 #     variables (jamais leurs valeurs). Une unite modifiee a la main -- autre
 #     ExecStart, autre EnvironmentFile -- change ce qui tourne sans laisser de
 #     trace dans git (audit F4). `systemctl cat` inclut les drop-ins.
-MODELE="$REPO/infra/vera-consultation.service"
 reel=$(systemctl cat "$UNITE" 2>/dev/null)
 if [ -z "$reel" ] || [ ! -f "$MODELE" ]; then
     ko "unite ou modele illisible : comparaison impossible"
 else
-    for cle in WorkingDirectory ExecStart EnvironmentFile; do
+    for cle in WorkingDirectory ExecStart EnvironmentFile User StateDirectory ProtectSystem; do
         a=$(grep -h "^$cle=" "$MODELE" | tail -1)
         b=$(printf '%s\n' "$reel" | grep "^$cle=" | tail -1)
         [ "$a" = "$b" ] && ok "unite : $cle conforme au modele" \
@@ -139,6 +167,31 @@ else
         [ "$vides" = "0" ] && ok "fichier de secrets : aucune valeur vide ni « CHANGER_MOI »" \
             || ko "fichier de secrets : $vides valeur(s) vide(s) ou « CHANGER_MOI »"
     fi
+fi
+
+# 3d. La base (audit externe du 24/10/2026, N7). Le modele d'unite fixe VERA_DB_PATH
+#     et le compte ; le dossier de la base doit appartenir a ce compte, en 700 :
+#     c'est le seul endroit ou le processus ecrit. Une ancienne base restee a
+#     son emplacement d'avant est signalee : elle ne sert plus, mais elle existe.
+base_modele=$(grep -h '^Environment="VERA_DB_PATH=' "$MODELE" 2>/dev/null \
+    | tail -1 | sed 's/^Environment="VERA_DB_PATH=//; s/"$//')
+compte_modele=$(grep -h '^User=' "$MODELE" 2>/dev/null | tail -1 | sed 's/^User=//')
+if [ -n "$base_modele" ] && [ -n "$compte_modele" ]; then
+    dossier_base=$(dirname "$base_modele")
+    if [ ! -d "$dossier_base" ]; then
+        ko "dossier de la base $dossier_base absent"
+    else
+        [ "$(stat -c '%U %a' "$dossier_base")" = "$compte_modele 700" ] \
+            && ok "dossier de la base : $compte_modele, mode 700" \
+            || ko "dossier de la base $dossier_base : $(stat -c '%U %a' "$dossier_base") (attendu $compte_modele 700)"
+        [ -f "$base_modele" ] && ok "base presente a $base_modele" \
+            || ko "base absente de $base_modele"
+    fi
+    case "$base_modele" in
+        /root/*) ;;   # modele ancien : la base reste sous /root, rien a signaler
+        *) [ -e /root/vera_state.db ] \
+               && att "/root/vera_state.db existe encore (ancienne base de la migration) : a supprimer une fois la migration confirmee" ;;
+    esac
 fi
 
 # 4. Fichiers servis par l'application = fichiers du depot.

@@ -49,6 +49,19 @@ verifier(all(k in v for k in ("WorkingDirectory", "ExecStart", "EnvironmentFile"
 verifier("vera_state_*.db.enc" in v and "find /root" in v,
          "verifier_deploiement.sh : cherche les anciennes sauvegardes V1 (F12)")
 
+# N7 (audit externe du 24/10/2026) : le service ne tourne plus en root, et le
+# verificateur doit le DIRE -- un « CONFORME » qui laisse passer un processus
+# root alors que le modele demande un compte dedie rouvrirait le defaut.
+code_v = "\n".join(l for l in v.splitlines() if not l.lstrip().startswith("#"))
+verifier("ps -o user=" in code_v and "attendu" in code_v,
+         "verifier_deploiement.sh : controle le compte sous lequel tourne le processus")
+verifier("runuser" in code_v and "test -w" in code_v,
+         "verifier_deploiement.sh : controle que ce compte ne peut pas ecrire dans le code servi")
+verifier("User StateDirectory ProtectSystem" in code_v,
+         "verifier_deploiement.sh : compare User, StateDirectory et ProtectSystem au modele")
+verifier("700" in code_v and "VERA_DB_PATH" in code_v,
+         "verifier_deploiement.sh : controle le dossier de la base (proprietaire, mode 700)")
+
 print()
 if echecs:
     print(f"ECHEC : {len(echecs)} verification(s).")
