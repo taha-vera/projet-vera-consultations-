@@ -110,11 +110,24 @@ def main():
     #    pas : uvicorn --workers N ne pose pas cette variable, la garde ne se
     #    declenchait pas, et chaque worker avait son propre budget epsilon.
     try:
-        src = open(os.path.join(os.path.dirname(vera_consultation_api.__file__),
-                                "vera_consultation_api.py"), encoding="utf-8").read()
-        if "sys.argv" not in src or "--workers" not in src:
-            raise Echec("la garde worker-unique n'inspecte plus sys.argv "
-                        "-- uvicorn --workers 2 redemarrerait silencieusement")
+        # Ancienne version (audit N4, 24/10/2026) : elle cherchait les mots
+        # "sys.argv" et "--workers" DANS LE SOURCE, que les commentaires
+        # contiennent deja -- supprimer l'appel de la garde laissait ce test
+        # vert. On l'EXECUTE maintenant avec une ligne de commande simulee ;
+        # l'import reel est couvert par test_gardes_demarrage_executees.py.
+        argv_avant = sys.argv
+        try:
+            sys.argv = ["uvicorn", "app:app", "--workers", "2"]
+            try:
+                vera_consultation_api._verifier_worker_unique()
+                raise Echec("--workers 2 n'est plus refuse -- uvicorn "
+                            "redemarrerait silencieusement avec deux budgets epsilon")
+            except RuntimeError:
+                pass
+            sys.argv = ["uvicorn", "app:app"]
+            vera_consultation_api._verifier_worker_unique()   # un seul : doit passer
+        finally:
+            sys.argv = argv_avant
         _ok("4. garde worker-unique inspecte bien la ligne de commande")
     except Echec as e:
         print("FAIL 4. " + str(e)); ok = False

@@ -31,9 +31,11 @@
 set -euo pipefail
 
 BASE_SOURCE="${VERA_DB_PATH:-/root/vera_state.db}"
-DOSSIER_SAUVEGARDES="/root/sauvegardes_vera"
+# Les deux chemins peuvent etre surcharges (tests/test_sauvegarde_chemins_speciaux.py
+# lance ce script dans un dossier jetable) ; sans variable, valeurs de production.
+DOSSIER_SAUVEGARDES="${VERA_DOSSIER_SAUVEGARDES:-/root/sauvegardes_vera}"
 RETENTION_JOURS=7
-CLE_SAUVEGARDE_FICHIER="/root/.vera_backup_key"
+CLE_SAUVEGARDE_FICHIER="${VERA_CLE_SAUVEGARDE_FICHIER:-/root/.vera_backup_key}"
 PYTHON="${VERA_PYTHON:-/root/vera_blind_sig/.venv/bin/python3}"
 
 horodatage="$(date -u +%Y%m%dT%H%M%SZ)"

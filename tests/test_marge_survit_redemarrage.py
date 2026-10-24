@@ -163,6 +163,43 @@ verifier(tables_cles() == (0, 1),
          str(tables_cles()))
 arreter(g2)
 
+# --- 7. des redemarrages repetes ne PROLONGENT PAS la marge (audit 2, N4) ----
+# Mutant releve par l'audit du 24/10/2026 : fin_marge = maintenant + 24 h au lieu
+# de debut + 7 j + 24 h. Chaque redemarrage repoussait alors la fin de la marge :
+# un service redemarre toutes les 20 h gardait indefiniment les cles publiques.
+repartir_de_zero()
+g1 = nouvelle_instance()
+pub = g1.cle_publique(D)
+decalage["s"] = DUREE + 1 * H
+g1._expirer_cle()
+arreter(g1)
+servies = []
+for delta in (DUREE + 10 * H, DUREE + 20 * H, DUREE + 23 * H):
+    decalage["s"] = delta                       # trois redemarrages dans la marge
+    gx = nouvelle_instance()
+    try:
+        servies.append(gx.cle_publique_si_existe(D) == pub)
+    except Exception:   # noqa: BLE001
+        servies.append(False)
+    arreter(gx)
+verifier(all(servies), "7a. trois redemarrages dans la marge : la cle publique est servie a chacun",
+         str(servies))
+decalage["s"] = DUREE + GRACE + 1 * H          # 1 h apres la fin REELLE de la marge
+gz = nouvelle_instance()
+# AVANT toute lecture : le controle a la lecture (cle_publique_si_existe) repose
+# sur _ouverture_ts et masquerait un mauvais calcul de fin de marge au demarrage.
+verifier(gz._cles_publiques_expirees == {} and tables_cles() == (0, 0),
+         "7b0. des le demarrage (sans aucune lecture), la marge terminee n'est pas restauree",
+         f"{len(gz._cles_publiques_expirees)} cle(s) en memoire, tables {tables_cles()}")
+try:
+    gz.cle_publique_si_existe(D)
+    refuse = False
+except Exception:   # noqa: BLE001
+    refuse = True
+verifier(refuse, "7b. apres la fin reelle de la marge, les redemarrages precedents ne l'ont pas prolongee")
+verifier(tables_cles() == (0, 0), "7c. ... et la table des cles publiques est videe", str(tables_cles()))
+arreter(gz)
+
 # --- 4. la cloture explicite vide tout -------------------------------------
 g2.fermer_consultation()
 verifier(tables_cles() == (0, 0), "4. la cloture explicite vide les deux tables",
