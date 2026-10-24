@@ -172,16 +172,27 @@ avec un client parfaitement conforme aux empreintes ci-dessus :
   l'organisation. Le dépôt du vote porte la réponse. Les deux partent du même
   appareil à quelques secondes d'intervalle. Un opérateur qui journalise leur
   source relie les deux sans toucher au JavaScript ni à la cryptographie.
-- **La substitution de clé par votant.** L'empreinte `#k=` du lien est calculée
-  par le serveur lui-même. Un serveur modifié peut générer une clé distincte
-  par jeton et l'empreinte correspondante : le contrôle côté client passe, et
-  le serveur retrouve ensuite quel votant a produit quelle signature en
-  essayant ses clés. Un engagement n'a de valeur que s'il est émis par une
-  partie distincte de celle qu'il contraint ; ce n'est pas le cas ici.
+- **La substitution de clé par votant, qui ne se ferme que si des humains
+  comparent.** L'empreinte `#k=` du lien est calculée par le serveur lui-même.
+  Un serveur modifié peut générer une clé distincte par jeton et l'empreinte
+  correspondante : le contrôle côté client passe, et le serveur retrouve ensuite
+  quel votant a produit quelle signature en essayant ses clés. Un engagement n'a
+  de valeur que s'il est émis par une partie distincte de celle qu'il contraint.
+  **Ce qui la ferme, plus haut dans ce document :** l'empreinte de l'ensemble des
+  clés est identique pour tous les participants, le client refuse une clé qui
+  diffère de celle publiée pour le groupe, et une clé distincte par votant ferait
+  apparaître des empreintes différentes d'un lien à l'autre. Cela tient **à deux
+  conditions, qu'aucun code ne vérifie** : que l'organisation publie l'empreinte
+  par un canal distinct du serveur *avant* l'envoi des invitations, et que des
+  membres comparent leurs liens ou cette valeur. Sans l'une des deux, la
+  substitution reste possible (second audit externe, 24/10/2026, N11 : ce
+  paragraphe disait « aucune vérification côté client ne les ferme », ce qui
+  contredisait la section précédente).
 
 Ces deux vecteurs relèvent du Niveau 2 du modèle d'adversaire — un opérateur qui
-cherche activement à contourner le système — et sont documentés comme hors
-garantie. Aucune vérification côté client ne les ferme.
+cherche activement à contourner le système. Le premier n'a aucune vérification
+côté client. Le second en a une, qui dépend d'un acte humain (publication hors
+bande, comparaison) et que le logiciel ne peut pas imposer.
 
 ## Après chaque mise à jour
 

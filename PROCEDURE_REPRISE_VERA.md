@@ -324,7 +324,7 @@ pip install -r requirements.txt
 
 pip install maturin
 cd vera_blind_sig
-PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 maturin develop --release
+PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 maturin develop --release --locked
 cd ..
 
 which python3   # note ce chemin exact, il sert aux etapes 5 et 7, et a la Partie 3

@@ -56,7 +56,7 @@ if ! "$VENV" -c "import opendp" 2>/dev/null; then
     echo "  pip install -r requirements.txt" >&2
     echo "Et le module Rust, sans lequel rien ne signe :" >&2
     echo "  cd vera_blind_sig && PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 \\" >&2
-    echo "    maturin develop --release" >&2
+    echo "    maturin develop --release --locked" >&2
     exit 1
 fi
 

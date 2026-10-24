@@ -538,6 +538,11 @@ l'emporte, comme dans uvicorn) et refuse un descripteur herite (`--fd` /
 `UVICORN_FD`), dont l'adresse n'est pas verifiable. Garde :
 `tests/test_garde_ecoute_environnement.py`.*
 
+*Complement (audit du 24/10/2026, N12) : la garde lit aussi `-b` / `--bind` de
+gunicorn, sur la ligne de commande et dans `GUNICORN_CMD_ARGS`. **Reste ouvert** :
+un `bind = ...` dans un fichier de configuration gunicorn est invisible depuis le
+processus ; l'unite livree lance uvicorn, donc sans effet aujourd'hui.*
+
 *Deux durcissements de la CI au passage : `opendp` est epingle sur la version de
 production (les portes 2 et 3 etaient validees sur une version quelconque), et
 le workflow declare `permissions: contents: read` -- il ne fait que lire, un
@@ -1044,3 +1049,37 @@ presence : le cas ne peut pas survenir tant qu'il ne change pas. Commente sur
 place.
 
 
+
+
+### Second audit externe (24/10/2026, sur a126790) : treize constats, onze confirmes, un faux
+
+Rapport recu tel quel, chaque constat relu dans le code avant d'etre corrige. Le
+meme jour, la relecture des corrections du premier audit (A1-A12, F12) avait deja
+produit les commits 50 et 51 ; ce journal ne couvre que les constats N1 a N13.
+
+| # | Constat | Verdict apres lecture du code | Suite |
+|---|---------|-------------------------------|-------|
+| N1 | Date d'ouverture non bornee par l'expiration des cles | Confirme et reproduit : ouverture a J+8 acceptee, cles detruites a J+7, aucun vote possible | Corrige, `COLLECTE_MINIMALE_SECONDES` (72 h), `test_ouverture_bornee.py` |
+| N2 | `compteurs_votes` et `effectifs` gardent un rowid | Confirme : ordre des premiers votes lisible | Corrige, WITHOUT ROWID + migration, `test_agregats_sans_rowid.py` |
+| N3 | Un voisin actif prend la tranche de 30 s (A3) | Confirme | **Corrige en partie** : tranche par (adresse, identifiant existant). Un voisin qui vise le bon identifiant la prend toujours ; dit dans LIMITS.md, recours = tunnel SSH |
+| N4 | Six mutants survivent ; « la CI n'execute aucun test A1-A6 » | Six mutants confirmes. **Le second point est faux** : le job `crypto` lancait deja A1-A6 (signer_aveugle_indistinguable, resultats_http, blocage_adresse, ouverture_obligatoire, marge_survit_redemarrage, parcours_http). Il est exact que 27 autres tests n'etaient pas en CI | Un test par survivant, chacun verifie par mutation ; CI : pas final `run_tests.sh` (non encore vu tourner sur GitHub) |
+| N5 | Le blocage croissant repart de 5 min apres une heure | Confirme (300, 600, 1200, 2400, 3600, 300...) | Corrige, `derniere_activite` posee a la fin du blocage |
+| N6 | Jetons en clair dans les fichiers temporaires nginx | Confirme par lecture de la conf ; serveur non observe | Corrige, `proxy_max_temp_file_size 0` |
+| N7 | Le service tourne en root | Confirme | Documente, **non corrige** : chantier a repeter sur serveur neuf |
+| N8 | Ecart de duree residuel sur A1 | Confirme et **pire que rapporte** : 36 microsecondes avec 1500 signatures, duree croissant avec le rang de signature | Corrige (index O(1), meme travail sur tout refus) ; pas un temps constant |
+| N9 | A1 ferme la sonde passive, pas la destructive | Confirme | Documente (LIMITS.md section 1) |
+| N10 | Le cache HTTP garde le nom du groupe | Confirme | Corrige cote application (`no-store` sur `/api/cle_publique`), plus etroit que le correctif propose |
+| N11 | VERIFICATION_CLIENT.md se contredit | Confirme | Reecrit |
+| N12 | La garde d'ecoute ignore gunicorn | Confirme | Corrige pour `--bind` ; fichier de configuration non couvert |
+| N13 | Trois petits ecarts de texte | Confirmes | Corriges (SHA-384, commentaire nginx sur `unsafe-inline`, `--locked`) |
+
+**Leçon de ce passage.** Deux constats (N1, N8) etaient plus graves que ne le disait
+l'auditeur une fois reproduits ; un autre (le volet CI de N4) etait faux. Ni l'un
+ni l'autre ne se voit en lisant le rapport : il a fallu relancer le code.
+
+**Correspondance des numeros F de l'audit precedent**, pour ne pas la reperdre :
+F1 (refus apres publication, 410 et non 409), F3 (cle recue = cle publiee pour le
+groupe), F5 (le blocage par compte ne freine pas), F6 (secrets hors de l'unite),
+F8 (declaration relue sous verrou), F9 (marge de depot), F11 (client lent sur
+nginx), F12 (sauvegardes V1), F14 (quatre affirmations du modele de menace,
+commit 7ee5dbe).

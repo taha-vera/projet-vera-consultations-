@@ -459,7 +459,7 @@ ne prouve rien, `CONFORME` apres un deploiement oui.
 | 14 | Persistance de l'etat de confidentialite | Fermee | SQLite en `journal_mode=DELETE` (voir Porte 17 : le WAL joignait les deux registres). Verifie par `kill -9` et par reboot systeme complet. Complete par un effacement ACTIF a la cloture : compteurs, effectifs, jetons, budget, resultats publies et cle de signature detruits en une transaction, suivie de `VACUUM`. **Une exception** : `historique_consultations` survit -- elle ne contient que des noms de groupes et des dates, et sert a l'avertissement de frequence (`LIMITS.md` §14). **Consequence a connaitre** : un resultat publie disparait du serveur a la cloture. Il doit donc etre sauvegarde par l'organisation ET par les representants du personnel avant de cloturer -- `/api/resultats_publies` le sert tant que la consultation vit, pas apres |
 | 15 | Trafic en clair | Fermee | HTTPS via Nginx + Let's Encrypt, redirection 301, renouvellement automatique |
 | 16 | Retention des journaux | **Fermee sous condition** | Purge manuelle a la cloture + logrotate 3 jours. **Condition d'EXPLOITATION, pas propriete du code** : le test mecanique verifie la configuration du depot, pas celle reellement servie. L'access log applicatif est desactive (voir porte 26) |
-| 17 | Correlation temporelle en base | **Fermee au niveau de la table, bornee au niveau du journal** | Horodatage retire, table anti-rejeu en `WITHOUT ROWID` : ordonnee par empreinte SHA-256 pseudo-aleatoire, l'ordre d'insertion n'existe plus DANS LA TABLE. Le fichier journal, lui, est un autre sujet -- voir ci-dessous |
+| 17 | Correlation temporelle en base | **Fermee au niveau de la table, bornee au niveau du journal** | Horodatage retire, table anti-rejeu en `WITHOUT ROWID` : ordonnee par empreinte SHA-384 pseudo-aleatoire, l'ordre d'insertion n'existe plus DANS LA TABLE. Le fichier journal, lui, est un autre sujet -- voir ci-dessous |
 | 18 | Generation de cles a la volee (DoS keygen) | Fermee | Les endpoints publics sont en lecture seule (404 si le departement n'existe pas) ; la creation de cle est reservee au flux RH authentifie |
 | 19 | API exposee hors TLS | Fermee | uvicorn ecoute sur `127.0.0.1` ; Nginx est l'unique chemin d'acces |
 | 20 | Publication declenchee par une lecture | Fermee | `GET /api/rh/resultats` est en lecture pure ; la publication est un `POST /api/rh/publier` explicite, avec confirmation. Ferme aussi le CSRF (le cookie `SameSite=Lax` laisse passer les GET de navigation) |
@@ -544,7 +544,7 @@ mesure (LIMITS.md, section sur la table `jetons_autorisation`).
 ### Ordre d'insertion en base
 
 L'ordre des votes ne fuit plus : la table anti-rejeu est en `WITHOUT ROWID`,
-donc ordonnee par empreinte SHA-256 pseudo-aleatoire et non par insertion.
+donc ordonnee par empreinte SHA-384 pseudo-aleatoire et non par insertion.
 
 La table des jetons d'autorisation, elle, conserve un ordre — mais celui de la
 GENERATION par le RH, pas de la consommation. Le passage a l'etat « utilise »
