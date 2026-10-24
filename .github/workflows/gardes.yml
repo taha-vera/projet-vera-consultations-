@@ -351,8 +351,33 @@ jobs:
                    test_signer_aveugle_indistinguable \
                    test_resultats_http_ne_publie_pas \
                    test_blocage_adresse_http test_marge_survit_redemarrage \
-                   test_ouverture_obligatoire test_garde_ecoute_environnement test_ouverture_bornee test_index_jetons_signataires test_agregats_sans_rowid; do
+                   test_ouverture_obligatoire test_garde_ecoute_environnement test_ouverture_bornee test_index_jetons_signataires test_agregats_sans_rowid \
+                   test_gardes_demarrage_executees test_courses_repondre_publication_cloture \
+                   test_publication_figee_et_collision_jeton test_sauvegarde_chemins_speciaux; do
             base_jetable=$(mktemp -u /tmp/vera_ci_XXXXXX.db)
             VERA_DB_PATH="$base_jetable" PYTHONPATH=. .venv/bin/python3 "tests/$t.py"
             rm -f "$base_jetable" "$base_jetable"-wal "$base_jetable"-shm
           done
+
+      # LA SUITE COMPLETE, pas seulement la liste ci-dessus.
+      #
+      # Audit externe du 24/10/2026, N4 : cette CI lancait une liste fixe de
+      # fichiers, et 27 tests de tests/ n'y figuraient pas -- ils ne tournaient
+      # que si quelqu'un lancait run_tests.sh a la main, c'est-a-dire la
+      # situation qui avait laisse passer A2. Une liste ecrite a la main
+      # s'oublie ; run_tests.sh prend tous les tests/test_*.py, donc un test
+      # ajoute demain est couvert sans y penser. La boucle ci-dessus reste, pour
+      # un retour plus rapide et un nom d'etape qui dit quoi a casse.
+      #
+      # `npm ci` : test_bundle_reconstructible reconstruit le bundle depuis ses
+      # sources et a besoin de node_modules (voir le job `gardes`).
+      #
+      # Non verifie hors de la machine du mainteneur : ce pas n'a pas encore
+      # tourne sur GitHub Actions. S'il echoue, lire le journal avant de
+      # conclure qu'un test est mauvais -- c'est peut-etre le premier run reel
+      # de l'un d'eux (voir l'historique de ce job : trois variables
+      # d'environnement manquantes decouvertes ainsi).
+      - name: La suite complete (run_tests.sh)
+        run: |
+          (cd chantier_crypto && npm ci --silent)
+          VERA_PYTHON="$PWD/.venv/bin/python3" ./run_tests.sh
