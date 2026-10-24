@@ -1359,10 +1359,33 @@ du 20/10/2026, A3).
 Corrigé sans retirer la protection de calcul : une adresse bloquée obtient
 **une** vérification des identifiants par tranche de 30 secondes
 (`INTERVALLE_VERIFICATION_IP_BLOQUEE`) ; les autres requêtes reçoivent 429 sans
-aucun calcul. Un bon mot de passe passe donc au plus tard 30 secondes après la
-première tentative refusée ; une vérification qui échoue pendant le blocage ne
-l'allonge pas. Vérifié par `tests/test_blocage_adresse_http.py`, qui compte les
-calculs de vérification payés.
+aucun calcul. Une vérification qui échoue pendant le blocage ne l'allonge pas.
+Vérifié par `tests/test_blocage_adresse_http.py`, qui compte les calculs de
+vérification payés.
+
+**Ce que la promesse vaut, et ne vaut pas (audit externe du 24/10/2026, N3).**
+La tranche est tenue par *(adresse, identifiant existant)*, et tous les
+identifiants inconnus partagent une seule tranche : un voisin qui essaie un autre
+identifiant ne prend plus celle de l'organisateur. Mais un voisin qui vise **le
+bon identifiant** (il n'est pas secret) la prend dès qu'elle s'ouvre, à raison
+d'une requête par seconde, sous la limite nginx : simulé, l'organisateur réussit
+alors 0 connexion sur 120 essais en deux heures (la gigue réseau lui en laisse
+quelques-unes en pratique). « Un bon mot de passe passe au plus tard 30 secondes
+après » ne tient donc que contre un voisin passif, ou qui se trompe
+d'identifiant ; contre un voisin qui vise l'organisateur, elle ne tient pas.
+**Recours** : le tunnel SSH de la section 12 ; l'adresse vue par le service
+devient 127.0.0.1 et ne partage plus le blocage du voisin. Autre limite : sur une
+adresse bloquée, la rapidité de la réponse (calcul payé ou non) peut révéler
+qu'un identifiant existe ; l'identifiant n'est pas un secret de VERA.
+
+**Le blocage croissant ne repart plus de cinq minutes (N5).** `derniere_activite`
+n'était posée que par un échec compté : après un blocage d'une heure, la purge
+effaçait l'entrée et la série recommençait (300, 600, 1200, 2400, 3600, puis 300
+s). Elle est maintenant posée à la **fin** du blocage : la mémoire de la récidive
+court encore une heure après. « Une attaque soutenue s'arrête d'elle-même »
+n'est pas pour autant vrai : le plafond d'une heure laisse l'adresse bloquée la
+plupart du temps, mais la tranche de 30 secondes ci-dessous continue de donner
+une devinette par tranche.
 
 **Ce que cela coûte.** Chaque adresse bloquée coûte désormais un calcul PBKDF2
 toutes les 30 secondes au lieu de zéro (environ 0,3 % d'un cœur). Cent adresses

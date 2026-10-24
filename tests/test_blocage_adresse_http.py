@@ -141,6 +141,65 @@ verifier(r1.status_code == 200,
          "2. adresse tout juste bloquee : le bon mot de passe passe tout de suite",
          f"recu {r1.status_code}")
 
+# --- 7. N3 (audit du 24/10/2026) : un voisin actif ne prend pas la periode ---
+# Le voisin envoie, une fois par periode et sans cesse, un mauvais mot de passe
+# pour un AUTRE identifiant. Avant : une seule periode par adresse, prise par lui
+# des qu'elle s'ouvrait -> l'organisateur n'etait jamais verifie.
+api._tentatives_par_ip.clear()
+api._tentatives_par_compte.clear()
+for _ in range(api.SEUIL_ECHECS_AVANT_BLOCAGE):
+    voisin.post("/api/rh/connexion", json={"identifiant": "voisin_inconnu", "mot_de_passe": "x"})
+time.sleep(PERIODE + 0.2)
+r_voisin = voisin.post("/api/rh/connexion", json={"identifiant": "voisin_inconnu", "mot_de_passe": "x"})
+verifier(r_voisin.status_code == 429, "7a. le voisin prend la periode de l'identifiant inconnu",
+         f"recu {r_voisin.status_code}")
+r_orga = tenter(voisin, MDP)
+verifier(r_orga.status_code == 200,
+         "7b. ... et l'organisateur (identifiant existant) a SA periode : bon mot de passe accepte",
+         f"recu {r_orga.status_code} : {r_orga.text[:120]}")
+
+# --- 8. identifiants inconnus : une seule verification par periode ----------
+api._tentatives_par_ip.clear()
+api._tentatives_par_compte.clear()
+for _ in range(api.SEUIL_ECHECS_AVANT_BLOCAGE):
+    voisin.post("/api/rh/connexion", json={"identifiant": "voisin_inconnu", "mot_de_passe": "x"})
+time.sleep(PERIODE + 0.2)
+avant = appels["n"]
+for i in range(30):
+    voisin.post("/api/rh/connexion", json={"identifiant": f"inconnu_{i}", "mot_de_passe": "x"})
+verifier(appels["n"] - avant <= 1,
+         "8a. trente identifiants inconnus distincts : au plus UNE verification payee",
+         f"{appels['n'] - avant} verification(s)")
+cles = api._tentatives_par_ip[next(iter(api._tentatives_par_ip))].get("derniere_verif_bloquee", {})
+verifier(set(cles) <= {"*", "rh_blocage"},
+         "8b. le limiteur ne grossit pas avec les identifiants inventes", str(cles))
+
+# --- 9. N5 : le blocage croissant ne repart pas de 5 minutes apres une heure --
+class _Horloge:
+    maintenant = 1_000_000.0
+    def __getattr__(self, nom):
+        return getattr(time, nom)
+    def time(self):
+        return self.maintenant
+
+h = _Horloge()
+reel = api.time
+api.time = h
+try:
+    api._tentatives_par_ip.clear()
+    IP9 = "203.0.113.9"
+    durees = []
+    for _ in range(8):
+        for _ in range(api.SEUIL_ECHECS_AVANT_BLOCAGE):
+            api._enregistrer_echec(IP9)
+        durees.append(round(api._tentatives_par_ip[IP9]["bloque_jusqu_a"] - h.maintenant))
+        h.maintenant = api._tentatives_par_ip[IP9]["bloque_jusqu_a"] + 60   # reprise 1 min apres la fin
+finally:
+    api.time = reel
+verifier(durees == [300, 600, 1200, 2400, 3600, 3600, 3600, 3600],
+         "9. huit blocages successifs : durees croissantes puis plafonnees, sans retour a 5 minutes",
+         str(durees))
+
 print()
 if echecs:
     print(f"ECHEC : {len(echecs)} verification(s).\n")

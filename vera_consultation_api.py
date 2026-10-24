@@ -509,7 +509,9 @@ SEUIL_ECHECS_AVANT_BLOCAGE = 5
 #
 # Le blocage double a chaque recidive, jusqu'a une heure. Cinq echecs coutent
 # 5 minutes, dix en coutent 10, quinze en coutent 20. Un operateur legitime qui
-# se trompe deux fois ne voit rien ; une attaque soutenue s'arrete d'elle-meme.
+# se trompe deux fois ne voit rien. Cela RALENTIT une attaque soutenue, mais ne
+# l'arrete pas : le plafond est d'une heure, et une adresse bloquee garde une
+# devinette par tranche de 30 secondes (voir INTERVALLE_VERIFICATION_IP_BLOQUEE).
 DUREE_BLOCAGE_INITIALE = 300      # 5 minutes
 DUREE_BLOCAGE_MAX = 3600          # 1 heure
 
@@ -565,6 +567,22 @@ def _ip_client(request) -> str:
 # et l'organisateur derriere une adresse partagee peut se connecter au plus tard
 # 30 secondes apres sa premiere tentative refusee. Une verification qui echoue
 # pendant un blocage ne l'allonge pas et n'est pas comptee.
+#
+# LA PERIODE EST PAR (ADRESSE, IDENTIFIANT), et non par adresse seule (audit
+# externe du 24/10/2026, N3). Avec une seule fenetre par adresse, un voisin qui
+# envoyait un mauvais mot de passe par seconde (sous la limite nginx) prenait
+# chaque fenetre des qu'elle s'ouvrait : l'organisateur reussissait 0 connexion
+# sur 120 essais simules. Desormais le voisin qui essaie un AUTRE identifiant ne
+# lui prend plus la sienne. Les identifiants inconnus partagent une seule cle
+# ("*") : leur nombre est choisi par l'attaquant, et une cle par identifiant
+# essaye aurait rendu le limiteur sans borne, ou ressuscite l'amplification CPU.
+#
+# CE QUE CELA NE FERME PAS. Un voisin qui vise le BON identifiant (il n'est pas
+# secret) prend toujours la fenetre de cet identifiant : la promesse « le bon mot
+# de passe passe au plus tard 30 secondes apres » ne tient que contre un voisin
+# passif ou qui se trompe d'identifiant. Recours documente : le tunnel SSH
+# (LIMITS.md, section 12). Et, sur une adresse bloquee, la rapidite de la
+# reponse peut reveler qu'un identifiant existe (limite documentee).
 INTERVALLE_VERIFICATION_IP_BLOQUEE = 30  # secondes
 
 # Ce que lit l'organisateur bloque par l'echec d'un voisin : qu'il peut
@@ -575,7 +593,8 @@ _DETAIL_429_CONNEXION = (
 )
 
 
-def _verifier_anti_bruteforce(ip: str, verification_espacee: bool = False) -> bool:
+def _verifier_anti_bruteforce(ip: str, verification_espacee: bool = False,
+                              identifiant: str = "") -> bool:
     """Leve 429 si l'adresse est bloquee ; renvoie False sinon.
 
     Avec `verification_espacee=True` (connexion RH seulement), une adresse
@@ -583,15 +602,20 @@ def _verifier_anti_bruteforce(ip: str, verification_espacee: bool = False) -> bo
     de INTERVALLE_VERIFICATION_IP_BLOQUEE secondes : la fonction renvoie True
     (« bloquee, mais cette requete peut faire verifier les identifiants ») et
     memorise l'instant. L'appelant doit alors refuser en 429 si les
-    identifiants sont faux, sans les compter comme un echec de plus."""
+    identifiants sont faux, sans les compter comme un echec de plus.
+
+    La periode est tenue par (adresse, identifiant existant), ou par "*" pour
+    tout identifiant inconnu (voir INTERVALLE_VERIFICATION_IP_BLOQUEE)."""
     with verrou:
         info = _tentatives_par_ip.get(ip)
         maintenant = time.time()
         if info and info.get("bloque_jusqu_a", 0) > maintenant:
+            cle = identifiant if auth.compte_existe(identifiant) else "*"
+            verifs = info.setdefault("derniere_verif_bloquee", {})
             if (verification_espacee
-                    and maintenant - info.get("derniere_verif_bloquee", 0)
+                    and maintenant - verifs.get(cle, 0)
                     >= INTERVALLE_VERIFICATION_IP_BLOQUEE):
-                info["derniere_verif_bloquee"] = maintenant
+                verifs[cle] = maintenant
                 return True
             raise HTTPException(
                 status_code=429,
@@ -659,6 +683,12 @@ def _enregistrer_echec(ip: str, compte: str = "") -> None:
                         DUREE_BLOCAGE_MAX)
             info["bloque_jusqu_a"] = maintenant + duree
             info["echecs"] = 0
+            # La memoire de la recidive court a partir de la FIN du blocage
+            # (audit N5). Avant, `derniere_activite` restait a l'instant du
+            # dernier echec : un blocage d'une heure expire, la purge (inactive
+            # depuis plus d'une heure) effacait l'entree, et la serie repartait
+            # de 5 minutes : 300, 600, 1200, 2400, 3600, puis 300...
+            info["derniere_activite"] = maintenant + duree
 
         if compte:
             par_compte = _tentatives_par_compte.setdefault(
@@ -844,7 +874,8 @@ def connexion_rh(payload: IdentifiantsRH, response: Response, request: Request):
     # Adresse bloquee : 429 sans calcul, SAUF une verification par periode
     # (audit A3, voir _verifier_anti_bruteforce). `ip_bloquee` vaut True quand
     # cette requete est cette verification.
-    ip_bloquee = _verifier_anti_bruteforce(ip_client, verification_espacee=True)
+    ip_bloquee = _verifier_anti_bruteforce(
+        ip_client, verification_espacee=True, identifiant=payload.identifiant)
 
     # BLOCAGE PAR COMPTE, verifie AVANT le PBKDF2.
     #

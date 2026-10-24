@@ -165,6 +165,13 @@ def verifier_identifiants(identifiant: str, mot_de_passe: str) -> bool:
         return hmac.compare_digest(hash_calcule, compte["hash_mdp"])
 
 
+def compte_existe(identifiant: str) -> bool:
+    """Vrai si l'identifiant correspond a un compte RH. Sert a borner les cles
+    du limiteur de verifications sur adresse bloquee (voir l'API)."""
+    with _verrou:
+        return identifiant in _comptes_rh
+
+
 def ouvrir_session(identifiant: str) -> str:
     """Genere un jeton de session opaque, distinct des tokens de vote."""
     jeton = "sess_" + secrets.token_urlsafe(32)
