@@ -556,6 +556,7 @@ séparation des rôles, pas à un défaut d'implémentation.
 | [VERA_THREAT_MODEL_COMPLETE.md](VERA_THREAT_MODEL_COMPLETE.md) | Modèle de menace (26 portes), modèle d'adversaire, analyses |
 | [AUDITS.md](AUDITS.md) | Journal des quatorze audits externes : ce qui a été trouvé, corrigé ou réfuté |
 | [docs/archive/VERA_AUDIT_REFERENCE.md](docs/archive/VERA_AUDIT_REFERENCE.md) | Instantané daté du 31/07 — trace historique, **paramètres périmés** |
+| [DOSSIER_RELECTURE_CRYPTO.md](DOSSIER_RELECTURE_CRYPTO.md) | À remettre à une personne qui relit la cryptographie : protocole, paramètres, questions précises, limites de ce qui a été vérifié |
 | [VERIFICATION_CLIENT.md](VERIFICATION_CLIENT.md) | Vérifier que le serveur sert bien ce code |
 | [GUIDE_DEPLOIEMENT.md](GUIDE_DEPLOIEMENT.md) | Guide de l'organisation qui consulte, notice RGPD |
 | [PROCEDURE_REPRISE_VERA.md](PROCEDURE_REPRISE_VERA.md) | Reprise après perte du serveur ou de l'opérateur — à conserver avec l'enveloppe scellée ; **ne contient aucun secret** |
