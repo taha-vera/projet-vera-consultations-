@@ -1302,19 +1302,46 @@ la machine entière, y compris la réécriture de `static/vote.html` et du bundl
 servis aux votants, ce qui défait la vérification du client (empreintes publiées)
 pour tous ceux qui ouvrent ensuite un lien.
 
-**Statut : connu, non corrigé.** Le correctif demandé est classique — compte
-dédié (`User=vera`), base dans `StateDirectory=vera`, code en lecture seule pour ce
-compte, `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes` ; systemd lit
-`EnvironmentFile` en root avant d'abaisser les droits, donc `/etc/vera/vera.env`
-peut rester `root:600`. Il touche pourtant les chemins que tout le dépôt suppose
-(`/root/repo-push`, `/root/vera_state.db`, `/root/consultation.log`, le venv sous
-`/root/`), `infra/verifier_deploiement.sh`, la sauvegarde et la procédure de
-reprise. Le faire sur la machine en service, sans l'avoir répété ailleurs, ferait
-courir le risque d'un service qui ne redémarre pas. **Chantier proposé** : le
-répéter sur un serveur neuf, en même temps que l'essai de la procédure de reprise
-(déjà reporté, voir plus haut), puis l'appliquer. Jusque-là, la défense est
-l'absence de surface : un seul processus, écoute sur la boucle locale (gardée au
-démarrage), nginx devant, aucune exécution de code fournie par l'utilisateur.
+**Statut au 24/10/2026 : préparé et testé en logique, pas encore appliqué sur
+le serveur en service.** Le processus tourne toujours en root. Ce qui existe :
+
+- l'unité cible `infra/vera-consultation-durci.service` : compte `vera`, code en
+  lecture seule (`/opt/vera`, propriétaire root), base et verrou dans
+  `/var/lib/vera` (0700), journal dans `/var/log/vera`, `ProtectSystem=strict`,
+  `ProtectHome=yes`, aucune capacité, familles d'adresses limitées à TCP/IP. systemd
+  255 la lit sans avertissement ; sa note d'exposition, estimée hors ligne, est de
+  1,7 contre 9,2 pour l'unité actuelle (mesurée en service : 9,6) ;
+- `infra/migrer_vers_utilisateur_dedie.sh` : refuse s'il reste une consultation,
+  copie la base par l'API de sauvegarde SQLite avec contrôle d'intégrité et des
+  effectifs de chaque table, installe la nouvelle unité, redirige la sauvegarde
+  nocturne, redémarre, et **revient seul en arrière** si le service ne répond pas
+  ou ne tourne pas sous le bon compte (`infra/annuler_migration_utilisateur_dedie.sh`,
+  utilisable à la main) ; rien n'est supprimé ;
+- `tests/test_migration_utilisateur_dedie.py`, qui exécute ces scripts dans un faux
+  système de fichiers (vrais git, sqlite, chown ; fausses commandes systemctl,
+  crontab, runuser) sur le chemin nominal, le refus, le retour arrière et trois
+  échecs après l'arrêt du service. Essai de cassure du script : sept variantes
+  volontairement fautives sur huit étaient détectées d'emblée ; la huitième (code non
+  rendu lecture seule) ne l'était pas, le test a été renforcé et la détecte.
+
+**Ce que ces tests ne voient pas** : un vrai systemd, un vrai `User=vera`, un
+appel système bloqué par le filtre, un réglage refusé par la version de systemd du
+serveur. Cela se vérifie sur un serveur neuf, en rejouant la procédure de reprise
+puis la migration (PROCEDURE_REPRISE_VERA.md, partie 4), avant la machine en service.
+L'unité cible garde un nom à part tant que la migration n'a pas eu lieu, pour que
+`verifier_deploiement.sh` continue de comparer l'unité en service à son vrai modèle ;
+un commit de bascule la renommera ensuite.
+
+**Ce que cela ne fermera pas.** Un attaquant qui exécute du code dans le processus
+garde les droits de ce processus : il lit la base, voit `VERA_DB_KEY` dans son
+propre environnement et la clé privée en mémoire, et peut modifier ce que le
+processus sert tant qu'il tourne. Ce qu'il perd : la réécriture des fichiers
+(`static/vote.html`, le bundle, le code), le reste de la machine (nginx, clés SSH,
+autres services), et la durée (un redémarrage efface une compromission qui ne vit
+qu'en mémoire). On passe de « une faille = la machine, pour toujours » à « une
+faille = ce processus, jusqu'au redémarrage ». Jusqu'à l'application, la défense
+reste l'absence de surface : un seul processus, écoute sur la boucle locale (gardée
+au démarrage), nginx devant, aucune exécution de code fournie par l'utilisateur.
 **Limite de la garde d'écoute** (N12) : elle lit les options d'uvicorn et le `--bind` de
 gunicorn (ligne de commande et `GUNICORN_CMD_ARGS`). Un `bind = ...` dans un fichier
 de configuration gunicorn lui est invisible ; l'unité livrée lance uvicorn.

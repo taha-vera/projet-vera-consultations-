@@ -556,6 +556,114 @@ Cette étape suppose que la nouvelle base (`/root/vera_state.db`) existe déjà
 
 ---
 
+## Partie 4 — Faire tourner le service sous un compte dédié (N7)
+
+Le service tourne en root (LIMITS.md §12, audit externe du 24/10/2026, N7). Cette
+partie décrit la migration vers le compte `vera`, **à répéter d'abord sur un serveur
+neuf**, puis à appliquer sur la machine en service **entre deux consultations**.
+C'est aussi le « test grandeur nature » dont la fin de ce document dit qu'il n'a
+jamais eu lieu : le rejouer en entier (Partie 2, puis ceci) sur un petit serveur
+jetable les couvre tous les deux.
+
+**Ce qui est déjà vérifié sans serveur** : les scripts s'exécutent dans un faux système de
+fichiers (`tests/test_migration_utilisateur_dedie.py`), l'unité cible est lue par
+systemd-analyze (`tests/test_unite_durcie.py`). **Ce qui ne l'est pas** : un vrai
+`User=vera`, les durcissements sur la version de systemd du serveur, le filtre
+d'appels système. C'est ce que l'essai ci-dessous doit montrer.
+
+### 4a. Essai sur un serveur neuf
+
+Prérequis : un serveur installé selon la Partie 2, jusqu'à l'étape 6 incluse, avec un
+`verifier_deploiement.sh` qui dit `CONFORME`, et aucune consultation.
+
+```
+cd <chemin du clone>
+bash infra/migrer_vers_utilisateur_dedie.sh
+```
+Il doit finir par `MIGRATION TERMINEE`. S'il s'arrête avant l'arrêt du service
+(étapes 0 à 4), rien n'a changé pour le service ; s'il échoue après, il remet tout
+seul l'ancienne configuration et le dit (« Retour arriere automatique »).
+
+Puis, un contrôle par ligne :
+```
+ps -o user=,pid= -p $(systemctl show vera-consultation -p MainPID --value)
+```
+→ `vera` (et non `root`).
+```
+systemctl is-active vera-consultation.service; curl -s http://127.0.0.1:8001/api/health
+```
+```
+ls -ld /opt/vera /var/lib/vera /var/log/vera; ls -l /var/lib/vera
+```
+→ `/opt/vera` à root, `/var/lib/vera` à `vera` en `drwx------`, la base en `-rw-------`.
+```
+runuser -u vera -- sh -c 'echo x >> /opt/vera/static/vote.html'
+```
+→ doit **échouer** (`Permission denied` ou système de fichiers en lecture seule) :
+c'est la protection de la page de vote.
+```
+systemd-analyze security vera-consultation | tail -2
+```
+→ une note sous 4 (le service en root faisait 9,6).
+```
+journalctl -u vera-consultation -n 40 --no-pager | grep -iE "denied|not permitted|syscall|error"
+```
+→ rien. Une ligne ici dit quel réglage de l'unité gêne le service : ne pas
+l'assouplir à l'aveugle, relever la ligne.
+
+**L'essai fonctionnel, le plus important** : se connecter à la page d'administration,
+déclarer **un groupe d'essai**, générer **un** lien, puis clôturer. Cela exerce, sous
+le compte `vera`, ce que les contrôles ci-dessus ne touchent pas : création de la clé
+RSA, écriture en base, verrou de processus, journal.
+
+Puis la sauvegarde nocturne, avec la ligne exacte de la crontab (le script de migration
+l'a mise à jour) :
+```
+crontab -l | grep sauvegarder_base
+```
+Copier-coller cette ligne **sans** les cinq premiers champs de l'heure, la lancer, et
+vérifier qu'un nouveau fichier apparaît dans `/root/sauvegardes_vera`.
+
+Enfin le retour arrière, pour savoir qu'il marche **avant** d'en avoir besoin :
+```
+bash infra/annuler_migration_utilisateur_dedie.sh
+ps -o user= -p $(systemctl show vera-consultation -p MainPID --value)
+```
+→ `root` de nouveau ; puis relancer `bash infra/migrer_vers_utilisateur_dedie.sh`, qui
+doit reprendre ce qui existe déjà et finir sur `MIGRATION TERMINEE`.
+
+### 4b. Sur la machine en service
+
+Mêmes commandes que 4a, depuis `/root/repo-push`, **après** que l'essai a réussi et
+**entre deux consultations** (le script refuse sinon). Rien n'est supprimé : l'ancienne
+base, l'ancienne unité et la crontab d'origine restent dans `/root/avant_migration_vera`.
+À supprimer à la main quelques jours plus tard : `vera_state.db.avant` (il ne contient
+que l'historique) et l'ancien venv `/root/vera_blind_sig/.venv`.
+
+### 4c. Après la migration : le déploiement courant change
+
+Le service lit `/opt/vera`, pas le clone de travail. Un déploiement devient :
+```
+cd /root/repo-push
+# appliquer les patchs, puis les tests AVEC le venv du service :
+VERA_PYTHON=/opt/vera-venv/bin/python3 ./run_tests.sh 2>&1 | grep -E 'reussis|echec'
+git -C /opt/vera pull --ff-only /root/repo-push main
+```
+Si `vera_blind_sig/` a changé (Cargo.toml, Cargo.lock, src/), recompiler **dans le venv du
+service**, depuis le clone de travail :
+```
+cd /root/repo-push/vera_blind_sig && VIRTUAL_ENV=/opt/vera-venv PATH=/root/.cargo/bin:$PATH PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 maturin develop --release --locked
+```
+Puis :
+```
+systemctl restart vera-consultation.service
+bash /opt/vera/infra/verifier_deploiement.sh | tail -3
+cd /root/repo-push && git push origin main
+```
+**Le vérificateur se lance depuis `/opt/vera`**, pas depuis le clone de travail : c'est là
+que tourne le processus, et il le contrôle (dossier de travail, compte, droits). Lancé
+depuis l'autre dossier, il dit `ECART` sur le dossier de travail du processus — c'est voulu.
+
 ## Ce que cette procédure ne couvre toujours pas
 
 - **Une consultation active ne survit à la perte du serveur dans aucun des
@@ -571,6 +679,14 @@ Cette étape suppose que la nouvelle base (`/root/vera_state.db`) existe déjà
   tests hors d'une machine réelle — jamais par une reprise complète sur un
   vrai serveur neuf. Tant que ce test grandeur nature n'a pas eu lieu, la
   considérer comme sérieusement revue, pas comme une garantie.
+
+## Corrections apportées le 24/10/2026 (version 9)
+
+- **Partie 4 ajoutée** : migration du service de root vers un compte dédié (audit externe
+  du 24/10/2026, N7), essai sur serveur neuf, retour arrière, et changement du
+  déploiement courant. Les Parties 1 à 3 décrivent toujours l'agencement d'avant la
+  migration (`/root/repo-push`, base sous `/root`) ; elles restent exactes tant que la
+  migration n'est pas appliquée. À réécrire après la bascule, quand l'essai aura eu lieu.
 
 ## Corrections apportées le 20/10/2026 (version 8)
 
