@@ -102,8 +102,8 @@ _SQL_TABLES = [
     # explicitement. Mais ils ne sont pas fermes par ce mot-cle, et le
     # commentaire ne doit pas le laisser croire.
     "CREATE TABLE IF NOT EXISTS tokens_consommes (empreinte TEXT PRIMARY KEY) WITHOUT ROWID",
-    "CREATE TABLE IF NOT EXISTS compteurs_votes (departement TEXT NOT NULL, reponse TEXT NOT NULL, compte INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (departement, reponse))",
-    "CREATE TABLE IF NOT EXISTS effectifs (departement TEXT PRIMARY KEY, effectif INTEGER NOT NULL DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS compteurs_votes (departement TEXT NOT NULL, reponse TEXT NOT NULL, compte INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (departement, reponse)) WITHOUT ROWID",
+    "CREATE TABLE IF NOT EXISTS effectifs (departement TEXT PRIMARY KEY, effectif INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID",
     "CREATE TABLE IF NOT EXISTS resultats_publies (departement TEXT PRIMARY KEY, resultat_json TEXT NOT NULL)",
     # Intitule de la question, fige a l'ouverture de la consultation.
     # Une seule ligne (id=1). Les OPTIONS ne sont pas stockees : elles restent
@@ -405,6 +405,46 @@ def _migrer_tokens_sans_rowid(conn):
     conn.execute("VACUUM")
 
 
+# Tables d'AGREGATS mises a jour au moment du vote. Avec un rowid implicite, la
+# ligne (departement, reponse) ou departement est creee au PREMIER vote qui la
+# concerne : `SELECT rowid` restitue donc l'ordre dans lequel les groupes et les
+# reponses ont recu leur premier vote (audit externe du 24/10/2026, N2). Meme
+# canal que tokens_consommes, ferme de la meme facon.
+_TABLES_AGREGATS_SANS_ROWID = {
+    "compteurs_votes": (
+        "CREATE TABLE compteurs_votes_v2 (departement TEXT NOT NULL, reponse TEXT NOT NULL, "
+        "compte INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (departement, reponse)) WITHOUT ROWID",
+        "departement, reponse, compte"),
+    "effectifs": (
+        "CREATE TABLE effectifs_v2 (departement TEXT PRIMARY KEY, "
+        "effectif INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID",
+        "departement, effectif"),
+}
+
+
+def _migrer_agregats_sans_rowid(conn):
+    """Migration idempotente : compteurs_votes et effectifs AVEC rowid ->
+    WITHOUT ROWID. Les valeurs sont copiees (ce sont les comptes de la
+    consultation en cours) ; le VACUUM libere les pages de l'ancien schema."""
+    migre = False
+    for table, (creation, colonnes) in _TABLES_AGREGATS_SANS_ROWID.items():
+        row = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        ).fetchone()
+        if not row or "WITHOUT ROWID" in row[0].upper():
+            continue  # absente (creee au bon schema ensuite) ou deja migree
+        nouvelle = table + "_v2"
+        conn.execute(f"DROP TABLE IF EXISTS {nouvelle}")
+        conn.execute(creation)
+        conn.execute(f"INSERT INTO {nouvelle} ({colonnes}) SELECT {colonnes} FROM {table}")
+        conn.execute(f"DROP TABLE {table}")
+        conn.execute(f"ALTER TABLE {nouvelle} RENAME TO {table}")
+        migre = True
+    if migre:
+        conn.commit()
+        conn.execute("VACUUM")
+
+
 def initialiser():
     """Ouvre la connexion et applique les migrations. Idempotente.
 
@@ -425,6 +465,7 @@ def initialiser():
         _migrer_schema_tokens(_conn)
         _migrer_jetons_vers_empreintes(_conn)
         _migrer_tokens_sans_rowid(_conn)
+        _migrer_agregats_sans_rowid(_conn)
         for sql in _SQL_TABLES:
             _conn.execute(sql)
         _conn.commit()

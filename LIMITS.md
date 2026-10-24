@@ -540,7 +540,10 @@ Etat actuel : l'aveuglement et la finalisation ont lieu dans le NAVIGATEUR du
 votant (static/vote.html, bibliotheque auto-hebergee). Le serveur ne recoit
 qu'un message déjà aveugle, ne voit jamais le secret K ni la signature finale,
 et les deux registres (jetons d'autorisation, empreintes de votes consommes)
-sont disjoints, sans horodatage, sans ordre d'insertion. Verifie bout-en-bout :
+sont disjoints, sans horodatage, sans ordre d'insertion lisible dans les tables
+(tokens_consommes, compteurs_votes et effectifs sont WITHOUT ROWID depuis le
+24/10/2026, audit N2 : avant, les deux dernieres restituaient l'ordre des premiers
+votes entre groupes et reponses ; `tests/test_agregats_sans_rowid.py`). Verifie bout-en-bout :
 chantier_crypto/test_pont_complet.mjs et test_brique7_v2.mjs.
 
 CE QUI SUBSISTE, et qui est la vraie limite : cette garantie vaut contre un
