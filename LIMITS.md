@@ -1956,6 +1956,32 @@ Deux choix à connaître, audit du 20/10/2026 (A12) :
   4096 bits, celle de VERA 2048 ; l'aveuglement tire ses propres aléas et n'est
   pas rejoué ; et un vecteur ne prouve ni la non-liaison ni la sûreté de la
   construction, qui relèvent d'une relecture cryptographique.
+- **`cargo audit` sur `Cargo.lock` (24/10/2026).** Lancé ce jour-là : 5 avis, dont
+  **deux corrigés** et trois non.
+  *Corrigés* : `crypto-bigint` 0.7.5 → 0.7.6 (RUSTSEC-2026-0387, variations de
+  temps dans des opérations censées être à temps constant) et `ctutils` 0.4.2 →
+  0.4.5 (RUSTSEC-2026-0385, génération de masque et comparaisons `u128` non
+  constantes). Ces deux avis datent du 23/10 ; ils touchent l'arithmétique sous
+  l'opération de signature du serveur. Seules ces deux lignes de `Cargo.lock` ont
+  changé ; les vecteurs de la RFC 9474 et la suite complète (65 tests) passent
+  avec le module recompilé.
+  *Non corrigé, `rsa` 0.10.0-rc.18, « Marvin Attack » (RUSTSEC-2023-0071, gravité
+  5,9)* : fuite possible de la clé par canal temporel sur les opérations à clé
+  privée. **Aucune version corrigée n'existe.** Ce que cela veut dire ici :
+  l'attaquant devrait mesurer, avec précision et en grand nombre, la durée de
+  signatures obtenues avec des jetons valides, à travers Internet, sur une clé qui
+  vit sept jours, et chaque jeton ne signe qu'une fois. Je ne l'ai pas rendu
+  exploitable et je ne prétends pas qu'il est impossible : c'est un risque résiduel
+  accepté, à rouvrir quand `rsa` publie un correctif.
+  *Non corrigés, `pyo3` 0.22.6 (RUSTSEC-2025-0020, RUSTSEC-2026-0177)* : le code
+  de `src/lib.rs` n'appelle ni `PyString::from_object` ni
+  `PyCFunction::new_closure` (vérifié par recherche), donc hors chemin. Les
+  corriger demande de passer de pyo3 0.22 à 0.29, un changement d'API à faire à
+  froid, pas dans une correction.
+  Deux crates sont *retirés du registre* (« yanked »), `chacha20` 0.10.1 et `der`
+  0.8.0 : tirés par la pré-version de `rsa`, sans alternative tant que
+  `blind-rsa-signatures` ne publie pas de nouvelle version. À relancer :
+  `cargo install cargo-audit --locked && (cd vera_blind_sig && cargo audit)`.
 - **`npm audit` signale `sjcl` (GHSA-2w8x-224x-785m, validation de point sur
   courbe elliptique)**, tiré par `@cloudflare/blindrsa-ts` 0.4.4. Hors chemin :
   VERA n'utilise que la partie RSA de cette bibliothèque (`sjcl.bn`, codec,
