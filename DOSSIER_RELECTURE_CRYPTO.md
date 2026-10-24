@@ -50,7 +50,7 @@ La réponse n'est **pas** couverte par la signature : seul `K` l'est.
 | Élément | Valeur | Source |
 |---|---|---|
 | Schéma | RSABSSA-SHA384-PSS-Randomized, [RFC 9474](https://www.rfc-editor.org/rfc/rfc9474) | |
-| Serveur | crate Rust `blind-rsa-signatures` 0.17.2, au-dessus de `rsa` **0.10.0-rc.18 (pré-version)**, pont `pyo3` 0.22.6 | `vera_blind_sig/` (139 lignes) |
+| Serveur | crate Rust `blind-rsa-signatures` 0.17.2, au-dessus de `rsa` **0.10.0-rc.18 (pré-version)**, pont `pyo3` 0.30.1 | `vera_blind_sig/` (139 lignes) |
 | Client | `@cloudflare/blindrsa-ts` 0.4.4, empaqueté (esbuild), empreinte SRI sur la page | `chantier_crypto/`, `static/blindrsa-bundle.js` |
 | Aléa serveur | `rand` (via `DefaultRng` du crate) ; `os.urandom` côté Python | à confirmer par vous (question 5) |
 | Taille de clé | 2048 bits ; la signature fait 256 octets (contrôlé à la réception) | |
@@ -96,7 +96,11 @@ La réponse n'est **pas** couverte par la signature : seul `K` l'est.
    `rsa_decrypt_and_check` avec aveuglement par un RNG, ce qui semble écarter
    l'attaque *Marvin* au niveau de la signature, mais l'avis RUSTSEC-2023-0071
    reste ouvert et sans correctif. Le risque est-il réel dans notre usage
-   (signature uniquement, aucun déchiffrement exposé) ? Le RNG par défaut
+   (signature uniquement, aucun déchiffrement exposé) ? Un fait qui borne
+   l'exposition : chaque jeton ne déclenche qu'une opération à clé privée, un refus
+   précède tout calcul et le rejeu renvoie la signature mémorisée ; le nombre
+   d'opérations par clé est donc au plus l'effectif du groupe. Ce plafond suffit-il
+   face aux attaques par canal temporel sur signature aveuglée ? Le RNG par défaut
    (`rand`) est-il un bon choix pour la génération de clés et l'aveuglement ?
 6. **Taille de clé.** 2048 bits suffit-il pour une durée de vie de 7 jours et
    des signatures qui ne servent qu'à compter une fois ?

@@ -1970,14 +1970,31 @@ Deux choix à connaître, audit du 20/10/2026 (A12) :
   privée. **Aucune version corrigée n'existe.** Ce que cela veut dire ici :
   l'attaquant devrait mesurer, avec précision et en grand nombre, la durée de
   signatures obtenues avec des jetons valides, à travers Internet, sur une clé qui
-  vit sept jours, et chaque jeton ne signe qu'une fois. Je ne l'ai pas rendu
+  vit sept jours, et chaque jeton ne signe qu'une fois (vérifié dans
+  `/api/signer_aveugle` : un jeton déjà utilisé reçoit un refus avant tout calcul
+  RSA, et le rejeu d'une même demande renvoie la signature mémorisée sans nouveau
+  calcul ; le nombre d'opérations à clé privée par clé est donc borné par
+  l'effectif du groupe). Je ne l'ai pas rendu
   exploitable et je ne prétends pas qu'il est impossible : c'est un risque résiduel
-  accepté, à rouvrir quand `rsa` publie un correctif.
-  *Non corrigés, `pyo3` 0.22.6 (RUSTSEC-2025-0020, RUSTSEC-2026-0177)* : le code
-  de `src/lib.rs` n'appelle ni `PyString::from_object` ni
-  `PyCFunction::new_closure` (vérifié par recherche), donc hors chemin. Les
-  corriger demande de passer de pyo3 0.22 à 0.29, un changement d'API à faire à
-  froid, pas dans une correction.
+  accepté, à rouvrir quand `rsa` publie un correctif. Une pré-version plus
+  récente existe (0.10.0-rc.19, 06/10/2026) ; je ne l'ai pas adoptée : la base
+  d'avis continue de la déclarer touchée, aucun journal des changements que j'aie
+  pu lire n'indique ce qu'elle corrige, et changer la pré-version d'une
+  bibliothèque de signature sans raison documentée ajoute un risque qu'elle ne
+  retire pas.
+  *Corrigés le 24/10/2026, `pyo3` 0.22.6 → 0.30.1 (RUSTSEC-2025-0020,
+  RUSTSEC-2026-0177)* : le code de `src/lib.rs` n'appelait aucune des deux API
+  (vérifié par recherche), donc le risque n'était pas atteint ; la montée a quand
+  même été faite pour que `cargo audit` ne signale plus rien de ce côté. Seule la
+  ligne `pyo3` de `Cargo.toml` change, et dans le verrou uniquement la famille
+  `pyo3` et ses outils de compilation (`syn` 3 ajouté ; `indoc`, `memoffset`,
+  `rustversion`, `unindent` retirés ; `target-lexicon` 0.13). `src/lib.rs` n'a pas
+  eu besoin d'être modifié. Vecteurs de la RFC 9474 et suite complète (65) passent
+  avec le module recompilé. Ce que ce contrôle ne couvre pas : le crash test de bout
+  en bout (`chantier_crypto/crash_test.sh`, client JavaScript réel) n'a pas pu servir,
+  car il échoue avant toute signature : il appelle `declarer_groupes` sans
+  `effectifs`, champ devenu obligatoire, et ne fixe pas la date d'ouverture. Constat
+  indépendant de ce changement, à traiter à part.
   Deux crates sont *retirés du registre* (« yanked »), `chacha20` 0.10.1 et `der`
   0.8.0 : tirés par la pré-version de `rsa`, sans alternative tant que
   `blind-rsa-signatures` ne publie pas de nouvelle version. À relancer :

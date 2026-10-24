@@ -94,6 +94,6 @@ explicite sinon) plutot que tronque silencieusement.
 ## Dependance et licence
 
 - `blind-rsa-signatures` 0.17 -- implementation RFC 9474
-- `pyo3` 0.22 -- interface Python
+- `pyo3` 0.30 -- interface Python
 
 Voir la licence du depot principal.
