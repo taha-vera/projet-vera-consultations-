@@ -1429,6 +1429,24 @@ l'inscrire au registre de traitement comme sous-traitant, et vérifier sa durée
 de retention des messages envoyes -- un historique de SMS conserve six mois
 conserve six mois de jetons en clair.
 
+### Les jetons en clair ne passent plus par un fichier temporaire de nginx (N6)
+
+La base ne garde les jetons d'autorisation qu'en empreinte, pour qu'une image du
+disque ne permette pas de les rejouer. Mais `/api/rh/generer_autorisations` les
+renvoie en clair (environ 250 Ko pour 1000 liens), et nginx, aux valeurs par
+défaut, peut déverser une réponse volumineuse dans un fichier de `proxy_temp`
+quand le navigateur la lit moins vite qu'uvicorn ne la livre, puis l'effacer sans
+l'écraser (audit externe du 24/10/2026, N6, lu dans la configuration ; le
+serveur réel n'a pas été observé). Depuis ce correctif, un bloc dédié fixe
+`proxy_max_temp_file_size 0` ; gardé par
+`tests/test_nginx_jetons_sans_fichier_temporaire.py`.
+
+**Ce que cela ne ferme pas.** La réponse reste en mémoire de nginx et d'uvicorn
+(donc potentiellement dans le swap, si le serveur en a un), et dans le navigateur
+de l'organisateur, son historique de téléchargements et tout ce qui synchronise
+ses fichiers. Ce sont les jetons de l'organisation : elle les envoie de toute
+façon par SMS ou courriel (voir ci-dessus).
+
 
 ## 12ter. Une voix peut se perdre en silence, et pas au hasard
 
