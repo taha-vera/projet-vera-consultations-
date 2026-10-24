@@ -1342,8 +1342,14 @@ calculs de vérification payés.
 toutes les 30 secondes au lieu de zéro (environ 0,3 % d'un cœur). Cent adresses
 bloquées en continu coûteraient donc environ un tiers de cœur : c'est le prix de
 ne pas enfermer l'organisateur. Et une adresse bloquée obtient une devinette de
-mot de passe de plus par tranche : sans effet sur une attaque répartie (voir
-plus haut), qui ne dépend pas de ce blocage. La route de création de compte
+mot de passe de plus par tranche de 30 secondes, **non comptée** (ni par
+adresse, ni par compte). Une seule adresse peut donc deviner jusqu'à 120 mots de
+passe par heure sans jamais être verrouillée plus longtemps (avant : quelques-uns
+par heure une fois le blocage à son maximum). Cela n'ajoute rien à une attaque
+répartie sur de nombreuses adresses, qui ne dépend pas de ce blocage, mais cela
+rend la **force du mot de passe de l'organisateur** plus déterminante : un mot de
+passe long (au moins seize caractères, ou une phrase de passe) rend ce débit
+sans effet ; un mot de passe court ou courant, non. La route de création de compte
 (`/api/admin/creer_compte_rh`) garde l'ancien comportement : elle compare un
 secret à temps constant, sans PBKDF2, et n'est pas utilisée par l'organisateur.
 
