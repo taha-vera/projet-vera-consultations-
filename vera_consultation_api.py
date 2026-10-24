@@ -83,6 +83,36 @@ def _verifier_ecoute_loopback():
     # ligne de commande l'emporte sur l'environnement, comme dans uvicorn.
     hote = os.environ.get("UVICORN_HOST") or None
     argv = sys.argv
+
+    # GUNICORN (audit externe du 24/10/2026, N12). La garde des workers cite
+    # gunicorn, mais celle-ci ne lisait que les options d'uvicorn :
+    # `gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001` passait. On lit
+    # donc aussi -b / --bind, sur la ligne de commande ET dans GUNICORN_CMD_ARGS.
+    # Un `bind = ...` dans un fichier de configuration gunicorn reste invisible
+    # d'ici : limite documentee dans LIMITS.md. L'unite livree lance uvicorn.
+    liaisons = []
+    jetons = list(argv) + os.environ.get("GUNICORN_CMD_ARGS", "").split()
+    for i, a in enumerate(jetons):
+        if a in ("-b", "--bind") and i + 1 < len(jetons):
+            liaisons.append(jetons[i + 1])
+        elif a.startswith("--bind="):
+            liaisons.append(a.split("=", 1)[1])
+        elif a.startswith("-b") and len(a) > 2 and not a.startswith("--"):
+            liaisons.append(a[2:])
+    for liaison in liaisons:
+        if liaison.startswith("unix:"):
+            continue                     # socket de fichier : pas d'ecoute reseau
+        if liaison.startswith("[") and "]" in liaison:
+            hote_liaison = liaison[1:liaison.index("]")]
+        else:
+            hote_liaison = liaison.rsplit(":", 1)[0] if ":" in liaison else liaison
+        if hote_liaison not in ("127.0.0.1", "::1", "localhost"):
+            raise RuntimeError(
+                f"REFUS : gunicorn est lance avec --bind {liaison}.\n"
+                "Le service doit ecouter sur la boucle locale et n'etre atteint "
+                "que par nginx (voir la garde uvicorn ci-dessous).\n"
+                "Poser VERA_ECOUTE_PUBLIQUE=1 si c'est delibere."
+            )
     descripteur = os.environ.get("UVICORN_FD") or None
     for i, a in enumerate(argv):
         if a in ("--host",) and i + 1 < len(argv):

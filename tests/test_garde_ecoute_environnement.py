@@ -13,7 +13,10 @@ CE QUE CE TEST VERIFIE (appel direct de la garde, environnement et argv simules)
   3. --host 0.0.0.0 reste refuse, et --host 127.0.0.1 l'emporte sur
      UVICORN_HOST=0.0.0.0 (la ligne de commande prime, comme dans uvicorn) ;
   4. un descripteur herite (UVICORN_FD ou --fd) est refuse ;
-  5. VERA_ECOUTE_PUBLIQUE=1 permet toujours de passer outre, volontairement.
+  5. VERA_ECOUTE_PUBLIQUE=1 permet toujours de passer outre, volontairement ;
+  6. gunicorn (audit du 24/10/2026, N12) : -b / --bind / --bind= et
+     GUNICORN_CMD_ARGS vers une adresse non locale sont refuses ; 127.0.0.1,
+     [::1], localhost et unix:... sont acceptes.
 """
 
 import os
@@ -40,7 +43,7 @@ except ImportError as e:  # pragma: no cover
     print(f"IGNORE : {e}")
     raise SystemExit(2)
 
-VARIABLES = ("UVICORN_HOST", "UVICORN_FD", "VERA_ECOUTE_PUBLIQUE")
+VARIABLES = ("UVICORN_HOST", "UVICORN_FD", "VERA_ECOUTE_PUBLIQUE", "GUNICORN_CMD_ARGS")
 argv_origine = list(sys.argv)
 echecs = []
 
@@ -88,6 +91,27 @@ verifier(refuse(argv=["--fd", "3"]),
          "4b. --fd est refuse")
 verifier(not refuse({"UVICORN_HOST": "0.0.0.0", "VERA_ECOUTE_PUBLIQUE": "1"}),
          "5. VERA_ECOUTE_PUBLIQUE=1 permet de passer outre")
+
+for libelle, argv, env in (
+    ("-b 0.0.0.0:8001", ["-b", "0.0.0.0:8001"], None),
+    ("--bind 0.0.0.0:8001", ["--bind", "0.0.0.0:8001"], None),
+    ("--bind=0.0.0.0:8001", ["--bind=0.0.0.0:8001"], None),
+    ("-b0.0.0.0:8001", ["-b0.0.0.0:8001"], None),
+    ("--bind :8001 (toutes interfaces)", ["--bind", ":8001"], None),
+    ("--bind [::]:8001", ["--bind", "[::]:8001"], None),
+    ("GUNICORN_CMD_ARGS=--bind 0.0.0.0:8001", [], {"GUNICORN_CMD_ARGS": "--bind 0.0.0.0:8001"}),
+):
+    verifier(refuse(env, argv), f"6a. gunicorn {libelle} est refuse")
+for libelle, argv, env in (
+    ("-b 127.0.0.1:8001", ["-b", "127.0.0.1:8001"], None),
+    ("--bind=localhost:8001", ["--bind=localhost:8001"], None),
+    ("--bind [::1]:8001", ["--bind", "[::1]:8001"], None),
+    ("--bind unix:/run/vera.sock", ["--bind", "unix:/run/vera.sock"], None),
+    ("GUNICORN_CMD_ARGS=--bind 127.0.0.1:8001", [], {"GUNICORN_CMD_ARGS": "--bind 127.0.0.1:8001"}),
+):
+    verifier(not refuse(env, argv), f"6b. gunicorn {libelle} est accepte")
+verifier(not refuse({"GUNICORN_CMD_ARGS": "--bind 0.0.0.0:8001", "VERA_ECOUTE_PUBLIQUE": "1"}),
+         "6c. VERA_ECOUTE_PUBLIQUE=1 passe outre aussi pour gunicorn")
 
 print()
 if echecs:
