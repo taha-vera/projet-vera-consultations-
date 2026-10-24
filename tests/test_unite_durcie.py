@@ -133,8 +133,12 @@ else:
     r = subprocess.run([analyse, "verify", chemin], capture_output=True, text=True)
     sortie = r.stdout + r.stderr
     # Le seul avertissement attendu : le venv n'existe pas sur la machine qui lance le test.
+    # Seules comptent les lignes qui parlent de NOTRE unite : sur un systeme plus recent, verify
+    # signale aussi des unites du systeme (ex. xfs_scrub, CPUAccounting=) qui ne nous concernent pas
+    # -- constate sur le serveur le 24/10/2026, ou ces lignes faisaient echouer ce test a tort.
     inattendus = [l for l in sortie.splitlines()
-                  if l.strip() and "is not executable" not in l and "No such file" not in l]
+                  if l.strip() and "vera-consultation.service" in l
+                  and "is not executable" not in l and "No such file" not in l]
     verifier(not inattendus, "6bis-a. systemd-analyze verify : aucune directive inconnue ni valeur refusee",
              "\n      ".join(inattendus))
     r = subprocess.run([analyse, "security", "--offline=true", chemin],
