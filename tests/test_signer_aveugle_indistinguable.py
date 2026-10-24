@@ -25,6 +25,11 @@ CE QU'IL VERIFIE, EN HTTP, SUR LA VRAIE ROUTE
      recherche du departement, une analyse de cle) : pas de branche plus courte
      pour un jeton utilise ou inconnu (audit du 24/10/2026, N8).
 
+CE QU'IL NE FERME PAS (audit du 24/10/2026, N9). Il ferme la sonde PASSIVE, celle
+qui n'utilise que des messages invalides. Un organisateur peut aussi envoyer, pour
+chaque jeton, un message aveugle VALIDE : jeton utilise -> 403, jeton libre -> 200
+et une signature. Cette sonde destructive est decrite dans LIMITS.md section 1.
+
 Un test qui lirait le code au lieu d'appeler la route ne verrait pas une
 regression : celui-ci appelle la route.
 """

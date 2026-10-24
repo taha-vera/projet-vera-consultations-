@@ -185,6 +185,19 @@ d'EXCLUSIVITE qui etait trop forte, relevee le 03/09/2026.
 Le marqueur de participation, lui, est la seule trace PERMANENTE, et
 elle n'est pas effacable par VERA.
 
+**Le cache HTTP du navigateur (audit externe du 24/10/2026, N10).** La page de
+vote appelle `GET /api/cle_publique?departement=<groupe>` à chaque ouverture de
+lien. nginx répond `Cache-Control: no-cache`, qui oblige à revalider mais
+**n'interdit pas de stocker** : le cache du navigateur gardait l'URL, donc le nom
+du groupe, avec l'heure. Sur un appareil que l'employeur administre, c'est la
+preuve qu'on est allé jusqu'à la demande de signature. Depuis ce correctif
+l'application répond aussi `no-store` sur cette route (succès comme refus ;
+`tests/test_cle_publique_no_store.py`). **Ce que cela ne ferme pas :** les
+navigateurs qui journalisent l'historique de navigation (l'URL de la page de vote
+elle-même, `/vote`, y figure toujours, sans le jeton qui est dans le fragment), et
+tout proxy d'entreprise qui journalise les URL : il voit `?departement=` en clair,
+comme il voit le domaine.
+
 *Dans la taille des requêtes.* Le parcours de vote est bourré à longueur
 constante. **Les trois etapes sont bourrees ; les chiffres qui figuraient ici
 etaient faux ou incomparables** (constat d'un audit externe, 29/08/2026).
@@ -291,6 +304,20 @@ dans le processus, pas à travers Internet, et ce n'est pas un temps constant
 (ordonnanceur, cache du processeur et SQLite gardent leur gigue). La sonde
 passive est fermée aussi bien que je sais la fermer ; elle n'est pas démontrée
 inexploitable.
+
+**La sonde destructive reste ouverte (audit du 24/10/2026, N9).** Ce qui précède
+ferme la sonde *passive* : un message aveugle invalide ou un jeton qui ne mène à
+rien ne renseigne plus. Pas la sonde *destructive*. L'organisateur, qui détient
+tous les jetons, peut envoyer pour chacun un message aveugle **valide**, peu avant
+l'échéance : un jeton déjà utilisé reçoit 403, un jeton libre reçoit 200 **et une
+signature**. Il obtient la liste nominative complète de ceux qui ont participé, et
+des signatures qu'il peut transformer en voix à déposer à la place des absents
+(le volet « bourrage » est écrit en §13). Seule trace : un retardataire qui
+trouve son lien déjà servi. Aucun correctif technique ne la ferme sans retirer à
+l'organisateur ses propres jetons, ce que le modèle ne permet pas. Elle relève de
+la confiance faite à l'organisateur (§6) ; l'en-tête de
+`tests/test_signer_aveugle_indistinguable.py` ne doit pas être lu comme « la
+sonde est fermée ».
 
 Relevee le 03/09/2026 par un audit externe. Elle etait mentionnee ailleurs dans
 ce document -- le cache de signatures y renvoie -- mais ne figurait pas dans

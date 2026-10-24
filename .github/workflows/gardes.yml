@@ -353,7 +353,8 @@ jobs:
                    test_blocage_adresse_http test_marge_survit_redemarrage \
                    test_ouverture_obligatoire test_garde_ecoute_environnement test_ouverture_bornee test_index_jetons_signataires test_agregats_sans_rowid \
                    test_gardes_demarrage_executees test_courses_repondre_publication_cloture \
-                   test_publication_figee_et_collision_jeton test_sauvegarde_chemins_speciaux; do
+                   test_publication_figee_et_collision_jeton test_sauvegarde_chemins_speciaux \
+                   test_cle_publique_no_store; do
             base_jetable=$(mktemp -u /tmp/vera_ci_XXXXXX.db)
             VERA_DB_PATH="$base_jetable" PYTHONPATH=. .venv/bin/python3 "tests/$t.py"
             rm -f "$base_jetable" "$base_jetable"-wal "$base_jetable"-shm

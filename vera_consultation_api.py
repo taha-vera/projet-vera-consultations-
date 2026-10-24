@@ -1410,17 +1410,27 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
 # du lien, JAMAIS se fier aveuglement a ce que renvoie le serveur.
 # ============================================================================
 @app.get("/api/cle_publique")
-def cle_publique_endpoint(departement: str):
+def cle_publique_endpoint(departement: str, response: Response):
     import hashlib
+    # NE PAS LAISSER LE NAVIGATEUR GARDER CETTE URL (audit externe du
+    # 24/10/2026, N10). Le serveur nginx pose `Cache-Control: no-cache`, qui
+    # oblige a revalider mais n'interdit pas de STOCKER la reponse : le cache HTTP
+    # du navigateur conserve alors l'URL, donc le nom du groupe, et l'heure.
+    # Sur un appareil administre par l'employeur, c'est la preuve qu'on est alle
+    # jusqu'a la demande de signature. `no-store` l'interdit. Les deux en-tetes
+    # sont envoyes (celui de nginx s'ajoute, il ne remplace pas) ; no-store l'emporte.
+    response.headers["Cache-Control"] = "no-store"
     # LECTURE SEULE (voir cle_publique_si_existe) : endpoint public, ne doit
     # jamais declencher de generation de cle. La cle est creee par le flux RH
     # authentifie (generer_autorisations) avant toute distribution de lien.
     try:
         pk_der = gestionnaire_signature.cle_publique_si_existe(departement)
     except RuntimeError:
-        raise HTTPException(status_code=503, detail="Aucune consultation active.")
+        raise HTTPException(status_code=503, detail="Aucune consultation active.",
+                            headers={"Cache-Control": "no-store"})
     except KeyError:
-        raise HTTPException(status_code=404, detail="Departement inconnu.")
+        raise HTTPException(status_code=404, detail="Departement inconnu.",
+                            headers={"Cache-Control": "no-store"})
     return {
         "cle_publique_hex": pk_der.hex(),
         "empreinte_sha256": hashlib.sha256(pk_der).hexdigest(),
