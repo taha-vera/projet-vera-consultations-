@@ -20,7 +20,10 @@ CE QU'IL VERIFIE, EN HTTP, SUR LA VRAIE ROUTE
      pour un jeton inconnu ;
   4. consultation expiree : meme reponse pour un jeton utilise et un jeton libre ;
   5. une longueur invalide reste refusee en 422, pour tous les jetons de la
-     meme facon (la longueur ne depend pas du jeton).
+     meme facon (la longueur ne depend pas du jeton) ;
+  6. tout refus fait le MEME TRAVAIL (une lecture du cache des signatures, une
+     recherche du departement, une analyse de cle) : pas de branche plus courte
+     pour un jeton utilise ou inconnu (audit du 24/10/2026, N8).
 
 Un test qui lirait le code au lieu d'appeler la route ne verrait pas une
 regression : celui-ci appelle la route.
@@ -163,6 +166,57 @@ finally:
 verifier(forme(e_utilise) == forme(e_libre) == forme(e_inconnu) and e_libre.status_code == 503,
          "4. consultation expiree : meme reponse (503) pour utilise, libre et inconnu",
          f"utilise={forme(e_utilise)} libre={forme(e_libre)} inconnu={forme(e_inconnu)}")
+
+# --- 6. MEME TRAVAIL pour tout jeton qui ne peut pas signer (audit N8) ------
+# La duree d'une reponse ne se teste pas de facon fiable (c'est du bruit). Ce
+# qui se teste, c'est l'ABSENCE de branche plus courte : chaque refus doit lire
+# le jeton, chercher le departement, et analyser UNE cle publique. Avant le
+# correctif, un jeton utilise ou inconnu s'arretait avant l'analyse de la cle
+# (12 microsecondes d'ecart mesurees, 36 avec 1500 signatures en cache).
+compteurs = {"cle": 0, "deja": 0, "dept": 0}
+_ser = api.serialization
+_charger = _ser.load_der_public_key
+_deja = api.persistance.jeton_a_deja_signe
+_dept = api.persistance.lire_departement_jeton
+
+
+def _compte_cle(*a, **k):
+    compteurs["cle"] += 1
+    return _charger(*a, **k)
+
+
+def _compte_deja(*a, **k):
+    compteurs["deja"] += 1
+    return _deja(*a, **k)
+
+
+def _compte_dept(*a, **k):
+    compteurs["dept"] += 1
+    return _dept(*a, **k)
+
+
+_ser.load_der_public_key = _compte_cle
+api.persistance.jeton_a_deja_signe = _compte_deja
+api.persistance.lire_departement_jeton = _compte_dept
+try:
+    cas = {
+        "jeton utilise, sonde m >= n": lambda: sonde(UTILISE),
+        "jeton libre, sonde m >= n": lambda: sonde(LIBRE2),
+        "jeton inconnu, sonde m >= n": lambda: sonde(INCONNU),
+        "jeton utilise, second message valide": lambda: signer(UTILISE),
+        "jeton inconnu, message valide": lambda: signer(INCONNU),
+    }
+    for nom, appel in cas.items():
+        for k in compteurs:
+            compteurs[k] = 0
+        rep = appel()
+        verifier(rep.status_code == 403 and compteurs == {"cle": 1, "deja": 1, "dept": 1},
+                 f"6. {nom} : 403 apres exactement une lecture de chaque sorte",
+                 f"statut {rep.status_code}, travail {compteurs}")
+finally:
+    _ser.load_der_public_key = _charger
+    api.persistance.jeton_a_deja_signe = _deja
+    api.persistance.lire_departement_jeton = _dept
 
 print()
 if echecs:

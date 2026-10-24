@@ -275,11 +275,22 @@ participation ne l'etait pas du tout face a l'organisateur.
 Corrige : jeton inconnu, jeton utilise, second message sur un jeton qui vient
 de signer, message >= n et consultation expiree recoivent le meme statut et le
 meme texte (`tests/test_signer_aveugle_indistinguable.py`, qui appelle la
-route). **Ce qui reste** : un ecart de duree entre un jeton utilise (refus apres
-deux lectures) et un jeton libre (chargement de la cle, comparaison a n), de
-l'ordre de quelques microsecondes, derriere 5 requetes par seconde et par
-adresse. Il n'a pas ete mesure ; une moyenne sur un tres grand nombre
-d'essais le ferait peut-etre apparaitre.
+route). **La durée de la réponse, mesurée puis réduite** (audit du 24/10/2026, N8).
+Un second audit a mesuré, en processus, un écart de 8 microsecondes entre un
+jeton utilisé et un jeton libre. En le reprenant avec 1500 signatures en cache,
+l'écart des médianes montait à **36 microsecondes**, et la durée d'un jeton
+utilisé **croissait avec son rang de signature** (de 104 à 234 microsecondes) :
+la recherche parcourait tout le cache. La réponse trahissait donc la
+participation *et* l'ordre des signatures. Corrigé en deux temps : un index
+remplace le parcours, et tout refus fait désormais le même travail (une lecture
+du cache, une recherche du groupe, l'analyse d'une clé publique,
+`tests/test_signer_aveugle_indistinguable.py` §6). Après correction, sur 4000
+paires entrelacées et 1500 signatures : écart des médianes **+0,2 microseconde**,
+sans tendance avec le rang. **Ce que cela ne prouve pas** : la mesure est faite
+dans le processus, pas à travers Internet, et ce n'est pas un temps constant
+(ordonnanceur, cache du processeur et SQLite gardent leur gigue). La sonde
+passive est fermée aussi bien que je sais la fermer ; elle n'est pas démontrée
+inexploitable.
 
 Relevee le 03/09/2026 par un audit externe. Elle etait mentionnee ailleurs dans
 ce document -- le cache de signatures y renvoie -- mais ne figurait pas dans

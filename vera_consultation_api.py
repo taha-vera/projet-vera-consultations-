@@ -1060,10 +1060,10 @@ class SignerAveugleRequete(BaseModel):
 # >= n, et static/vote.html affiche son propre texte sur tout 403 sans lire le
 # detail.
 #
-# CE QUI RESTE : un ecart de DUREE entre un jeton utilise (refus apres deux
-# lectures) et un jeton libre (chargement de la cle, comparaison a n). Quelques
-# microsecondes, noyees dans la gigue du reseau, derriere 5 requetes par seconde
-# et par adresse (nginx) -- mais pas nul. Voir LIMITS.md.
+# DUREE (audit du 24/10/2026, N8) : un ecart avait ete mesure entre jeton utilise et
+# jeton libre, et croissait avec le rang de signature (parcours du cache). Index
+# O(1) et meme travail pour tout refus (voir plus bas) ; ce n'est pas un temps
+# constant -- LIMITS.md section 1.
 _DETAIL_JETON_INUTILISABLE = "Jeton d'autorisation invalide ou deja utilise."
 
 
@@ -1188,9 +1188,20 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     # libre. Le rattrapage d'un rejeu IDENTIQUE se fait plus haut
     # (signature_deja_emise), sans passer par ici ; le votant, lui, voit le
     # texte de vote.html, pas ce detail.
-    if persistance.jeton_a_deja_signe(emp_jeton):
-        raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
-
+    #
+    # MEME TRAVAIL POUR TOUS LES JETONS QUI NE PEUVENT PAS SIGNER (audit du
+    # 24/10/2026, N8). Le statut, le texte, la taille et les en-tetes sont
+    # identiques depuis A1, mais la DUREE ne l'etait pas : un jeton libre
+    # chargeait la cle de son groupe, l'analysait et la comparait au message,
+    # un jeton utilise ou inconnu s'arretait avant (12 microsecondes d'ecart
+    # mesurees en processus, et un parcours du cache proportionnel a sa taille,
+    # maintenant remplace par un index). Ici, les trois lectures sont faites
+    # TOUJOURS, dans le meme ordre, puis UNE SEULE decision est prise ; faute de
+    # cle de groupe, on analyse une cle quelconque pour payer le meme travail.
+    # Ce n'est pas une garantie de temps constant (l'ordonnanceur, le cache du
+    # processeur, SQLite gardent leur gigue) : c'est la suppression des
+    # branches dont la duree dependait de la participation.
+    #
     # Lecture SEULE du departement, AVANT de consommer le jeton -- pour
     # connaitre n (le modulus RSA de ce departement) et signer avant de
     # consommer. Cet ordre ferme la CLASSE entiere des echecs qui
@@ -1201,34 +1212,42 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     # (vera_persistance.py, UPDATE ... WHERE utilise=0 + rowcount,
     # inchangee) : cette lecture ne fait qu'anticiper. Audit cible du
     # 24-25/09/2026 sur vera_blind_sig/src/lib.rs.
+    deja_signe = persistance.jeton_a_deja_signe(emp_jeton)
     departement = persistance.lire_departement_jeton(payload.jeton_autorisation)
-    if departement is None:
-        raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
 
     # cle_publique_si_existe, PAS cle_publique : lecture seule, ne demarre
     # pas le minuteur d'expiration de la consultation au premier appel
     # (vera_signature_manager.py, _obtenir_ou_creer_cle). Meme fonction que
     # /api/cle_publique, ou un client honnete recupere deja n -- un
     # departement legitime a donc toujours sa cle a ce stade.
+    cle_pub_der = None
     try:
-        cle_pub_der = gestionnaire_signature.cle_publique_si_existe(departement)
+        if departement is not None:
+            cle_pub_der = gestionnaire_signature.cle_publique_si_existe(departement)
     except RuntimeError:
         raise HTTPException(status_code=503, detail="Aucune consultation active.")
     except KeyError:
-        raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
+        cle_pub_der = None
+    cle_de_groupe_trouvee = cle_pub_der is not None
+    if cle_pub_der is None:
+        cle_pub_der = gestionnaire_signature.cle_publique_quelconque()
 
     # RSABSSA opere modulo n : un message aveugle valide verifie m < n. La
     # validation de longueur ci-dessus ne couvre pas ce cas -- un message de
     # EXACTEMENT 256 octets peut quand meme representer une valeur >= n.
     # Sans ce controle, un tel message consommait le jeton puis echouait a
     # la signature (voir plus bas) : la voix etait perdue sans recours.
-    # Erreur du CLIENT : 422, pas 503 -- reessayer ne changerait rien.
-    n = serialization.load_der_public_key(cle_pub_der).public_numbers().n
     #
     # 403 et le MEME detail que « jeton inutilisable », PAS 422 (audit A1) : un
     # 422 ici n'etait renvoye que pour un jeton libre, et signait donc la
     # non-participation. Le client honnete n'envoie jamais m >= n.
-    if int.from_bytes(message_aveugle, "big") >= n:
+    message_trop_grand = False
+    if cle_pub_der is not None:
+        n = serialization.load_der_public_key(cle_pub_der).public_numbers().n
+        message_trop_grand = int.from_bytes(message_aveugle, "big") >= n
+
+    if (deja_signe or departement is None or not cle_de_groupe_trouvee
+            or message_trop_grand):
         raise HTTPException(status_code=403, detail=_DETAIL_JETON_INUTILISABLE)
 
     # 3. Signer a l'aveugle (seule etape serveur du protocole RSABSSA) --

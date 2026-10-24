@@ -415,6 +415,20 @@ class GestionnaireSignature:
                 raise RuntimeError("Aucune consultation active.")
             raise KeyError(departement)
 
+    def cle_publique_quelconque(self):
+        """Une cle publique du registre (n'importe laquelle), ou None.
+
+        Sert UNIQUEMENT a /api/signer_aveugle pour faire, sur un jeton inconnu ou
+        deja utilise, le meme travail (analyse de la cle, comparaison a n) que
+        sur un jeton libre : sans cela la duree de la reponse distingue les deux
+        (audit du 24/10/2026, N8). Lecture seule, ne cree rien."""
+        with self._verrou:
+            for _priv, pub in self._cles.values():
+                return pub
+            for pub in self._cles_publiques_expirees.values():
+                return pub
+        return None
+
     def signer_message_aveugle(self, departement, message_aveugle_bytes):
         """Signe a l'aveugle un message DEJA aveugle par le client (navigateur
         du votant). C'est la SEULE etape du protocole RSABSSA qui reste cote

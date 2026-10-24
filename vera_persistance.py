@@ -874,6 +874,25 @@ RETENTION_SIGNATURES_SECONDES = 3600
 # n'y a pas d'autre processus avec qui partager cet etat.
 _signatures_emises = {}
 
+# INDEX DES JETONS AYANT SIGNE, pour jeton_a_deja_signe en temps CONSTANT.
+#
+# Audit externe du 24/10/2026, N8. jeton_a_deja_signe parcourait tout le cache
+# (une tuile par signature de l'heure) : un jeton libre le parcourait en entier,
+# un jeton utilise s'arretait a sa position. La duree de la reponse dependait
+# donc de la participation ET de l'ordre de signature. Un dictionnaire jeton ->
+# nombre d'entrees supprime cette dependance. Meme duree de vie que le cache,
+# vide avec lui.
+_jetons_signataires = {}
+
+
+def _oublier_jeton_signataire(empreinte_jeton):
+    """Retire une entree de l'index (appele quand le cache en retire une)."""
+    reste = _jetons_signataires.get(empreinte_jeton, 0) - 1
+    if reste > 0:
+        _jetons_signataires[empreinte_jeton] = reste
+    else:
+        _jetons_signataires.pop(empreinte_jeton, None)
+
 
 def _horloge_cache():
     """Horloge MONOTONE pour la retention du cache de signatures.
@@ -925,6 +944,7 @@ def _purger_signatures_expirees(seuil):
     """
     for cle in [k for k, v in _signatures_emises.items() if v[2] <= seuil]:
         del _signatures_emises[cle]
+        _oublier_jeton_signataire(cle[0])
 
 
 def signature_deja_emise(empreinte_jeton, empreinte_message):
@@ -953,10 +973,7 @@ def jeton_a_deja_signe(empreinte_jeton):
     seuil = _horloge_cache() - RETENTION_SIGNATURES_SECONDES
     with _verrou_db:
         _purger_signatures_expirees(seuil)
-        for jeton, _msg in _signatures_emises:
-            if jeton == empreinte_jeton:
-                return True
-    return False
+        return empreinte_jeton in _jetons_signataires
 
 
 def enregistrer_signature_emise(empreinte_jeton, empreinte_message, signature_hex, departement):
@@ -968,8 +985,12 @@ def enregistrer_signature_emise(empreinte_jeton, empreinte_message, signature_he
     maintenant = _horloge_cache()
     seuil = maintenant - RETENTION_SIGNATURES_SECONDES
     with _verrou_db:
-        _signatures_emises[(empreinte_jeton, empreinte_message)] = (
-            signature_hex, departement, maintenant)
+        cle = (empreinte_jeton, empreinte_message)
+        if cle in _signatures_emises:
+            # Remplacement d'une entree existante : l'index la compte deja.
+            _oublier_jeton_signataire(empreinte_jeton)
+        _signatures_emises[cle] = (signature_hex, departement, maintenant)
+        _jetons_signataires[empreinte_jeton] = _jetons_signataires.get(empreinte_jeton, 0) + 1
         _purger_signatures_expirees(seuil)
 
 
@@ -977,6 +998,7 @@ def vider_signatures_emises():
     """Vide le cache. Appele a la cloture, avec le reste de l'etat."""
     with _verrou_db:
         _signatures_emises.clear()
+        _jetons_signataires.clear()
 
 
 def charger_groupes_declares():
