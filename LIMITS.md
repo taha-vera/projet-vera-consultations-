@@ -131,10 +131,12 @@ signature** -- information que `jetons_autorisation.utilise = 1` publié déjà 
 base, sans limite de retention. L'apport marginal est proche de zero.
 
 Il est écrit pour qu'un votant puisse retrouver sa signature en renvoyant la MÊME
-demande. **Le client actuel ne la renvoie jamais** (relecture du 15/11/2026) : il
-tire un nouveau secret `K` et un nouvel aveuglement à chaque envoi, donc sa demande
-n'est jamais identique, et le cache ne sert à rien avec lui. Le rattrapage que ce
-paragraphe annonçait n'existe pas aujourd'hui ; voir §12ter pour ce que cela coûte.
+demande. **Jusqu'au 15/11/2026 le client ne la renvoyait jamais** (relecture
+indépendante) : il tirait un nouveau secret `K` et un nouvel aveuglement à chaque
+envoi, donc sa demande n'était jamais identique, et le cache ne servait à rien avec
+lui ; la promesse de ce paragraphe était fausse. Depuis, le client conserve sa demande
+**avant** de l'envoyer (voir §12ter) et la rejoue : le cache sert enfin, et
+`tests/test_client_navigateur.py` le vérifie dans un vrai navigateur.
 
 Retention : une heure, purge physique a chaque lecture et a chaque ecriture,
 vidage complet a la clôture. Il ne survit pas a un redemarrage du service.
@@ -1606,24 +1608,30 @@ façon par SMS ou courriel (voir ci-dessus).
 
 ## 12ter. Une voix peut se perdre en silence, et pas au hasard
 
-**Correction du 15/11/2026.** Cette section disait que le cache de la section 1
-rattrape le cas courant. C'était faux avec le client réel : voir §1.
+**Correction du 15/11/2026, en deux temps.** Cette section disait que le cache de la
+section 1 rattrape le cas courant. C'était faux avec le client réel : un votant dont
+la réponse de signature se perdait, ou qui fermait l'onglet avant le dépôt, ne pouvait
+plus voter (« ce lien a déjà servi »), sans condition d'heure. Reproduit dans un vrai
+navigateur, puis corrigé.
 
-Ce qui rattrape réellement : le **rechargement de la page après la signature**, car
-le client conserve alors la réponse prête à déposer dans `sessionStorage` et la
-redépose à l'ouverture.
+**Ce qui rattrape aujourd'hui.** Avant d'envoyer sa demande de signature, le client
+conserve dans `localStorage` de quoi la rejouer à l'identique (message préparé, facteur
+d'aveuglement, message aveuglé), jamais la réponse choisie. Le serveur, voyant la même
+demande, renvoie la même signature. Cela couvre la réponse perdue, le rechargement et
+la fermeture de l'onglet. Le credentiel s'efface dès que le dépôt aboutit ou est
+refusé, et vit au plus 55 minutes.
 
-Ce qui ne rattrape pas : un votant perd sa voix définitivement si son navigateur
-échoue **entre le moment où le serveur signe et celui où le dépôt aboutit**, sauf
-simple rechargement de la page. Deux cas : la réponse de signature ne lui parvient
-pas (coupure réseau au mauvais moment), ou il ferme l'onglet avant le dépôt. Le
-jeton est consommé, le nouvel essai tire un nouveau secret, le serveur répond « ce
-lien a déjà servi » : aucun recours automatique, il faut demander une nouvelle
-invitation. Cela ne dépend ni d'une heure ni d'un redémarrage.
+**Ce qui n'est toujours pas rattrapé** : un votant revenant **plus d'une heure après**,
+ou après un redémarrage du service (le cache du serveur est en mémoire) ; un autre
+navigateur ou un autre appareil (le stockage ne les suit pas) ; la navigation privée,
+qui efface ce stockage. Dans ces cas le jeton est consommé et le seul recours est une
+nouvelle invitation.
 
-Une correction existe (conserver, avant l'envoi, le message aveuglé et ses paramètres,
-pour que la même demande puisse être rejouée) ; elle modifie le client et attend sa
-mise en œuvre.
+**Ce que cela laisse sur l'appareil, et pourquoi c'est accepté.** Pendant moins d'une
+heure, `localStorage` contient de quoi redéposer avec ce jeton : sur un poste partagé,
+quelqu'un pourrait déposer un vote à la place du votant. Il le pourrait déjà avec le
+lien lui-même. L'ancien refus de `localStorage` tenait à ce que la réponse y resterait
+lisible ; elle n'y est plus jamais écrite (vérifié par le test).
 
 **Ce n'est pas neutre pour le résultat.** Cette perte ne frappe pas au hasard :
 elle touche les connexions instables, les usages mobiles, les zones mal

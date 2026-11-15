@@ -1117,10 +1117,10 @@ affirmations du relecteur ne l'ont jamais été sur parole.
 | # | Constat | Verdict | Suite |
 |---|---------|---------|-------|
 | 6 | Un jeton déclenche N opérations de clé privée sous requêtes simultanées (une seule signature livrée) | **Confirmé par expérience** : 24 requêtes, 24 calculs | Verrou par jeton ; `test_signature_concurrente.py`, vérifié par mutant |
-| C | La perte de la réponse de signature coûte la voix ; le cache de rejeu ne sert jamais avec le client réel | **Confirmé** dans le code (nouveau secret et nouvel aveuglement à chaque envoi) | Textes corrigés (LIMITS §1, §12ter) ; **client à corriger** |
-| D | Après clôture, le dépôt reçoit 404 et le client dit « réessayez » | **Reproduit** (404 « Département inconnu », puis boucle) | **Client à corriger** |
+| C | La perte de la réponse de signature coûte la voix ; le cache de rejeu ne sert jamais avec le client réel | **Confirmé**, puis **reproduit dans un vrai navigateur** (« ce lien a déjà servi ») | **Corrigé (lot 72)** : le client conserve sa demande avant l'envoi et la rejoue ; `test_client_navigateur.py`, qui échoue sur l'ancienne page |
+| D | Après clôture, le dépôt reçoit 404 et le client dit « réessayez » | **Reproduit** dans un vrai navigateur (boucle sans fin) | **Corrigé (lot 72)** : « consultation terminée, voix non enregistrée » |
 | A | Signature et dépôt partent à quelques secondes d'écart | Confirmé ; **admis dans un commentaire du code, absent de LIMITS** | LIMITS §9 ; docstring de `definir_ouverture` corrigée |
-| B | Un serveur malveillant isole chaque votant par un nom de groupe unique | Confirmé ; opérateur actif (hors garantie), non corrigé | Dossier §5bis ; affichage du groupe et du nombre d'invitations à décider |
+| B | Un serveur malveillant isole chaque votant par un nom de groupe unique | Confirmé ; opérateur actif (hors garantie) | **Atténué (lot 72)** : la page affiche le groupe et le nombre d'invitations, avec une alerte sous le seuil. Un serveur qui ment n'est pas arrêté |
 | E | `DELTA_INT` et epsilon non liés ; `VERA_DB_KEY` sans contrôle de longueur ; texte « plus aucune donnée » | Confirmés, faibles | `test_epsilon_lie_au_bruit.py` ; textes corrigés ; contrôle de la clé laissé à `verifier_deploiement.sh` |
 | 1, 2, 3, 7, 8, 9 | K_MIN ne protège que la publication ; jetons au porteur ; epsilon par consultation ; monopole du résultat ; date d'ouverture ; participation hors bruit | **Déjà documentés** (§13, §13bis, §14, §9bis) | Aucune |
 

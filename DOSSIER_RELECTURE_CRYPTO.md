@@ -76,6 +76,9 @@ La réponse n'est **pas** couverte par la signature : seul `K` l'est.
   vérifié par mutant (sans le verrou, 24 calculs).
 - **Epsilon annoncé, budget et échelle du bruit liés** :
   `tests/test_epsilon_lie_au_bruit.py`.
+- **La page de vote dans un vrai navigateur** (Chromium, vrai serveur, coupures
+  provoquées) : signature perdue rattrapée, clôture dite vraie, rien de la réponse
+  conservé : `tests/test_client_navigateur.py`.
 - **Interopérabilité client JS ↔ serveur Rust**, concurrence, et survie de
   l'anti-rejeu à un `kill -9` : `chantier_crypto/test_*.mjs`.
 - **`cargo audit`** (24/10/2026) : 5 avis, 2 corrigés par mise à jour du verrou,
@@ -146,11 +149,15 @@ ne les redécouvriez pas, et pour que vous jugiez ce que nous en avons fait.
   garantie), désormais écrit dans LIMITS §9.
 - **Un serveur malveillant peut fabriquer des liens à nom de groupe unique** : il
   isole chaque votant sans toucher au JavaScript, car le lien porte aussi l'agrégat
-  que le client compare. Seule la comparaison hors bande y répond. Non corrigé.
+  que le client compare. Seule la comparaison hors bande y répond. Non corrigé ; la
+  page affiche désormais le groupe du lien et le nombre d'invitations déclaré, avec une
+  alerte sous le seuil : cela révèle un serveur honnête mais curieux, pas un serveur qui
+  ment.
 - **La perte de la réponse de signature coûte la voix** : le client tire un nouveau
   `K` et un nouvel aveuglement à chaque envoi, donc le cache de rejeu du serveur ne
-  sert jamais avec lui. Le texte qui promettait le contraire est corrigé ; le client
-  reste à corriger.
+  sert jamais avec lui. Corrigé : le client conserve sa demande avant l'envoi
+  (`localStorage`, moins d'une heure, sans la réponse) et la rejoue ; vérifié dans un
+  vrai navigateur (`tests/test_client_navigateur.py`).
 - **Un groupe sous le seuil peut voter** : K_MIN ne protège que la publication ;
   l'effectif déclaré n'est contrôlé que par un avertissement.
 

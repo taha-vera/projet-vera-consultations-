@@ -228,6 +228,8 @@
         professionnel peut garder la trace que vous avez participé.</span>
       </div>
 
+      <p id="info-groupe" style="display:none; margin:0 0 14px; font-size:14px;"></p>
+
       <form id="vote-form">
         <div class="question-block">
           <!-- D4 : role="radiogroup" + aria-labelledby lie les options a la question.
@@ -527,6 +529,38 @@
     });
   }
 
+  // Dans QUEL groupe la reponse sera comptee, et combien de liens ont ete emis
+  // pour lui (relecture du 15/11/2026). Le groupe est celui du lien, dont la page
+  // n'affichait rien ; l'effectif est celui que le serveur declare. Un serveur
+  // honnete mais curieux ne peut plus isoler quelqu'un sans que cela se voie ;
+  // un serveur qui MENT n'est pas arrete par cette ligne (LIMITS.md §6). Le texte
+  // suit les principes de la garantie ci-dessus : decrire sans promettre, ne pas
+  // accoler « votre reponse » et « identifiable », dire que repondre est libre.
+  // textContent, jamais innerHTML : le nom du groupe vient de l'adresse.
+  async function afficherInfoGroupe() {
+    try {
+      if (!departementVote) return;
+      const r = await fetch(`${API_BASE}/engagement_cles`);
+      if (!r.ok) return;
+      const eng = await r.json();
+      const el = document.getElementById('info-groupe');
+      if (!el || eng.consultation_terminee) return;
+      const n = eng.invitations_emises ? eng.invitations_emises[departementVote] : undefined;
+      const seuil = eng.seuil_publication;
+      let txt = 'Votre réponse sera comptée dans le groupe « ' + departementVote + ' ».';
+      if (typeof n === 'number' && typeof seuil === 'number' && n < seuil) {
+        txt += ' Ce groupe compte ' + n + ' invitation(s), moins que le seuil de ' + seuil
+             + ' : aucun résultat ne sera publié pour lui, et la séparation entre vous et '
+             + 'votre réponse y repose davantage sur la confiance accordée à l\'organisation. '
+             + 'Répondre reste libre.';
+        el.style.color = '#8B3A3A';
+        el.style.fontWeight = '600';
+      }
+      el.textContent = txt;
+      el.style.display = 'block';
+    } catch (e) { /* information facultative : le vote ne depend pas d'elle */ }
+  }
+
   async function chargerQuestion() {
     if (!jetonAutorisation) {
       showError("Ce lien semble incomplet. Il a peut-être été coupé lors de l'envoi : vérifiez que vous l'avez ouvert en entier, ou demandez-en un nouveau à la personne qui vous l'a transmis.", "Lien incomplet");
@@ -556,6 +590,7 @@
       const data = await resp.json();
       questionTitle.textContent = data.question;
       renderOptions(data.options);
+      afficherInfoGroupe();
     } catch (err) {
       questionTitle.textContent = 'Impossible de charger la consultation';
       optionsContainer.innerHTML = `<p style="font-size:14px;color:#8B3A3A;">Vérifiez votre connexion et réessayez.</p>`;
@@ -592,17 +627,27 @@
   // PAS la fermeture de l'onglet, sessionStorage etant efface a ce moment --
   // un commentaire anterieur affirmait le contraire, c'etait faux.
   //
-  // CE QUI COUVRE LE RESTE
-  // Depuis l'idempotence de la signature (12/08), un votant qui a ferme son
-  // onglet peut rouvrir son lien : sa demande de signature, identique, lui
-  // renvoie LA MEME signature au lieu d'un refus. Il refait son choix et
-  // depose. Valable une heure ; au-dela, il lui faut un nouveau lien.
+  // CE QUI COUVRE LE RESTE : LE CREDENTIEL, EN localStorage (15/11/2026)
+  // Ce commentaire disait qu'un votant qui rouvre son lien retrouve sa
+  // signature grace a l'idempotence du serveur (12/08). C'ETAIT FAUX : ce client
+  // tirait un nouveau secret K et un nouvel aveuglement a chaque envoi, donc sa
+  // demande n'etait jamais identique, et le serveur repondait « deja servi ».
+  // Une reponse de signature perdue, ou un onglet ferme avant le depot, coutait
+  // la voix (reproduit dans un vrai navigateur, tests/test_client_navigateur.py).
   //
-  // POURQUOI PAS localStorage
-  // Il survivrait a la fermeture de l'onglet, mais ferait persister la reponse
-  // choisie sur l'appareil jusqu'au depot -- lisible par le suivant sur un
-  // poste partage. Le cas etant deja couvert cote serveur, ce n'est pas la
-  // peine de laisser une trace de plus sur la machine du votant.
+  // Correctif : AVANT d'envoyer la demande de signature, on conserve ce qui la
+  // definit -- le message prepare, le facteur d'aveuglement et le message
+  // aveugle -- sous la cle vera_cred:<hash du jeton>. Un nouvel essai rejoue la
+  // MEME demande, et le serveur renvoie LA MEME signature (cache d'une heure).
+  //
+  // POURQUOI localStorage ET PAS sessionStorage
+  // sessionStorage ne survit pas a la fermeture de l'onglet, que les navigateurs
+  // de telephone font souvent. L'ancien refus de localStorage tenait a ce qu'il
+  // ferait persister la REPONSE choisie sur un poste partage : ici la reponse
+  // n'y est JAMAIS ecrite (elle se choisit apres, et se redonne a chaque essai).
+  // Ce qui reste est de quoi redeposer avec ce jeton pendant moins d'une heure --
+  // ce que permet deja le lien lui-meme. Efface des que le depot aboutit ou est
+  // refuse ; au plus CREDENTIEL_DUREE_MS dans tous les cas.
   //
   // Le payload contient la reponse choisie : stockage transitoire, sur
   // l'appareil du votant, jamais transmis ni au serveur ni a l'organisation.
@@ -623,6 +668,37 @@
   }
   async function effacerPendingLocal() {
     try { sessionStorage.removeItem(await clePendingLocal()); } catch (e) { /* degrade */ }
+  }
+
+  // Credentiel de signature (voir le commentaire ci-dessus). Duree : STRICTEMENT
+  // inferieure a la retention du serveur (RETENTION_SIGNATURES_SECONDS = 3600 s),
+  // pour ne jamais rejouer une demande dont le serveur a deja oublie la reponse.
+  // Gardee par tests/test_client_navigateur.py.
+  const CREDENTIEL_DUREE_MS = 55 * 60 * 1000;
+  async function cleCredentielLocal() {
+    const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(jetonAutorisation || ''));
+    return 'vera_cred:' + toHex(new Uint8Array(h));
+  }
+  async function sauverCredentielLocal(c) {
+    try { localStorage.setItem(await cleCredentielLocal(), JSON.stringify(c)); } catch (e) { /* degrade */ }
+  }
+  async function effacerCredentielLocal() {
+    try { localStorage.removeItem(await cleCredentielLocal()); } catch (e) { /* degrade */ }
+  }
+  async function lireCredentielLocal() {
+    try {
+      const brut = localStorage.getItem(await cleCredentielLocal());
+      if (!brut) return null;
+      const c = JSON.parse(brut);
+      const age = Date.now() - c.t;
+      const hexOk = (s) => typeof s === 'string' && /^([0-9a-f]{2})+$/.test(s);
+      if (typeof c.t !== 'number' || age < 0 || age > CREDENTIEL_DUREE_MS
+          || !hexOk(c.prepared) || !hexOk(c.inv) || !hexOk(c.blinded) || !hexOk(c.pub)) {
+        await effacerCredentielLocal();
+        return null;
+      }
+      return c;
+    } catch (e) { return null; }
   }
 
   // Verrou de re-entrance (Test double-tap). Le bouton disabled bloque deja les
@@ -657,16 +733,29 @@
         showError("La consultation n'a pas encore commencé. Votre lien reste valable : revenez à la date indiquée dans votre invitation.", "Ce n'est pas encore ouvert");
         return;
       }
+      if (rVote.status === 404) {
+        // Apres une CLOTURE, les cles du groupe n'existent plus : le serveur
+        // repond 404 « Departement inconnu » avant d'atteindre son 410. Avant le
+        // 15/11/2026 ce 404 tombait dans « echec reseau » et la page invitait a
+        // reessayer sans fin (« Votre lien reste valable »), ce qui etait faux.
+        votePayloadEnAttente = null;
+        await effacerPendingLocal();
+        await effacerCredentielLocal();
+        showError("Cette consultation est terminée, ou ce lien ne correspond plus à aucune consultation en cours. Votre voix n'a PAS été enregistrée. Signalez-le à la personne qui vous a envoyé ce lien." + phraseRecours(), "Consultation terminée");
+        return;
+      }
       if (rVote.status === 410) {
         votePayloadEnAttente = null;
         await effacerPendingLocal();
+        await effacerCredentielLocal();
         showError("Les réponses ne sont plus acceptées pour votre groupe : le résultat a déjà été publié, ou la consultation est close. Votre voix n'a PAS été enregistrée. Signalez-le à la personne qui vous a envoyé ce lien." + phraseRecours(), 'Voix non enregistrée');
         return;
       }
-      if (rVote.status === 409) { votePayloadEnAttente = null; await effacerPendingLocal(); await marquerVoteLocal(); showSuccess(); return; }
+      if (rVote.status === 409) { votePayloadEnAttente = null; await effacerPendingLocal(); await effacerCredentielLocal(); await marquerVoteLocal(); showSuccess(); return; }
       if (!rVote.ok) throw new Error('vote refuse (' + rVote.status + ')');
       votePayloadEnAttente = null;
       await effacerPendingLocal();
+      await effacerCredentielLocal();
       await marquerVoteLocal();
       showSuccess();
     } catch (err) {
@@ -884,9 +973,25 @@
       const publicKey = await crypto.subtle.importKey(
         'spki', fromHex(cle_publique_hex), { name: 'RSA-PSS', hash: 'SHA-384' }, true, ['verify']);
 
-      const K = crypto.getRandomValues(new Uint8Array(32));
-      const prepared = suite.prepare(K);
-      const { blindedMsg, inv } = await suite.blind(publicKey, prepared);
+      // CREDENTIEL : on rejoue la MEME demande si un essai precedent a laisse la
+      // sienne (reponse perdue, onglet ferme). Sinon on en cree un et on le
+      // CONSERVE AVANT l'envoi -- apres, il serait trop tard. Il n'est reutilise
+      // que pour la meme cle, le meme groupe, et moins de CREDENTIEL_DUREE_MS.
+      let prepared, inv, blindedMsg;
+      const cred = await lireCredentielLocal();
+      if (cred && cred.pub === cle_publique_hex) {
+        prepared = fromHex(cred.prepared);
+        inv = fromHex(cred.inv);
+        blindedMsg = fromHex(cred.blinded);
+      } else {
+        const K = crypto.getRandomValues(new Uint8Array(32));
+        prepared = suite.prepare(K);
+        ({ blindedMsg, inv } = await suite.blind(publicKey, prepared));
+        await sauverCredentielLocal({
+          t: Date.now(), pub: cle_publique_hex,
+          prepared: toHex(prepared), inv: toHex(inv), blinded: toHex(blindedMsg)
+        });
+      }
 
       const rSig = await fetch(`${API_BASE}/signer_aveugle`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -905,7 +1010,7 @@
         showError(quand || "La consultation n'a pas encore commencé. Votre lien reste valable : revenez à la date indiquée dans votre invitation.", "Ce n'est pas encore ouvert");
         return;
       }
-      if (rSig.status === 403) { showError("Ce lien a déjà servi. Si vous avez déjà voté, votre réponse est enregistrée : il n'y a rien d'autre à faire. Si vous n'avez PAS pu voter (page fermée trop tôt, connexion perdue), demandez un nouveau lien à la personne qui vous a envoyé celui-ci.", "Ce lien a déjà été utilisé"); return; }
+      if (rSig.status === 403) { await effacerCredentielLocal(); showError("Ce lien a déjà servi. Si vous avez déjà voté, votre réponse est enregistrée : il n'y a rien d'autre à faire. Si vous n'avez PAS pu voter (page fermée trop tôt, connexion perdue), demandez un nouveau lien à la personne qui vous a envoyé celui-ci.", "Ce lien a déjà été utilisé"); return; }
       if (!rSig.ok) throw new Error('signature refusee');
       const { signature_aveugle_hex, departement } = await rSig.json();
 

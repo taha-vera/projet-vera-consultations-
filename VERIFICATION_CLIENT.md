@@ -29,7 +29,7 @@ précisément celui que ces empreintes ferment.
 Version du 20 octobre 2026 (page de vote : un refus de voix ne s'affiche plus comme un succes, seule la cle publiee pour le groupe du lien est acceptee, et le lien de vote est retire de l'URL apres lecture ; le bundle est inchange depuis le 3 septembre) :
 
 ```
-c6996a78303133126ff1b7a545add6070e2548fc0cca6ff77a996d7c8cbb2d38  static/vote.html
+d39ca84ff499c26da80d5093aee6388d6c9d72e466f74587ff91f6341445c769  static/vote.html
 08e678cc5d64e9996cfe3cf54eb1220a1bb032c54d0c4351651f8aee057baa66  static/blindrsa-bundle.js
 ```
 

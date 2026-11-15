@@ -128,6 +128,8 @@ if [ -n "$divergents" ]; then
 fi
 
 passes=0
+ignores=0
+liste_ignores=""
 echecs=0
 liste_echecs=""
 
@@ -156,6 +158,14 @@ for f in tests/test_*.py; do
     if [ $code -eq 0 ]; then
         printf "PASS   %s\n" "$(basename "$f")"
         passes=$((passes + 1))
+    elif [ $code -eq 2 ] && echo "$sortie" | grep -q "^IGNORE :"; then
+        # Code 2 + ligne « IGNORE : » = un prerequis manque (navigateur pour
+        # test_client_navigateur, par exemple), PAS un defaut. Dit a voix haute et
+        # compte a part : un test ignore n'est jamais compte comme reussi. La CI,
+        # elle, pose VERA_EXIGER_NAVIGATEUR=1 et ne peut donc pas l'ignorer.
+        printf "IGNORE %s : %s\n" "$(basename "$f")" "$(echo "$sortie" | grep "^IGNORE :" | head -1)"
+        ignores=$((ignores + 1))
+        liste_ignores="$liste_ignores $(basename "$f")"
     else
         printf "ECHEC  %s (code %d)\n" "$(basename "$f")" "$code"
         echo "$sortie" | tail -3 | sed 's/^/         /'
@@ -165,7 +175,11 @@ for f in tests/test_*.py; do
 done
 
 echo "==================================================="
-echo "$passes reussis, $echecs echoues"
+if [ $ignores -ne 0 ]; then
+    echo "$passes reussis, $echecs echoues, $ignores ignore(s) :$liste_ignores"
+else
+    echo "$passes reussis, $echecs echoues"
+fi
 
 if [ $echecs -ne 0 ]; then
     echo "Fichiers en echec :$liste_echecs"
