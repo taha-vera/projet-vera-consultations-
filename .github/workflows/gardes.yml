@@ -356,13 +356,6 @@ jobs:
           export VERA_ADMIN_USER=ci_test
           export VERA_ADMIN_HASH=$(PYTHONPATH=. .venv/bin/python3 -c "from vera_admin_auth import generer_empreinte; print(generer_empreinte('mot_de_passe_ci_jetable'))")
 
-          # Navigateur pour test_client_navigateur : la page de vote tourne pour de bon
-          # (Chromium + vrai serveur). VERA_EXIGER_NAVIGATEUR=1 : sans navigateur le test
-          # ECHOUE au lieu de s'ignorer -- une garde qui s'ignore en silence ne garde rien.
-          .venv/bin/pip install --quiet playwright==1.56.0
-          .venv/bin/python3 -m playwright install --with-deps chromium
-          export VERA_EXIGER_NAVIGATEUR=1
-
           for t in test_signer_aveugle test_signature_production \
                    test_parcours_http test_cycle_vie_cle \
                    test_antirejeu_persistant test_non_regression_correctifs \
@@ -373,7 +366,7 @@ jobs:
                    test_gardes_demarrage_executees test_courses_repondre_publication_cloture \
                    test_publication_figee_et_collision_jeton test_sauvegarde_chemins_speciaux \
                    test_cle_publique_no_store test_documentation_api_absente \
-                   test_signature_concurrente test_epsilon_lie_au_bruit test_client_navigateur test_vecteurs_rfc9474; do
+                   test_signature_concurrente test_epsilon_lie_au_bruit test_vecteurs_rfc9474; do
             base_jetable=$(mktemp -u /tmp/vera_ci_XXXXXX.db)
             VERA_DB_PATH="$base_jetable" PYTHONPATH=. .venv/bin/python3 "tests/$t.py"
             rm -f "$base_jetable" "$base_jetable"-wal "$base_jetable"-shm
@@ -401,3 +394,50 @@ jobs:
         run: |
           (cd chantier_crypto && npm ci --silent)
           VERA_PYTHON="$PWD/.venv/bin/python3" ./run_tests.sh
+
+  # LA PAGE DE VOTE DANS UN VRAI NAVIGATEUR (15/11/2026)
+  #
+  # Job separe, sur Ubuntu 24.04 EPINGLE, et non ubuntu-latest : le premier essai,
+  # sur ubuntu-latest (devenu Ubuntu 26.04), a echoue en 4 secondes avec
+  # « Playwright does not support chromium on ubuntu26.04-x64 » -- lu dans le
+  # journal reel du run #112, pas devine. Playwright 1.56 ne sait pas installer
+  # son navigateur sur cette version du systeme. Isole ici, l'echec eventuel d'une
+  # mise a jour de Playwright ne rougit pas le job `crypto`, qui garde ubuntu-latest
+  # (meme systeme que le serveur, ce qui compte pour la compilation du module).
+  #
+  # VERA_EXIGER_NAVIGATEUR=1 : sans navigateur, tests/test_client_navigateur.py
+  # ECHOUE au lieu de s'ignorer -- une garde qui s'ignore en silence ne garde rien.
+  navigateur:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust stable (>= 1.85 exige par Cargo.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Creer le venv a la racine et installer les dependances
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet -r requirements.txt
+          .venv/bin/pip install --quiet maturin playwright==1.56.0
+
+      - name: Compiler le module Rust (PyO3)
+        run: |
+          cd vera_blind_sig
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 ../.venv/bin/maturin develop --release --locked
+
+      - name: Installer Chromium
+        run: .venv/bin/python3 -m playwright install --with-deps chromium
+
+      - name: Page de vote dans un vrai navigateur
+        run: |
+          export VERA_DB_KEY=$(.venv/bin/python3 -c "import secrets; print(secrets.token_hex(32))")
+          export VERA_ADMIN_USER=ci_test
+          export VERA_ADMIN_HASH=$(PYTHONPATH=. .venv/bin/python3 -c "from vera_admin_auth import generer_empreinte; print(generer_empreinte('mot_de_passe_ci_jetable'))")
+          export VERA_EXIGER_NAVIGATEUR=1
+          base_jetable=$(mktemp -u /tmp/vera_ci_XXXXXX.db)
+          VERA_DB_PATH="$base_jetable" PYTHONPATH=. .venv/bin/python3 tests/test_client_navigateur.py
