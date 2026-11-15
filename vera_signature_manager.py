@@ -217,13 +217,14 @@ class GestionnaireSignature:
             _persistance.effacer_cles_publiques_expirees()
 
     def _expirer_cle(self):
-        """Appelee par le TIMER a l'echeance des 48h. Detruit la cle en memoire
+        """Appelee par le TIMER a l'echeance de la duree de vie de la cle (7 jours,
+        DUREE_VIE_CLE_SECONDES ; 48 h avant le 24/07/2026). Detruit la cle en memoire
         ET la purge de la base.
 
         Correctif du 24/07 : le timer n'appelait que _detruire_cle_privee, qui
         zeroise la RAM. La cle privee chiffree survivait donc dans
         cle_rsa_active jusqu'au prochain ouvrir_consultation, c'est-a-dire
-        jusqu'a un redemarrage. La garantie affichee -- "a 48h la cle est
+        jusqu'a un redemarrage. La garantie affichee -- "a l'echeance la cle est
         detruite" -- n'etait vraie qu'en memoire : un snapshot disque ou une
         sauvegarde prise entre l'echeance et le reboot contenait encore la cle.
         Meme motif que la Porte 19 : une garantie qui repose sur une hypothese

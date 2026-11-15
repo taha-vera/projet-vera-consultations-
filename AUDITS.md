@@ -1106,3 +1106,38 @@ et l'en-tête ne montre que « nginx ». Hors dépôt, donc non vérifiée par l
 **Leçon de ce passage.** Le premier constat de fond (E1) ne se voyait ni dans le code ni
 dans les documents : il a fallu lire le journal de la machine. Un audit du seul dépôt aurait
 conclu à tort que tout était cohérent.
+
+### Relecture indépendante par un autre modèle (15/11/2026, deux tours, confrontée au code)
+
+Deux relectures du code du chemin critique par un autre modèle, à partir du dossier de
+relecture, commentaires retirés. Ce n'est **pas** un audit externe humain. Chaque constat a
+été confronté au code, et à une expérience quand c'était possible, avant d'être retenu ; les
+affirmations du relecteur ne l'ont jamais été sur parole.
+
+| # | Constat | Verdict | Suite |
+|---|---------|---------|-------|
+| 6 | Un jeton déclenche N opérations de clé privée sous requêtes simultanées (une seule signature livrée) | **Confirmé par expérience** : 24 requêtes, 24 calculs | Verrou par jeton ; `test_signature_concurrente.py`, vérifié par mutant |
+| C | La perte de la réponse de signature coûte la voix ; le cache de rejeu ne sert jamais avec le client réel | **Confirmé** dans le code (nouveau secret et nouvel aveuglement à chaque envoi) | Textes corrigés (LIMITS §1, §12ter) ; **client à corriger** |
+| D | Après clôture, le dépôt reçoit 404 et le client dit « réessayez » | **Reproduit** (404 « Département inconnu », puis boucle) | **Client à corriger** |
+| A | Signature et dépôt partent à quelques secondes d'écart | Confirmé ; **admis dans un commentaire du code, absent de LIMITS** | LIMITS §9 ; docstring de `definir_ouverture` corrigée |
+| B | Un serveur malveillant isole chaque votant par un nom de groupe unique | Confirmé ; opérateur actif (hors garantie), non corrigé | Dossier §5bis ; affichage du groupe et du nombre d'invitations à décider |
+| E | `DELTA_INT` et epsilon non liés ; `VERA_DB_KEY` sans contrôle de longueur ; texte « plus aucune donnée » | Confirmés, faibles | `test_epsilon_lie_au_bruit.py` ; textes corrigés ; contrôle de la clé laissé à `verifier_deploiement.sh` |
+| 1, 2, 3, 7, 8, 9 | K_MIN ne protège que la publication ; jetons au porteur ; epsilon par consultation ; monopole du résultat ; date d'ouverture ; participation hors bruit | **Déjà documentés** (§13, §13bis, §14, §9bis) | Aucune |
+
+**Erreurs de texte confirmées.** Le dossier de relecture disait que le lien porte la clé du
+groupe dans `#k=` : il porte l'agrégat. Les docstrings de `etat_departements`, `cloturer` et du
+gestionnaire de signature (« 48 h ») étaient inexactes. Corrigé.
+
+**Hypothèses du relecteur levées.** Aperçu de lien SMS (la signature ne part qu'à la validation
+du formulaire), rechargement de page (charge conservée), dépôt après publication (410), jetons
+en clair (hachés), taille du dépôt (bourrage constant), calcul de l'agrégat (JS et Python
+concordent), sensibilité 2 du bruit (le calcul tient).
+
+**Ce que cette relecture a trouvé que nos propres audits n'avaient pas vu :** une phrase du
+dossier envoyé au cryptographe qui était fausse, et un mécanisme de rattrapage décrit dans trois
+documents qui ne fonctionne pas avec le client réel. Les deux venaient de textes que nous avions
+écrits nous-mêmes et relus en y croyant.
+
+**Limite de ce passage.** Le relecteur n'a pas lu le code interne de la crate Rust ni le bundle
+JavaScript ; l'affirmation « un jeton = une opération » ne vaut que sous le verrou de ce
+processus, avec un seul worker.

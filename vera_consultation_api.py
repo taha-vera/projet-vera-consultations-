@@ -444,7 +444,10 @@ EPSILON_PAR_PUBLICATION = 0.5  # coherent avec validation_opendp.py existant
 # n'y a donc volontairement AUCUNE re-publication -- c'est ce qui empeche le
 # moyennage du bruit. Le budget est aligne sur ce comportement reel (0.5, pas
 # 1.5) pour ne pas laisser croire a 3 publications possibles.
-budget_epsilon = BudgetEpsilonParDepartement(epsilon_total_autorise=0.5)
+# Lie a EPSILON_PAR_PUBLICATION plutot que recopie : deux « 0.5 » independants
+# pouvaient diverger sans erreur (audit du 15/11/2026, constat E). La liaison
+# avec l'echelle du bruit est verifiee par tests/test_epsilon_lie_au_bruit.py.
+budget_epsilon = BudgetEpsilonParDepartement(epsilon_total_autorise=EPSILON_PAR_PUBLICATION)
 
 import vera_persistance as persistance
 
@@ -1137,6 +1140,40 @@ class SignerAveugleRequete(BaseModel):
 _DETAIL_JETON_INUTILISABLE = "Jeton d'autorisation invalide ou deja utilise."
 
 
+# VERROU PAR JETON (audit du 15/11/2026, constat 6)
+#
+# Avant ce correctif, le controle « ce jeton est-il libre ? » (jeton_a_deja_signe)
+# et la consommation (consommer_jeton_autorisation) etaient deux appels
+# separes, avec la SIGNATURE entre les deux. N requetes simultanees sur un meme
+# jeton, avec N messages differents, passaient donc toutes le controle, faisaient
+# toutes une operation de cle privee, et une seule gagnait la consommation : les
+# autres recevaient leur 403 APRES le calcul. Mesure le 15/11/2026 : 24 requetes
+# simultanees -> 1 signature livree, 24 operations de cle privee.
+#
+# Consequences : la borne « une operation privee par jeton » (LIMITS §16,
+# argument contre l'attaque de Marvin) etait fausse en concurrence, et la duree
+# des 403 perdants (calcul compris) les distinguait des refus immediats.
+#
+# Le verrou serialise toute la sequence controle -> signature -> consommation ->
+# memorisation POUR UN MEME JETON. Un perdant, une fois le verrou obtenu, trouve
+# le jeton deja signe : il est refuse AVANT tout calcul, comme en sequentiel.
+# Un rejeu identique (meme jeton, meme message) retrouve sa signature en cache,
+# toujours sous le verrou : l'idempotence est conservee.
+#
+# 64 verrous repartis par empreinte du jeton, plutot qu'un dictionnaire de
+# verrous : memoire bornee, rien a nettoyer. Deux jetons distincts qui tombent
+# sur le meme verrou s'attendent l'un l'autre -- une signature RSA-2048 dure
+# quelques millisecondes, et cela ne sert aucun canal : l'attente depend du
+# hasard du hachage, pas de la participation. Ordre des verrous : celui-ci,
+# puis _verrou_db (jamais l'inverse).
+_NB_VERROUS_JETON = 64
+_verrous_jeton = [threading.Lock() for _ in range(_NB_VERROUS_JETON)]
+
+
+def _verrou_pour_jeton(emp_jeton):
+    return _verrous_jeton[int(emp_jeton[:8], 16) % _NB_VERROUS_JETON]
+
+
 @app.post("/api/signer_aveugle")
 def signer_aveugle_endpoint(payload: SignerAveugleRequete):
     import hashlib
@@ -1244,6 +1281,17 @@ def signer_aveugle_endpoint(payload: SignerAveugleRequete):
 
     emp_jeton = hashlib.sha384(payload.jeton_autorisation.encode("utf-8")).hexdigest()
     emp_message = hashlib.sha384(message_aveugle).hexdigest()
+
+    # Un verrou par jeton : voir _verrou_pour_jeton. Tout ce qui suit -- controle,
+    # signature, consommation, memorisation -- se deroule SOUS ce verrou.
+    with _verrou_pour_jeton(emp_jeton):
+        return _signer_aveugle_sous_verrou(payload, message_aveugle, emp_jeton, emp_message)
+
+
+def _signer_aveugle_sous_verrou(payload, message_aveugle, emp_jeton, emp_message):
+    """Corps de /api/signer_aveugle, execute sous le verrou du jeton. Voir le
+    commentaire de _verrou_pour_jeton pour ce que ce verrou ferme (audit du
+    15/11/2026, constat 6)."""
 
     deja = persistance.signature_deja_emise(emp_jeton, emp_message)
     if deja is not None:
@@ -1967,10 +2015,15 @@ def cloturer_consultation(session_vera: Optional[str] = Cookie(None)):
     TOUT l'etat brut du serveur : compteurs, effectifs, codes courts, tokens
     consommes, budget, resultats publies, et la cle de signature.
 
-    Apres cet appel, le serveur ne conserve PLUS AUCUNE donnee de la
-    consultation. C'est la garantie de minimisation de VERA rendue
-    operationnelle et verifiable. Une nouvelle consultation (nouvelle cle)
-    est immediatement ouverte pour un usage ulterieur.
+    Apres cet appel, le serveur ne conserve plus AUCUNE donnee de la
+    consultation elle-meme (reponses, compteurs, jetons, cles). Il garde
+    seulement l'historique des consultations closes par groupe (nom du groupe
+    et date, table historique_consultations), qui sert a avertir quand un meme
+    groupe est consulte trop souvent. C'est la garantie de minimisation de VERA
+    rendue operationnelle et verifiable. Une nouvelle consultation (nouvelle
+    cle) est immediatement ouverte pour un usage ulterieur.
+    (Texte corrige le 15/11/2026 : il disait « PLUS AUCUNE donnee », ce que
+    l'historique contredisait.)
 
     ATTENTION : operation irreversible. Les resultats non sauvegardes par le
     RH a la reception de cette reponse sont definitivement perdus."""
@@ -2609,7 +2662,15 @@ def definir_ouverture(payload: OuvertureRequete, session_vera: Optional[str] = C
 
     L'emission peut donc s'etaler sur plusieurs jours -- ce qui correspond a la
     realite d'un envoi de SMS lisse pour ne pas declencher les filtres
-    anti-spam des operateurs. Seuls les DEPOTS attendent.
+    anti-spam des operateurs. La signature ET le depot attendent l'ouverture.
+
+    CE QUE CETTE DATE NE FERME PAS (corrige le 15/11/2026)
+    Elle separe l'ordre de VOS envois de l'ordre des votes. Elle ne separe pas
+    les deux requetes d'un meme votant : apres l'ouverture, son navigateur
+    demande la signature puis depose, a quelques secondes d'intervalle. Un
+    operateur qui voit les deux requetes peut les rapprocher (LIMITS §9, « Signature
+    et depot partent a quelques secondes d'ecart »). Cette docstring disait
+    « Seuls les DEPOTS attendent », ce qui etait faux.
 
     Modifiable tant que la date n'est pas passee : un RH dont l'envoi prend du
     retard doit pouvoir repousser l'ouverture.
@@ -2718,12 +2779,14 @@ def etat_departements(session_vera: Optional[str] = Cookie(None)):
     par departement (nombre de votes recus, seuil K_MIN atteint ou non),
     sans jamais montrer les reponses elles-memes.
 
-    NOTE : en mode signature aveugle (production), le serveur ne conserve
-    AUCUNE trace des tokens emis -- c'est precisement ce qui garantit
-    l'anonymat (impossible de lier un token a un participant). On ne peut
-    donc pas afficher "tokens generes/consommes" : cette information
-    n'existe pas cote serveur, par conception. On affiche la seule chose
-    reelle et non identifiante : le nombre de votes recus par departement."""
+    NOTE : le serveur conserve les jetons d'autorisation emis (sous forme
+    d'empreinte, avec un drapeau « utilise »), et le nombre d'invitations par
+    groupe s'affiche ci-dessous. Ce qu'il ne conserve PAS, c'est un lien entre
+    un jeton et un vote : le depot ne porte aucun jeton (signature aveugle).
+    On affiche donc le nombre d'invitations generees et le nombre de votes
+    recus par groupe, mais jamais « ce jeton a vote ». (Texte corrige le
+    15/11/2026 : il disait « AUCUNE trace des tokens emis », ce que le
+    nombre d'invitations ci-dessous contredisait.)"""
     exiger_session(session_vera)
 
     invitations = persistance.compter_jetons_par_departement()

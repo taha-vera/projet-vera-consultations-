@@ -28,10 +28,17 @@ redécouvrir.
    **agrégat** : SHA-256 des couples (nom de groupe, clé publique) triés, chaque
    champ précédé de sa longueur sur 4 octets.
 2. L'organisateur **publie cet agrégat hors du serveur** avant tout envoi. Chaque
-   lien d'invitation porte la clé publique de son groupe dans le fragment `#k=`.
+   lien d'invitation porte, dans le fragment `#k=`, **l'agrégat** (l'empreinte de
+   l'ensemble des clés), **et non la clé de son groupe** : le navigateur récupère
+   les clés à part (`/api/cle_publique`, `/api/engagement_cles`). Correction du
+   15/11/2026 : ce document disait l'inverse. Le lien étant fabriqué par le
+   serveur, la comparaison automatique que fait le navigateur est circulaire ;
+   seule la comparaison avec l'agrégat publié hors du serveur a une valeur, et la
+   page n'offre aucun support pour la faire (elle n'affiche ni l'agrégat ni le
+   groupe, et efface le fragment de la barre d'adresse).
 3. Le navigateur du votant récupère toutes les clés, recalcule l'agrégat,
    le compare à celui du lien, refuse si le nombre de clés par groupe n'est pas
-   un ou si la clé de son lien n'est pas celle de son groupe.
+   un ou si la clé reçue pour son groupe n'est pas celle de l'ensemble.
 4. Il tire `K` (32 octets, `crypto.getRandomValues`), fait
    `prepare(K)` → randomizer (32 octets) ‖ K, puis `blind`. Il envoie au serveur
    `jeton_autorisation` (à usage unique) et le message aveuglé.
@@ -64,6 +71,11 @@ La réponse n'est **pas** couverte par la signature : seul `K` l'est.
   octets de la RFC ; sept altérations sont refusées. Limites : le vecteur est en
   RSA 4096, pas 2048 ; `aveugler_message` n'est pas rejoué (il tire de
   l'aléa). `tests/test_vecteurs_rfc9474.py`.
+- **Un jeton = une opération à clé privée, même en concurrence** (24 requêtes
+  simultanées : une signature, un calcul) : `tests/test_signature_concurrente.py`,
+  vérifié par mutant (sans le verrou, 24 calculs).
+- **Epsilon annoncé, budget et échelle du bruit liés** :
+  `tests/test_epsilon_lie_au_bruit.py`.
 - **Interopérabilité client JS ↔ serveur Rust**, concurrence, et survie de
   l'anti-rejeu à un `kill -9` : `chantier_crypto/test_*.mjs`.
 - **`cargo audit`** (24/10/2026) : 5 avis, 2 corrigés par mise à jour du verrou,
@@ -99,7 +111,12 @@ La réponse n'est **pas** couverte par la signature : seul `K` l'est.
    (signature uniquement, aucun déchiffrement exposé) ? Un fait qui borne
    l'exposition : chaque jeton ne déclenche qu'une opération à clé privée, un refus
    précède tout calcul et le rejeu renvoie la signature mémorisée ; le nombre
-   d'opérations par clé est donc au plus l'effectif du groupe. Ce plafond suffit-il
+   d'opérations par clé est donc au plus l'effectif du groupe. **Ce fait était
+   faux en concurrence jusqu'au 15/11/2026** : le contrôle du jeton et sa
+   consommation étaient séparés par la signature, et 24 requêtes simultanées
+   sur un même jeton exécutaient 24 opérations à clé privée (une seule signature
+   livrée). Un verrou par jeton ferme ce cas ; `tests/test_signature_concurrente.py`
+   le vérifie. Ce plafond suffit-il
    face aux attaques par canal temporel sur signature aveuglée ? Le RNG par défaut
    (`rand`) est-il un bon choix pour la génération de clés et l'aveuglement ?
 6. **Taille de clé.** 2048 bits suffit-il pour une durée de vie de 7 jours et
@@ -115,6 +132,27 @@ La réponse n'est **pas** couverte par la signature : seul `K` l'est.
    publication de **trois** cases bruitées reste-t-elle à ε = 0,5 ?
    Cette partie relève peut-être d'une autre personne qu'un spécialiste de
    cryptographie à clé publique.
+
+## 5bis. Écarts déjà relevés par des relectures internes (15/11/2026)
+
+Une relecture indépendante par un autre modèle, confrontée au code, a produit ces
+constats. Ils ne sont pas des questions à vous poser : ils sont donnés pour que vous
+ne les redécouvriez pas, et pour que vous jugiez ce que nous en avons fait.
+
+- **Signature et dépôt partent à quelques secondes d'écart** (le client enchaîne
+  `/api/signer_aveugle` puis `/api/repondre`) ; la date d'ouverture les bloque tous
+  deux à l'identique et ne les sépare donc pas. Un opérateur qui journalise les deux
+  requêtes peut les rapprocher. C'est un risque **admis** (opérateur actif, hors
+  garantie), désormais écrit dans LIMITS §9.
+- **Un serveur malveillant peut fabriquer des liens à nom de groupe unique** : il
+  isole chaque votant sans toucher au JavaScript, car le lien porte aussi l'agrégat
+  que le client compare. Seule la comparaison hors bande y répond. Non corrigé.
+- **La perte de la réponse de signature coûte la voix** : le client tire un nouveau
+  `K` et un nouvel aveuglement à chaque envoi, donc le cache de rejeu du serveur ne
+  sert jamais avec lui. Le texte qui promettait le contraire est corrigé ; le client
+  reste à corriger.
+- **Un groupe sous le seuil peut voter** : K_MIN ne protège que la publication ;
+  l'effectif déclaré n'est contrôlé que par un avertissement.
 
 ## 6. Ce que nous savons ne pas savoir
 

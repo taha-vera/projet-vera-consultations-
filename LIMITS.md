@@ -130,8 +130,11 @@ la signature finalisee. Le cache prouve donc seulement **qu'un jeton a obtenu un
 signature** -- information que `jetons_autorisation.utilise = 1` publié déjà en
 base, sans limite de retention. L'apport marginal est proche de zero.
 
-Il permet a un votant dont la finalisation a echoue de rouvrir son lien et de
-retrouver sa signature au lieu de perdre sa voix.
+Il est écrit pour qu'un votant puisse retrouver sa signature en renvoyant la MÊME
+demande. **Le client actuel ne la renvoie jamais** (relecture du 15/11/2026) : il
+tire un nouveau secret `K` et un nouvel aveuglement à chaque envoi, donc sa demande
+n'est jamais identique, et le cache ne sert à rien avec lui. Le rattrapage que ce
+paragraphe annonçait n'existe pas aujourd'hui ; voir §12ter pour ce que cela coûte.
 
 Retention : une heure, purge physique a chaque lecture et a chaque ecriture,
 vidage complet a la clôture. Il ne survit pas a un redemarrage du service.
@@ -842,6 +845,31 @@ qui connait le système. Un organisateur n'y est jamais confronte.
 Si un jour plusieurs administrateurs permanents devenaient necessaires, la voie
 propre serait de les declarer dans l'unite systemd au même titre que le compte
 principal -- pas de les persister en base.
+
+### Signature et dépôt partent à quelques secondes d'écart (relecture du 15/11/2026)
+
+Le navigateur du votant envoie la demande de signature, puis le dépôt, sans délai.
+La date d'ouverture ne les sépare pas : elle les bloque tous deux de la même façon.
+Ce qu'elle ferme, c'est le lien entre l'ordre de vos envois et l'ordre des votes
+(§9bis) ; elle ne ferme pas le lien entre les deux requêtes d'un même votant.
+
+**Ce que cela permet.** La demande de signature porte le jeton, que l'organisateur
+connaît personne par personne ; le dépôt porte la réponse. Qui voit les deux requêtes
+avec leur heure et leur adresse -- le processus du serveur lui-même, l'hébergeur s'il
+journalise, un observateur du réseau de l'organisation -- peut les rapprocher et
+attribuer la réponse. Dans une minute chargée, l'ambiguïté protège ; dans une minute
+calme, non. Nous ne l'avons pas chiffré.
+
+**Pourquoi ce n'est pas fermé.** Le fermer exigerait deux visites du votant
+(obtenir son accréditation, revenir plus tard pour déposer), pour une menace qui
+suppose un opérateur activement malveillant (hors garantie, §1). Les journaux nginx
+sont coupés sur ces routes, ce qui retire le moyen le plus simple de conserver
+l'information ; mais le processus du serveur voit les deux requêtes, et la
+configuration nginx n'est pas une propriété du code.
+
+**Une atténuation envisageable, non faite :** un délai aléatoire côté client entre
+la signature et le dépôt, page ouverte. Elle aiderait dans les moments chargés et pas
+dans les moments calmes ; elle se décide avec les corrections du client.
 
 ## 9bis. La date d'ouverture des votes : obligatoire, mais le serveur ne voit pas vos envois
 
@@ -1578,13 +1606,24 @@ façon par SMS ou courriel (voir ci-dessus).
 
 ## 12ter. Une voix peut se perdre en silence, et pas au hasard
 
-Le cache décrit en section 1 rattrape le cas courant -- rechargement de page,
-coupure brève. Il ne rattrape pas tout.
+**Correction du 15/11/2026.** Cette section disait que le cache de la section 1
+rattrape le cas courant. C'était faux avec le client réel : voir §1.
 
-Un votant perd sa voix définitivement si son navigateur échoue entre la
-signature et le dépôt et qu'il revient **plus d'une heure après**, ou après un
-redémarrage du service. Le jeton est consommé, aucun recours automatique : il
-faut demander une nouvelle invitation.
+Ce qui rattrape réellement : le **rechargement de la page après la signature**, car
+le client conserve alors la réponse prête à déposer dans `sessionStorage` et la
+redépose à l'ouverture.
+
+Ce qui ne rattrape pas : un votant perd sa voix définitivement si son navigateur
+échoue **entre le moment où le serveur signe et celui où le dépôt aboutit**, sauf
+simple rechargement de la page. Deux cas : la réponse de signature ne lui parvient
+pas (coupure réseau au mauvais moment), ou il ferme l'onglet avant le dépôt. Le
+jeton est consommé, le nouvel essai tire un nouveau secret, le serveur répond « ce
+lien a déjà servi » : aucun recours automatique, il faut demander une nouvelle
+invitation. Cela ne dépend ni d'une heure ni d'un redémarrage.
+
+Une correction existe (conserver, avant l'envoi, le message aveuglé et ses paramètres,
+pour que la même demande puisse être rejouée) ; elle modifie le client et attend sa
+mise en œuvre.
 
 **Ce n'est pas neutre pour le résultat.** Cette perte ne frappe pas au hasard :
 elle touche les connexions instables, les usages mobiles, les zones mal
@@ -2047,7 +2086,11 @@ Deux choix à connaître, audit du 20/10/2026 (A12) :
   `/api/signer_aveugle` : un jeton déjà utilisé reçoit un refus avant tout calcul
   RSA, et le rejeu d'une même demande renvoie la signature mémorisée sans nouveau
   calcul ; le nombre d'opérations à clé privée par clé est donc borné par
-  l'effectif du groupe). Je ne l'ai pas rendu
+  l'effectif du groupe). **Cette borne était fausse en concurrence jusqu'au
+  15/11/2026** : le contrôle du jeton et sa consommation étaient séparés par la
+  signature, et 24 requêtes simultanées sur un même jeton exécutaient 24
+  opérations (une seule signature livrée). Un verrou par jeton la rend vraie ;
+  `tests/test_signature_concurrente.py` la vérifie et échoue sans le verrou. Je ne l'ai pas rendu
   exploitable et je ne prétends pas qu'il est impossible : c'est un risque résiduel
   accepté, à rouvrir quand `rsa` publie un correctif. Une pré-version plus
   récente existe (0.10.0-rc.19, 06/10/2026) ; je ne l'ai pas adoptée : la base
