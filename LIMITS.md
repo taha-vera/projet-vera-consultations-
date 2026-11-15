@@ -1346,6 +1346,52 @@ au démarrage), nginx devant, aucune exécution de code fournie par l'utilisateu
 gunicorn (ligne de commande et `GUNICORN_CMD_ARGS`). Un `bind = ...` dans un fichier
 de configuration gunicorn lui est invisible ; l'unité livrée lance uvicorn.
 
+### Une mise à jour système peut relancer le service sans qu'on l'ait décidé (audit d'exposition du 15/11/2026)
+
+Les mises à jour de sécurité s'installent seules (`unattended-upgrades`). Le
+15/11/2026 à 06:00:53, l'une d'elles a remplacé `libc6` ; treize secondes plus tard,
+`needrestart` a arrêté puis relancé **tous** les services du serveur, `vera-consultation`
+comprise. Rien n'était ouvert ce jour-là. Mais un redémarrage pendant une consultation
+efface les sessions et les comptes de la page RH (§12) sans que personne l'ait
+voulu ; les votes, eux, sont déjà sur disque.
+
+**Ce qui a été fait.** Une règle `needrestart` (`infra/needrestart-vera.conf`, installée
+dans `/etc/needrestart/conf.d/`) diffère le redémarrage de ce seul service. Les mises à
+jour continuent de s'installer ; nginx et le reste se relancent comme avant.
+`tests/test_unite_durcie.py` vérifie que la règle vise bien le nom de l'unité livrée.
+
+**Ce que cela coûte.** Tant que le service n'est pas relancé à la main, il garde en
+mémoire l'ancienne version des bibliothèques mises à jour : une faille corrigée sur
+disque reste ouverte dans ce processus-là. La règle déplace donc la décision au
+mainteneur : après une mise à jour système, **hors consultation**, relancer le service
+(PROCEDURE_REPRISE_VERA.md, Partie 5). Un noyau mis à jour, lui, n'est actif qu'après un
+redémarrage complet de la machine : à faire dans la même fenêtre.
+
+**Ce qui n'est pas vérifié.** La règle est contrôlée à l'analyse (`needrestart -b` ne
+signale aucune erreur, et la même règle différait bien les services déjà exclus par
+défaut). Elle n'a pas encore été vue en action sur une vraie mise à jour de bibliothèque.
+
+### Ce que l'audit d'exposition a laissé ouvert, et assumé
+
+Audit mené le 15/11/2026 avec `infra/audit_exposition_serveur.sh` (lecture seule). Ports,
+SSH par clé seule, droits des fichiers sensibles, en-têtes, certificat : conformes.
+Quatre points restent, dits ici plutôt que tus :
+
+- **Pas de pare-feu sur la machine** (`ufw` inactif). Seuls 22, 80 et 443 écoutent hors
+  boucle locale, donc rien n'est exposé aujourd'hui ; un pare-feu serait une seconde
+  barrière. Celui de la console Hetzner n'est pas visible depuis le serveur et n'a pas
+  été vérifié.
+- **Une seule clé SSH, sur un seul appareil**, protégée par une phrase secrète. Perdre
+  l'appareil ou la phrase coupe l'accès par SSH ; la reprise passe par la console du
+  fournisseur. Choix assumé du mainteneur le 15/11/2026 : pas de seconde clé pour l'instant.
+- **Des copies de secrets subsistent dans le dossier de root**, en dehors de
+  `/etc/vera/vera.env` : d'anciennes valeurs (remplacées depuis la rotation du
+  31/07/2026) et une copie de la clé de chiffrement actuelle. Même machine, mode 600 :
+  ce n'est pas un chemin d'attaque de plus pour qui est déjà root, mais une rotation de
+  secret reste incomplète tant que ces copies existent.
+- **Le certificat est enregistré sous un ancien nom de domaine** (DuckDNS) en plus de
+  `vera-consultation.fr` : son renouvellement dépend aussi de ce nom.
+
 ### L'accès SSH au serveur
 
 Depuis le 20/10/2026, SSH n'accepte que la clé (`infra/sshd-durcissement.conf`,

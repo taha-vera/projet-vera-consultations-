@@ -36,7 +36,16 @@ from vera_epsilon_budget import BudgetEpsilonParDepartement
 # le 09/09/2026.
 from vera_dp_noise import publier_histogramme_dp
 
-app = FastAPI(title="VERA Consultation")
+# PAS DE DOCUMENTATION INTERACTIVE EN LIGNE (audit d'exposition du 15/11/2026).
+#
+# FastAPI publie par defaut /openapi.json, /docs et /redoc. Constate EN LIGNE : les
+# trois repondaient 200, et le schema listait toutes les routes, celles de
+# l'administration comprises. Rien de secret -- le depot est public -- mais une
+# surface que personne n'avait decidee : le service n'a aucune raison de decrire
+# lui-meme ses points d'entree d'administration a qui les demande. Les routes
+# restent evidemment servies ; seule leur description automatique disparait.
+app = FastAPI(title="VERA Consultation",
+              docs_url=None, redoc_url=None, openapi_url=None)
 
 # --------------------------------------------------------------------------
 # GARDE CRITIQUE : un seul worker autorise.

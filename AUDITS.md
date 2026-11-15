@@ -1083,3 +1083,26 @@ groupe), F5 (le blocage par compte ne freine pas), F6 (secrets hors de l'unite),
 F8 (declaration relue sous verrou), F9 (marge de depot), F11 (client lent sur
 nginx), F12 (sauvegardes V1), F14 (quatre affirmations du modele de menace,
 commit 7ee5dbe).
+
+### Audit d'exposition du serveur (15/11/2026, mené avec l'assistant, pas un audit externe)
+
+Lot de lecture seule (`infra/audit_exposition_serveur.sh`) sur la machine en service, plus
+relecture du dépôt (bandit, pip-audit, npm audit, chemin de vote, clôture). Six constats ;
+chacun a été confronté à une sortie réelle avant d'être retenu.
+
+| # | Constat | Verdict | Suite |
+|---|---------|---------|-------|
+| E1 | Une mise à jour de `libc6` a relancé tous les services, VERA comprise (06:01) | Confirmé par le journal et `apt/history.log` | Règle `needrestart`, Partie 5 de la procédure ; non encore vue sur une vraie mise à jour |
+| E2 | Noyau et `libc6` en attente de redémarrage, 26 mises à jour | Confirmé | Appliqué le 15/11/2026 : serveur redémarré, noyau 7.0.0-43, vérificateur CONFORME |
+| E3 | `/openapi.json`, `/docs`, `/redoc` publics | Confirmé en ligne et en local | Corrigé (`docs_url=None`…), `test_documentation_api_absente.py` vérifié par mutation |
+| E4 | Pas de pare-feu sur la machine | Confirmé (`ufw` inactif) ; rien n'écoute hors 22/80/443 | Documenté ; pare-feu Hetzner non vérifié |
+| E5 | Copies de secrets hors de `vera.env` | Confirmé par empreintes : anciennes valeurs, et une copie de la clé actuelle | **Assumé par le mainteneur** : rien n'est changé, dit dans LIMITS.md §12 |
+| E6 | Une seule clé SSH, sur un seul appareil | Confirmé (phrase secrète retrouvée le jour même) | **Assumé par le mainteneur** : pas de seconde clé pour l'instant |
+
+**Soupçon écarté.** On avait cru lire une version de nginx dans l'en-tête `Server` (la
+directive `server_tokens` est absente du dépôt) : elle est posée dans `/etc/nginx/nginx.conf`
+et l'en-tête ne montre que « nginx ». Hors dépôt, donc non vérifiée par les tests.
+
+**Leçon de ce passage.** Le premier constat de fond (E1) ne se voyait ni dans le code ni
+dans les documents : il a fallu lire le journal de la machine. Un audit du seul dépôt aurait
+conclu à tort que tout était cohérent.

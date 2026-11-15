@@ -664,6 +664,47 @@ cd /root/repo-push && git push origin main
 que tourne le processus, et il le contrôle (dossier de travail, compte, droits). Lancé
 depuis l'autre dossier, il dit `ECART` sur le dossier de travail du processus — c'est voulu.
 
+## Partie 5 — Mises à jour du système
+
+**Pourquoi cette partie existe.** Les mises à jour de sécurité s'installent seules, et
+`needrestart` relançait alors tous les services, VERA comprise, à n'importe quelle heure
+(constaté le 15/11/2026, voir LIMITS.md §12). On a donc retiré à ces mises à jour le droit
+de relancer ce service ; la décision revient au mainteneur, hors consultation.
+
+### 5a. Installer la règle (une fois, sur chaque serveur)
+
+```
+cp /root/repo-push/infra/needrestart-vera.conf /etc/needrestart/conf.d/vera.conf
+needrestart -b 2>&1 | head -12
+```
+
+Aucune ligne « Error parsing » ne doit apparaître. Une règle fautive peut gêner les mises à
+jour : en cas d'erreur, `rm /etc/needrestart/conf.d/vera.conf` puis relire la règle.
+
+### 5b. Quand et comment mettre à jour
+
+À faire **quand aucune consultation n'est ouverte** (jamais entre l'ouverture des liens et
+la clôture), par exemple après chaque clôture :
+
+1. Vérifier que la base est vide de consultation (quatre compteurs à zéro) :
+   `python3 -c "import sqlite3;c=sqlite3.connect('file:/root/vera_state.db?mode=ro',uri=True);print([(t,c.execute('select count(*) from '+t).fetchone()[0]) for t in ('question_active','jetons_autorisation','tokens_consommes','compteurs_votes')])"`
+2. `DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confold" upgrade 2>&1 | tail -15`
+3. Si `ls /var/run/reboot-required` existe : `reboot`, attendre deux minutes, se reconnecter.
+   Sinon : `systemctl restart vera-consultation` (le service garde sinon l'ancienne bibliothèque).
+4. Vérifier : `systemctl is-active vera-consultation nginx ssh.socket`,
+   `curl -s https://vera-consultation.fr/api/health`, puis
+   `cd /root/repo-push && bash infra/verifier_deploiement.sh | tail -6` (attendu : CONFORME).
+
+Avant tout redémarrage de la machine, vérifier que `ssh.socket` est activé
+(`systemctl is-enabled ssh.socket`) : sur ce système, SSH est lancé par ce socket, pas par
+`ssh.service` (qui apparaît « disabled » à tort).
+
+### 5c. Voir ce que le serveur expose
+
+`bash infra/audit_exposition_serveur.sh 2>&1 | tee /root/audit_exposition_$(date -u +%Y%m%dT%H%M%SZ).txt`
+(lecture seule, secrets masqués). Les lignes « !! ECART » sont à traiter ; leur absence ne
+vaut pas conformité. À relancer après toute modification de nginx, de l'unité ou d'un port.
+
 ## Ce que cette procédure ne couvre toujours pas
 
 - **Une consultation active ne survit à la perte du serveur dans aucun des
@@ -679,6 +720,12 @@ depuis l'autre dossier, il dit `ECART` sur le dossier de travail du processus �
   tests hors d'une machine réelle — jamais par une reprise complète sur un
   vrai serveur neuf. Tant que ce test grandeur nature n'a pas eu lieu, la
   considérer comme sérieusement revue, pas comme une garantie.
+
+## Corrections apportées le 15/11/2026 (version 10)
+
+Audit d'exposition du serveur : nouvelle Partie 5 (mises à jour du système, règle
+`needrestart`, script d'audit). Constat à l'origine : une mise à jour de `libc6` avait
+relancé tous les services à 06:01, VERA comprise.
 
 ## Corrections apportées le 24/10/2026 (version 9)
 

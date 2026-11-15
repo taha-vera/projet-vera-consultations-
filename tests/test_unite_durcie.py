@@ -162,6 +162,21 @@ if ancienne.exists():
     verifier(migre == (t == code) or not migre,
              "7. infra/vera-consultation.service est soit l'ancienne unite, soit identique a la cible")
 
+# --- 8. La regle needrestart vise bien l'unite livree --------------------------------------------
+# Sans elle, une mise a jour de bibliotheque relance le service pendant une consultation
+# (constate le 15/11/2026). Une faute de nom la rendrait muette sans que rien ne le dise.
+regle = RACINE / "infra" / "needrestart-vera.conf"
+verifier(regle.exists(), "8a. infra/needrestart-vera.conf existe")
+if regle.exists():
+    lignes = [l for l in regle.read_text(encoding="utf-8").splitlines()
+              if l.strip() and not l.lstrip().startswith("#")]
+    import re as _re
+    motif = _re.search(r"qr\(\^(.+?)\$\)\}\s*=\s*0;", "\n".join(lignes))
+    nom = motif.group(1).replace("\\", "") if motif else None
+    verifier(len(lignes) == 1 and nom == "vera-consultation.service",
+             "8b. la regle differe le redemarrage automatique de vera-consultation.service",
+             f"lignes actives : {lignes!r}, nom lu : {nom!r}")
+
 print()
 if echecs:
     print(f"ECHEC : {len(echecs)} verification(s).\n")
